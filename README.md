@@ -39,9 +39,16 @@ requests Computer Use access to an app, the prototype displays the request and
 lets you allow or decline it.
 
 The app stores its Codex working directory under its Application Support folder.
-It shows the final Codex message and a short event log. Stop interrupts the
-current turn. The Codex session is tied to the app process and is not persisted
-by this prototype.
+It shows the final Codex message and a short in-app Activity list. **Reveal Log**
+opens the persistent JSONL diagnostic log for the current app launch in
+`~/Library/Application Support/VoiceComputerPOC/Logs/`. Each line has a timestamp,
+event name, and details. The log records entered commands, final results, server
+startup and exit, request IDs, Computer Use tool names and completion status,
+approval decisions, and error text. It does not record screenshots or full tool
+inputs and outputs. Logs stay on this Mac; they are not uploaded by the app.
+They may contain personal information from commands, results, app names, and
+errors, so review them before sharing. Stop interrupts the current turn. The
+Codex session is tied to the app process and is not persisted by this prototype.
 
 The current Computer Use connection can request approval more than once for an
 app, including during a sequence of clicks. When the request offers session

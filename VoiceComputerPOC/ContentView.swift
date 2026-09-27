@@ -82,7 +82,17 @@ struct ContentView: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Activity").font(.headline)
+                HStack {
+                    Text("Activity").font(.headline)
+                    Spacer()
+                    Button("Reveal Log") { client.revealLog() }
+                        .disabled(client.logURL == nil)
+                }
+                if !client.logError.isEmpty {
+                    Text(client.logError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 5) {

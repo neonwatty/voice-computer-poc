@@ -9,10 +9,13 @@ final class AppServerClient: ObservableObject {
     @Published private(set) var events: [String] = []
     @Published private(set) var spaceChangeCount = 0
     @Published private(set) var lastActivatedApp = "Unknown"
+    @Published private(set) var logError = ""
     @Published var approval: ApprovalRequest?
 
     private enum Pending {
         case initialize, models, thread, turn, interrupt
+
+        var name: String { String(describing: self) }
     }
 
     private var process: Process?
@@ -22,6 +25,8 @@ final class AppServerClient: ObservableObject {
     private var errorOutput: Pipe?
     private var outputBuffer = Data()
     private var errorBuffer = Data()
+    private var errorLineBuffer = Data()
+    private var errorLinesLogged = 0
     private var pending: [Int: Pending] = [:]
     private var nextID = 0
     private var threadID: String?
@@ -33,10 +38,23 @@ final class AppServerClient: ObservableObject {
     private var spaceCountAtTurnStart: Int?
     private var focusTargetBundleID: String?
     private var activatedBundleIDsThisTurn: Set<String> = []
+    private let diagnosticLog: DiagnosticLog?
+
+    var logURL: URL? { diagnosticLog?.fileURL }
 
     var canStop: Bool { isWorking }
 
     init() {
+        let logDirectory = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        )[0].appendingPathComponent("VoiceComputerPOC/Logs", isDirectory: true)
+        do {
+            diagnosticLog = try DiagnosticLog(directory: logDirectory)
+        } catch {
+            diagnosticLog = nil
+            logError = "Could not create diagnostic log: \(error.localizedDescription)"
+        }
+        record("app_started")
         let center = NSWorkspace.shared.notificationCenter
         lastActivatedApp = NSWorkspace.shared.frontmostApplication?.localizedName ?? "Unknown"
         spaceObserver = center.addObserver(
@@ -46,6 +64,7 @@ final class AppServerClient: ObservableObject {
         ) { [weak self] _ in
             self?.spaceChangeCount += 1
             self?.append("macOS reported an active Space change")
+            self?.record("space_changed", details: ["count": String(self?.spaceChangeCount ?? 0)])
         }
         activationObserver = center.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
@@ -56,6 +75,9 @@ final class AppServerClient: ObservableObject {
             self?.lastActivatedApp = frontmost?.localizedName ?? "Unknown"
             if let bundleID = frontmost?.bundleIdentifier {
                 self?.activatedBundleIDsThisTurn.insert(bundleID)
+                if self?.isWorking == true {
+                    self?.record("app_activated", details: ["bundle_id": bundleID])
+                }
             }
         }
     }
@@ -92,6 +114,7 @@ final class AppServerClient: ObservableObject {
             focusTargetBundleID = nil
         }
         append("Requested: \(phrase)")
+        record("command_started", details: ["phrase": phrase])
         if let threadID {
             startTurn(threadID: threadID)
         } else if process == nil {
@@ -103,6 +126,7 @@ final class AppServerClient: ObservableObject {
 
     func stop() {
         guard isWorking else { return }
+        record("stop_requested")
         if let threadID, let turnID {
             _ = send(
                 "turn/interrupt", params: ["threadId": threadID, "turnId": turnID], pendingKind: .interrupt)
@@ -120,6 +144,11 @@ final class AppServerClient: ObservableObject {
         sendRaw(request.response(allow: allow, forSession: forSession))
         let decision = allow ? (forSession ? "Allowed for session" : "Allowed once") : "Declined"
         append("\(decision): \(request.detail)")
+        record(
+            "approval_decided",
+            details: [
+                "request_id": String(request.id), "decision": decision, "detail": request.detail,
+            ])
         approval = queuedApprovals.isEmpty ? nil : queuedApprovals.removeFirst()
         if approval == nil && isWorking { status = "Codex is working…" }
     }
@@ -188,6 +217,11 @@ final class AppServerClient: ObservableObject {
             try task.run()
             status = "Connecting to Codex…"
             append("Started codex app-server")
+            record(
+                "server_started",
+                details: [
+                    "executable": executable, "pid": String(task.processIdentifier),
+                ])
             _ = send(
                 "initialize",
                 params: [
@@ -220,6 +254,7 @@ final class AppServerClient: ObservableObject {
         instruction += " User request: \(phrase)"
         status = "Codex is working…"
         append("Sent phrase to Codex")
+        record("turn_requested", details: ["thread_id": threadID])
         _ = send(
             "turn/start",
             params: [
@@ -233,6 +268,7 @@ final class AppServerClient: ObservableObject {
         nextID += 1
         let id = nextID
         pending[id] = pendingKind
+        record("rpc_sent", details: ["id": String(id), "method": method])
         sendRaw(["id": id, "method": method, "params": params])
         return id
     }
@@ -258,6 +294,7 @@ final class AppServerClient: ObservableObject {
                 let message = object as? [String: Any]
             else {
                 append("Received an unreadable app-server message")
+                record("unreadable_server_message")
                 continue
             }
             handle(message)
@@ -268,6 +305,21 @@ final class AppServerClient: ObservableObject {
         guard !data.isEmpty else { return }
         errorBuffer.append(data)
         if errorBuffer.count > 4_000 { errorBuffer.removeFirst(errorBuffer.count - 4_000) }
+        errorLineBuffer.append(data)
+        while let newline = errorLineBuffer.firstIndex(of: 0x0A) {
+            let line = errorLineBuffer.prefix(upTo: newline)
+            errorLineBuffer.removeSubrange(...newline)
+            if errorLinesLogged < 200 {
+                record("server_stderr", details: ["line": String(decoding: line, as: UTF8.self)])
+                errorLinesLogged += 1
+            } else if errorLinesLogged == 200 {
+                record("server_stderr_limit_reached")
+                errorLinesLogged += 1
+            }
+        }
+        if errorLineBuffer.count > 4_000 {
+            errorLineBuffer.removeFirst(errorLineBuffer.count - 4_000)
+        }
     }
 
     private func handle(_ message: [String: Any]) {
@@ -287,9 +339,16 @@ final class AppServerClient: ObservableObject {
     private func handleResponse(id: Int, message: [String: Any]) {
         guard let kind = pending.removeValue(forKey: id) else { return }
         if let error = message["error"] as? [String: Any] {
+            record(
+                "rpc_failed",
+                details: [
+                    "id": String(id), "method": kind.name,
+                    "error": error["message"] as? String ?? "Unknown error",
+                ])
             fail("Codex request failed: \(error["message"] as? String ?? "Unknown error")")
             return
         }
+        record("rpc_completed", details: ["id": String(id), "method": kind.name])
         let payload = message["result"] as? [String: Any] ?? [:]
         switch kind {
         case .initialize:
@@ -328,6 +387,7 @@ final class AppServerClient: ObservableObject {
         case .turn:
             if let turn = payload["turn"] as? [String: Any] {
                 turnID = turn["id"] as? String
+                record("turn_started", details: ["turn_id": turnID ?? "unknown"])
             }
         case .interrupt:
             append("Stop requested")
@@ -339,9 +399,16 @@ final class AppServerClient: ObservableObject {
             if approval == nil { approval = request } else { queuedApprovals.append(request) }
             status = "Waiting for your approval"
             append("Approval needed: \(request.detail)")
+            record(
+                "approval_requested",
+                details: [
+                    "request_id": String(id), "detail": request.detail,
+                    "session_grant_available": String(request.supportsSessionGrant),
+                ])
         } else {
             sendRaw(["id": id, "error": ["code": -32601, "message": "Unsupported request in prototype"]])
             append("Unsupported server request: \(method)")
+            record("unsupported_server_request", details: ["method": method])
         }
     }
 
@@ -352,18 +419,35 @@ final class AppServerClient: ObservableObject {
             let server = item["server"] as? String ?? "tool"
             let tool = item["tool"] as? String ?? "call"
             append("Using \(server).\(tool)")
+            record(
+                "tool_started",
+                details: [
+                    "item_id": item["id"] as? String ?? "unknown",
+                    "server": server, "tool": tool,
+                ])
         } else if method == "item/completed", let item = params["item"] as? [String: Any] {
             if item["type"] as? String == "agentMessage", let text = item["text"] as? String, !text.isEmpty {
                 result = text
-            } else if item["type"] as? String == "mcpToolCall", item["status"] as? String == "failed" {
+            } else if item["type"] as? String == "mcpToolCall" {
                 let directError = (item["error"] as? [String: Any])?["message"] as? String
                 let toolResult = item["result"] as? [String: Any]
                 let content = toolResult?["content"] as? [[String: Any]]
                 let resultError = content?.compactMap { $0["text"] as? String }.first
                 let detail = directError ?? resultError
-                append(
-                    detail.map { "Computer Use tool call failed: \(String($0.prefix(500)))" }
-                        ?? "Computer Use tool call failed")
+                let status = item["status"] as? String ?? "unknown"
+                var fields = [
+                    "item_id": item["id"] as? String ?? "unknown",
+                    "server": item["server"] as? String ?? "tool",
+                    "tool": item["tool"] as? String ?? "call",
+                    "status": status,
+                ]
+                if status == "failed" {
+                    fields["error"] = detail ?? "Unknown tool error"
+                    append(
+                        detail.map { "Computer Use tool call failed: \(String($0.prefix(500)))" }
+                            ?? "Computer Use tool call failed")
+                }
+                record("tool_completed", details: fields)
             }
         } else if method == "turn/completed" {
             let turn = params["turn"] as? [String: Any] ?? [:]
@@ -390,6 +474,14 @@ final class AppServerClient: ObservableObject {
                 result =
                     "Computer Use inspected the app window, but macOS did not report the requested app becoming active. Foreground focus is unverified."
             }
+            record(
+                "turn_completed",
+                details: [
+                    "turn_id": turnID ?? "unknown", "status": outcome, "result": result,
+                    "frontmost_app": lastActivatedApp,
+                    "activated_bundle_ids": activatedBundleIDsThisTurn.sorted().joined(separator: ","),
+                    "space_change_count": String(spaceChangeCount),
+                ])
             focusTargetBundleID = nil
             activatedBundleIDsThisTurn.removeAll()
             isWorking = false
@@ -405,6 +497,10 @@ final class AppServerClient: ObservableObject {
     private func serverEnded(exitCode: Int32) {
         let details =
             String(data: errorBuffer, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !errorLineBuffer.isEmpty && errorLinesLogged < 200 {
+            record("server_stderr", details: ["line": String(decoding: errorLineBuffer, as: UTF8.self)])
+        }
+        record("server_exited", details: ["exit_code": String(exitCode), "stderr_tail": details])
         cleanupProcess()
         if isWorking {
             fail("Codex app-server exited (\(exitCode)). \(details.suffix(500))")
@@ -426,9 +522,14 @@ final class AppServerClient: ObservableObject {
         pending.removeAll()
         approval = nil
         queuedApprovals.removeAll()
+        outputBuffer.removeAll()
+        errorBuffer.removeAll()
+        errorLineBuffer.removeAll()
+        errorLinesLogged = 0
     }
 
     private func fail(_ message: String) {
+        record("app_error", details: ["message": message])
         status = "Error"
         result = message
         append(message)
@@ -442,6 +543,20 @@ final class AppServerClient: ObservableObject {
     private func append(_ event: String) {
         let stamp = Date().formatted(date: .omitted, time: .shortened)
         events.append("\(stamp)  \(event)")
+        record("activity", details: ["message": event])
         if events.count > 60 { events.removeFirst(events.count - 60) }
+    }
+
+    func revealLog() {
+        guard let logURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([logURL])
+    }
+
+    private func record(_ event: String, details: [String: String] = [:]) {
+        do {
+            try diagnosticLog?.record(event, details: details)
+        } catch {
+            logError = "Could not write diagnostic log: \(error.localizedDescription)"
+        }
     }
 }
