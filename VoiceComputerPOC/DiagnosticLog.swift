@@ -25,7 +25,8 @@ final class DiagnosticLog {
 
     deinit { try? handle.close() }
 
-    func record(_ event: String, details: [String: String] = [:]) throws {
+    @discardableResult
+    func record(_ event: String, details: [String: String] = [:]) throws -> Entry {
         let entry = Entry(
             timestamp: timestampFormatter.string(from: Date()),
             event: event,
@@ -34,9 +35,10 @@ final class DiagnosticLog {
         var data = try encoder.encode(entry)
         data.append(0x0A)
         try handle.write(contentsOf: data)
+        return entry
     }
 
-    private struct Entry: Encodable {
+    struct Entry: Encodable {
         let timestamp: String
         let event: String
         let details: [String: String]

@@ -3,6 +3,12 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var client: AppServerClient
     @State private var phrase = ""
+    @State private var activityTab: ActivityTab = .activity
+
+    private enum ActivityTab: String, CaseIterable {
+        case activity = "Activity"
+        case diagnostics = "Diagnostic Log"
+    }
 
     private let samples = [
         "Open Calculator",
@@ -51,64 +57,98 @@ struct ContentView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Try a phrase").font(.headline)
-                ForEach(samples, id: \.self) { sample in
-                    Button(sample) { phrase = sample }
-                        .buttonStyle(.borderless)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Result").font(.headline)
-                ScrollView {
-                    if client.result.isEmpty {
-                        Text("Codex's result will appear here.")
-                            .foregroundStyle(.secondary)
+            if activityTab == .activity {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Try a phrase").font(.headline)
+                    ForEach(samples, id: \.self) { sample in
+                        Button(sample) { phrase = sample }
+                            .buttonStyle(.borderless)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                    } else {
-                        Text(
-                            (try? AttributedString(markdown: client.result))
-                                ?? AttributedString(client.result)
-                        )
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
                     }
                 }
-                .frame(height: 90)
-                .padding(10)
-                .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Result").font(.headline)
+                    ScrollView {
+                        if client.result.isEmpty {
+                            Text("Codex's result will appear here.")
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            Text(
+                                (try? AttributedString(markdown: client.result))
+                                    ?? AttributedString(client.result)
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                        }
+                    }
+                    .frame(height: 90)
+                    .padding(10)
+                    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+                }
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Activity").font(.headline)
+                    Picker("Activity view", selection: $activityTab) {
+                        ForEach(ActivityTab.allCases, id: \.self) { tab in
+                            Text(tab.rawValue).tag(tab)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 280)
                     Spacer()
-                    Button("Reveal Log") { client.revealLog() }
-                        .disabled(client.logURL == nil)
+                    if activityTab == .diagnostics {
+                        Button("Show File") { client.revealLog() }
+                            .disabled(client.logURL == nil)
+                    }
                 }
                 if !client.logError.isEmpty {
                     Text(client.logError)
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 5) {
-                            ForEach(Array(client.events.enumerated()), id: \.offset) { index, event in
-                                Text(event)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .id(index)
+                Group {
+                    if activityTab == .activity {
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 5) {
+                                    ForEach(Array(client.events.enumerated()), id: \.offset) { index, event in
+                                        Text(event)
+                                            .font(.system(.caption, design: .monospaced))
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .id(index)
+                                    }
+                                }
+                            }
+                            .onChange(of: client.events.count) { _, count in
+                                if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) }
+                            }
+                        }
+                    } else {
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 3) {
+                                    ForEach(Array(client.diagnosticEntries.enumerated()), id: \.offset) {
+                                        index, entry in
+                                        DiagnosticRow(entry: entry)
+                                            .id(index)
+                                    }
+                                }
+                            }
+                            .onAppear {
+                                if !client.diagnosticEntries.isEmpty {
+                                    proxy.scrollTo(client.diagnosticEntries.count - 1, anchor: .bottom)
+                                }
+                            }
+                            .onChange(of: client.diagnosticEntries.count) { _, count in
+                                if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) }
                             }
                         }
                     }
-                    .onChange(of: client.events.count) { _, count in
-                        if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) }
-                    }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(10)
                 .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
             }
@@ -140,4 +180,28 @@ struct ContentView: View {
     }
 
     private func run() { client.run(phrase) }
+}
+
+private struct DiagnosticRow: View {
+    let entry: DiagnosticLog.Entry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(entry.timestamp)
+                    .foregroundStyle(.secondary)
+                Text(entry.event)
+                    .fontWeight(.semibold)
+            }
+            ForEach(entry.details.keys.sorted(), id: \.self) { key in
+                Text("\(key): \(entry.details[key] ?? "")")
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+        .font(.system(.caption, design: .monospaced))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
+        .overlay(alignment: .bottom) { Divider() }
+    }
 }
