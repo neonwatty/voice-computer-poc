@@ -11,7 +11,7 @@ not record audio or perform transcription.
 
 Requirements: macOS 14+, Xcode, a signed-in Codex CLI, and a working
 Computer Use installation. The app looks for `codex` in `~/.local/bin`,
-`/opt/homebrew/bin`, and `/usr/local/bin`.
+the installed Codex or ChatGPT app, `/opt/homebrew/bin`, and `/usr/local/bin`.
 
 ```sh
 git clone https://github.com/neonwatty/voice-computer-poc.git

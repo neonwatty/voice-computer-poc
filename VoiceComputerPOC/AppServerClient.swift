@@ -128,11 +128,13 @@ final class AppServerClient: ObservableObject {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let candidates = [
             home.appendingPathComponent(".local/bin/codex").path,
+            "/Applications/Codex.app/Contents/Resources/codex",
+            "/Applications/ChatGPT.app/Contents/Resources/codex",
             "/opt/homebrew/bin/codex",
             "/usr/local/bin/codex",
         ]
         guard let executable = candidates.first(where: FileManager.default.isExecutableFile(atPath:)) else {
-            fail("Codex CLI was not found in ~/.local/bin, /opt/homebrew/bin, or /usr/local/bin.")
+            fail("Codex CLI was not found in ~/.local/bin, an installed app, or Homebrew.")
             return
         }
 
