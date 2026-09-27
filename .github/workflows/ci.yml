@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pinned XcodeGen
+        run: |
+          binary="$(scripts/install-xcodegen.sh | tail -1)"
+          echo "XCODEGEN_BIN=$binary" >> "$GITHUB_ENV"
+      - name: Check generated Xcode project
+        run: |
+          "$XCODEGEN_BIN" generate --spec project.yml
+          git diff --exit-code -- VoiceComputerPOC.xcodeproj
+      - name: Check Swift formatting
+        run: xcrun swift-format lint --strict --recursive VoiceComputerPOC VoiceComputerPOCTests
+      - name: Build and run unit tests
+        run: |
+          xcodebuild -quiet \
+            -project VoiceComputerPOC.xcodeproj \
+            -scheme VoiceComputerPOC \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath DerivedData \
+            test CODE_SIGNING_ALLOWED=NO

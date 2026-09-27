@@ -1,0 +1,33 @@
+name: VoiceComputerPOC
+options:
+  bundleIdPrefix: com.neonwatty
+targets:
+  VoiceComputerPOC:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - VoiceComputerPOC
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.neonwatty.VoiceComputerPOC
+        PRODUCT_NAME: VoiceComputerPOC
+        SWIFT_VERSION: 5.0
+        SWIFT_STRICT_CONCURRENCY: minimal
+        CODE_SIGNING_ALLOWED: NO
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Voice Computer POC
+  VoiceComputerPOCTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - VoiceComputerPOCTests
+    dependencies:
+      - target: VoiceComputerPOC
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.neonwatty.VoiceComputerPOCTests
+        SWIFT_VERSION: 5.0
+        CODE_SIGNING_ALLOWED: NO
+        GENERATE_INFOPLIST_FILE: YES

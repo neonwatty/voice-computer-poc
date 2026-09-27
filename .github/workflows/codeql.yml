@@ -1,0 +1,50 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze Swift
+    runs-on: macos-26
+    timeout-minutes: 35
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pinned XcodeGen
+        run: |
+          binary="$(scripts/install-xcodegen.sh | tail -1)"
+          echo "XCODEGEN_BIN=$binary" >> "$GITHUB_ENV"
+      - name: Generate Xcode project
+        run: |
+          "$XCODEGEN_BIN" generate --spec project.yml
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        with:
+          languages: swift
+          build-mode: manual
+          queries: security-extended
+      - name: Build for analysis
+        run: |
+          xcodebuild -quiet \
+            -project VoiceComputerPOC.xcodeproj \
+            -scheme VoiceComputerPOC \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath DerivedData \
+            build CODE_SIGNING_ALLOWED=NO
+      - name: Analyze
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
