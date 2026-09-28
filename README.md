@@ -84,27 +84,41 @@ shortcuts. The activity log includes available tool error text for diagnostics.
 ## Interactive smoke test
 
 For repeatable interactive checks on a Mac, the bounded driver in
-`scripts/smoke_app_server.py` runs six explicit Computer Use
-commands through the same local app-server protocol. It writes a private JSONL
-receipt and prints each result. Select one command with `--case 1` through
-`--case 6`; omit `--case` to run all six. The last two commands check the app's
-in-window Diagnostic Log and one full Calculator run through the app.
+`scripts/smoke_app_server.py` runs six default Computer Use commands through
+the same local app-server protocol. It writes a private JSONL receipt and prints
+each result. Select one command with `--case 1` through `--case 8`; omit
+`--case` to run the original six. Cases 5 and 6 check the app's in-window
+Diagnostic Log and one full Calculator run through the app.
 
 ```sh
 python3 scripts/smoke_app_server.py \
   --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/manual-$(date +%s).jsonl"
 ```
 
+Cases 7 and 8 explicitly test right and left desktop Space shortcuts. They
+require an adjacent Space and compare the main display's current Space ID before
+and after the command. Run right before left when starting on the first Space:
+
+```sh
+python3 scripts/smoke_app_server.py --case 7 --case 8 \
+  --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/spaces-$(date +%s).jsonl"
+```
+
+Add `--trace-tool-output` only when diagnosing a failure. It stores up to 3,000
+characters of each tool call's input and text output in the private receipt;
+those excerpts may contain visible desktop text. The normal receipt omits them.
+
 The driver automatically grants **session** Computer Use access only to the app
 named by the selected test case, for that test session. It declines other apps
 and stops if the agent asks for one. Each command is
 limited to 12 tool calls and 180 seconds, except the full app run can use up to
-24 tool calls. The first four cases check the backend path; they do not test
-the app's approval sheet or in-window log viewer. The receipt contains
-commands, responses, errors, and app names, so review it before sharing. A
+24 tool calls. The first four and the two Space cases check the backend path;
+they do not test the app's approval sheet or in-window log viewer. The receipt
+contains commands, responses, errors, and app names, so review it before sharing. A
 preflight check stops the test if the macOS console is locked; Computer Use
-cannot inspect app windows while the desktop session is locked. All six checks
-passed on the unlocked MacBook Air; results are in [PLAN.md](PLAN.md).
+cannot inspect app windows while the desktop session is locked. The original six
+checks passed on the unlocked MacBook Air. The rightward Space case has not
+passed there; results are in [PLAN.md](PLAN.md).
 
 ## Scope
 
