@@ -39,8 +39,9 @@ requests Computer Use access to an app, the prototype displays the request and
 lets you allow or decline it.
 
 The app stores its Codex working directory under its Application Support folder.
-It shows the final Codex message and a short in-app Activity list. **Reveal Log**
-opens the persistent JSONL diagnostic log for the current app launch in
+It shows the final Codex message, a short Activity list, and a live **Diagnostic
+Log** tab in the same window. **Show File** reveals the persistent JSONL log for
+the current app launch in
 `~/Library/Application Support/VoiceComputerPOC/Logs/`. Each line has a timestamp,
 event name, and details. The log records entered commands, final results, server
 startup and exit, request IDs, Computer Use tool names and completion status,

@@ -7,6 +7,7 @@ final class AppServerClient: ObservableObject {
     @Published private(set) var isWorking = false
     @Published private(set) var result = ""
     @Published private(set) var events: [String] = []
+    @Published private(set) var diagnosticEntries: [DiagnosticLog.Entry] = []
     @Published private(set) var spaceChangeCount = 0
     @Published private(set) var lastActivatedApp = "Unknown"
     @Published private(set) var logError = ""
@@ -553,8 +554,9 @@ final class AppServerClient: ObservableObject {
     }
 
     private func record(_ event: String, details: [String: String] = [:]) {
+        guard let diagnosticLog else { return }
         do {
-            try diagnosticLog?.record(event, details: details)
+            diagnosticEntries.append(try diagnosticLog.record(event, details: details))
         } catch {
             logError = "Could not write diagnostic log: \(error.localizedDescription)"
         }
