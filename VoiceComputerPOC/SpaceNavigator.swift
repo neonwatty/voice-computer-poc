@@ -107,11 +107,17 @@ enum SpaceNavigator {
             let arrowUp = CGEvent(keyboardEventSource: source, virtualKey: arrow, keyDown: false),
             let controlUp = CGEvent(keyboardEventSource: source, virtualKey: 59, keyDown: false)
         else { throw SpaceNavigatorError.eventCreationFailed }
+        controlDown.type = .flagsChanged
+        controlUp.type = .flagsChanged
         controlDown.flags = .maskControl
         arrowDown.flags = .maskControl
         arrowUp.flags = .maskControl
-        for event in [controlDown, arrowDown, arrowUp, controlUp] {
-            event.post(tap: .cghidEventTap)
-        }
+        controlDown.post(tap: .cghidEventTap)
+        Thread.sleep(forTimeInterval: 0.05)
+        arrowDown.post(tap: .cghidEventTap)
+        Thread.sleep(forTimeInterval: 0.05)
+        arrowUp.post(tap: .cghidEventTap)
+        Thread.sleep(forTimeInterval: 0.1)
+        controlUp.post(tap: .cghidEventTap)
     }
 }

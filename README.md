@@ -135,7 +135,8 @@ contains commands, responses, errors, and app names, so review it before sharing
 preflight check stops the test if the macOS console is locked; Computer Use
 cannot inspect app windows while the desktop session is locked. The original six
 checks passed on the unlocked MacBook Air. The rightward Space case has not
-passed there; results are in [PLAN.md](PLAN.md).
+passed there, including after the app received Accessibility permission;
+results are in [PLAN.md](PLAN.md).
 
 ## Scope
 

@@ -85,18 +85,23 @@ The app writes the source, target, resulting ID, event count, and verification
 status to its in-window and private JSONL diagnostics.
 
 The first rightward run on the Air reached the native route but macOS denied
-permission to post keyboard events. The app logged `native_space_requested`
-from ID 3 to ID 4, then `native_space_finished` with `status: failed` and
-`verification: unverified` after 71 ms. No Space change occurred. The native
-right and round-trip behavior remains unverified until the app receives the
-macOS permission and the cases are rerun.
+permission to post keyboard events. After Accessibility permission was granted
+and the app restarted, the permission check passed. We tested direct event
+posting, Control modifier `flagsChanged` events, and a delayed Control release.
+All three runs posted the shortcut, but Space ID 3 remained current, ID 4 was
+not reached, and the app observed zero active-Space-change notifications. The
+round-trip command stopped after its first, unverified rightward step. Its
+diagnostic log reported `native_space_finished` with `status: unverified`,
+`space_after_id: 3`, and `space_change_events: 0`. The Air's physical
+Control-Right shortcut is the next baseline to check.
 
 ## What to test next
 
-1. Grant Voice Computer POC macOS permission to post keyboard events on the Air,
-   then run the native right and right-then-left smoke cases. Current Computer
-   Use reliably inspects and interacts with Calculator, TextEdit, and the
-   resolved Chrome instance, but did not produce an observed Space change.
+1. Check whether physical Control-Right and Control-Left switch Spaces on the
+   Air. If they do, investigate a supported macOS event or UI path that the
+   system accepts and verify each move independently. Current Computer Use
+   reliably inspects and interacts with Calculator, TextEdit, and the resolved
+   Chrome instance, but did not produce an observed Space change.
 2. Decide how Codex should select the native action beyond the three explicit
    prototype phrases while keeping its scope narrow and verifiable.
 3. Replace the machine-specific Computer Use dependency with a documented
