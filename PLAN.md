@@ -92,16 +92,28 @@ All three runs posted the shortcut, but Space ID 3 remained current, ID 4 was
 not reached, and the app observed zero active-Space-change notifications. The
 round-trip command stopped after its first, unverified rightward step. Its
 diagnostic log reported `native_space_finished` with `status: unverified`,
-`space_after_id: 3`, and `space_change_events: 0`. The Air's physical
-Control-Right shortcut is the next baseline to check.
+`space_after_id: 3`, and `space_change_events: 0`. The user confirmed that
+physical Control-Right and Control-Left switch Spaces on this Air. We then
+tried posting through the session event tap while Voice Computer POC was
+frontmost; the result was still ID 3 and zero change notifications. A separate
+System Events command stalled without a result and was stopped. These results
+isolate the problem to software control on this machine, not the configured
+keyboard shortcut.
+
+Two bounded Computer Use Mission Control probes also failed. Targeting the
+Mission Control app timed out twice without exposing a window. Targeting Finder
+and sending F3 did not show Mission Control; `fn+F3` was rejected as an
+unsupported key. Neither probe clicked a Space, and both independently read
+ID 3 afterward. The private receipts are in the Air's `SmokeLogs` directory.
 
 ## What to test next
 
-1. Check whether physical Control-Right and Control-Left switch Spaces on the
-   Air. If they do, investigate a supported macOS event or UI path that the
-   system accepts and verify each move independently. Current Computer Use
-   reliably inspects and interacts with Calculator, TextEdit, and the resolved
-   Chrome instance, but did not produce an observed Space change.
+1. Investigate a different macOS control path for Spaces, such as a scoped
+   Accessibility interaction with Mission Control or a user-approved System
+   Events path. Verify the rightward move and the return separately on the Air
+   before calling either route supported. Current Computer Use reliably
+   inspects and interacts with Calculator, TextEdit, and the resolved Chrome
+   instance, but did not produce an observed Space change.
 2. Decide how Codex should select the native action beyond the three explicit
    prototype phrases while keeping its scope narrow and verifiable.
 3. Replace the machine-specific Computer Use dependency with a documented

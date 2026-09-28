@@ -32,8 +32,10 @@ COMMANDS = [
     "Switch one desktop Space to the left using Control-Left Arrow, then report whether the desktop changed. Use Finder only if Computer Use needs an app target. Do not create or remove Spaces.",
     'In Voice Computer POC, enter "Switch to the next desktop Space" in the command field and click Run. Wait for its result, then inspect Diagnostic Log for native_space_finished. Report the app result. Do not control other apps.',
     'In Voice Computer POC, enter "Switch one desktop Space right and then back left" in the command field and click Run. Wait for its result, then inspect Diagnostic Log for two native_space_step_verified entries and native_space_finished with verification verified. Report the app result. Do not control other apps.',
+    "Use Computer Use with Mission Control as the only app target. Begin with cua.getApp('Mission Control'), then inspect its UI and click the desktop Space immediately to the right of the current one if available. Do not access Voice Computer POC or other apps. Do not send Control-Right or use shell commands or AppleScript. Do not create or remove Spaces. Report whether the desktop changed.",
+    "Use Finder as the only Computer Use app target. Press F3 to show Mission Control, inspect the resulting UI, and click the desktop Space immediately to the right of the current one if its thumbnail is available. Do not send Control-Right or use shell commands or AppleScript. Do not create or remove Spaces or access unrelated apps. Report whether the desktop changed.",
 ]
-CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC"]
+CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Mission Control", "Finder"]
 EXPECTED_EVIDENCE = [
     re.compile(r"Window:.*Safari|standard window.*Safari", re.IGNORECASE),
     re.compile(r"(?<!\d)63(?!\d)"),
@@ -45,6 +47,8 @@ EXPECTED_EVIDENCE = [
     None,
     re.compile(r"native_space_finished"),
     re.compile(r"native_space_step_verified"),
+    None,
+    None,
 ]
 INSTRUCTION = (
     "This prototype is for reversible, low-impact desktop tests. For other requests, "
@@ -332,14 +336,14 @@ def main():
         }))["thread"]["id"]
         for index in args.case or range(1, 7):
             phrase = COMMANDS[index - 1]
-            space_before = space_state() if index in (7, 8, 9, 10) else None
+            space_before = space_state() if index in (7, 8, 9, 10, 11, 12) else None
             expected_space = None
-            if index in (7, 8, 9, 10):
+            if index in (7, 8, 9, 10, 11, 12):
                 if space_before is None:
                     raise RuntimeError("Cannot read current desktop Space before case %s" % index)
                 ordered = space_before["ordered"]
                 position = ordered.index(space_before["current"])
-                destination = position + (1 if index in (7, 9, 10) else -1)
+                destination = position + (1 if index in (7, 9, 10, 11, 12) else -1)
                 if not 0 <= destination < len(ordered):
                     driver.command_index = index
                     driver.record("command_skipped", reason="No adjacent desktop Space",

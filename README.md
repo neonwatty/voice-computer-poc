@@ -121,6 +121,10 @@ python3 scripts/smoke_app_server.py --case 10 --case 9 \
   --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/native-spaces-$(date +%s).jsonl"
 ```
 
+Cases 11 and 12 probe Mission Control through Computer Use, first as its own
+app target and then through Finder's F3 key. They independently check the
+resulting Space ID. Both probes failed on the Air; see [PLAN.md](PLAN.md).
+
 Add `--trace-tool-output` only when diagnosing a failure. It stores up to 3,000
 characters of each tool call's input and text output in the private receipt;
 those excerpts may contain visible desktop text. The normal receipt omits them.
