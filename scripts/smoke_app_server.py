@@ -377,6 +377,9 @@ def main():
             ) is not None
             verified = (space_after is not None and space_after["current"] == expected_space
                         if expected_space is not None else bool(driver.evidence_matches))
+            if index == 9:
+                verified = (verified and bool(driver.evidence_matches)
+                            and "Switched one desktop Space to the right" in driver.last_result)
             if index == 10:
                 verified = (verified and bool(driver.evidence_matches)
                             and "returned left to the original Space" in driver.last_result)

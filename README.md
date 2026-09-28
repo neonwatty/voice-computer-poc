@@ -112,11 +112,12 @@ python3 scripts/smoke_app_server.py --case 7 --case 8 \
   --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/spaces-$(date +%s).jsonl"
 ```
 
-Cases 9 and 10 run the native action through the app, including a right-and-back
-round trip. They require macOS permission for the app to post keyboard events:
+Cases 9 and 10 run the native action through the app. Case 10 makes a
+right-and-back round trip, so run it before case 9 when starting on the first
+Space. They require macOS permission for the app to post keyboard events:
 
 ```sh
-python3 scripts/smoke_app_server.py --case 9 --case 10 \
+python3 scripts/smoke_app_server.py --case 10 --case 9 \
   --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/native-spaces-$(date +%s).jsonl"
 ```
 
