@@ -3,7 +3,7 @@
 
 This tests the same app-server protocol as the Mac app without requiring remote
 screen-control credentials. It approves only Computer Use requests for the
-allowlisted apps below and writes a local JSONL diagnostic receipt.
+app named by the selected case and writes a local JSONL diagnostic receipt.
 """
 
 import argparse
@@ -28,7 +28,7 @@ COMMANDS = [
     'In Voice Computer POC, type "For this log test, reply with one sentence and do not use computer controls." into the command field and click Run. Wait for the result, then open Diagnostic Log and verify that command_started and command_finished are visible. Do not control other apps.',
     'In Voice Computer POC, replace its command field with "In Calculator, enter 4 + 5 = and verify the displayed result is 9", then click Run. If Voice Computer POC shows a Computer Use approval for Calculator, choose Allow for session. Wait for the app result, open Diagnostic Log, and verify that command_started, tool_completed, and command_finished are visible. Do not control other apps.',
 ]
-ALLOWED_APPS = {"Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC"}
+CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC"]
 EXPECTED_EVIDENCE = [
     re.compile(r"Window:.*Safari|standard window.*Safari", re.IGNORECASE),
     re.compile(r"(?<!\d)63(?!\d)"),
@@ -173,7 +173,8 @@ class Driver:
             and params.get("mode") == "form"
             and meta.get("connector_id") == "computer-use"
             and not ((params.get("requestedSchema") or {}).get("properties") or {})
-            and app in ALLOWED_APPS
+            and self.command_index is not None
+            and app == CASE_APP[self.command_index - 1]
         )
         self.approvals.append({"app": app, "allowed": allowed})
         self.record("approval_requested", app=app, action=meta.get("tool_name"), allowed=allowed)

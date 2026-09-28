@@ -95,9 +95,9 @@ python3 scripts/smoke_app_server.py \
   --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/manual-$(date +%s).jsonl"
 ```
 
-The driver automatically grants **session** Computer Use access to Safari,
-Calculator, TextEdit, Finder, and Voice Computer POC for that test session only.
-It declines other apps and stops if the agent asks for one. Each command is
+The driver automatically grants **session** Computer Use access only to the app
+named by the selected test case, for that test session. It declines other apps
+and stops if the agent asks for one. Each command is
 limited to 12 tool calls and 180 seconds, except the full app run can use up to
 24 tool calls. The first four cases check the backend path; they do not test
 the app's approval sheet or in-window log viewer. The receipt contains
