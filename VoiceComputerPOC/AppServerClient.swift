@@ -161,6 +161,15 @@ final class AppServerClient: ObservableObject {
     func stop() {
         guard isWorking else { return }
         record("stop_requested")
+        if queuedPhrase?.lowercased() == "inspect mission control desktop controls" {
+            status = "Stopped"
+            result = "Stopped the Mission Control inspection."
+            record("mission_control_probe_stopped")
+            queuedPhrase = nil
+            isWorking = false
+            finishCommand()
+            return
+        }
         if nativeSpacePollTimer != nil || queuedPhrase.flatMap({ SpaceCommand(phrase: $0) }) != nil {
             nativeSpacePollTimer?.invalidate()
             nativeSpacePollTimer = nil
@@ -186,6 +195,14 @@ final class AppServerClient: ObservableObject {
     private func runNativeSpaceStep(
         _ direction: SpaceDirection, remaining: [SpaceDirection], roundTripOrigin: Int?
     ) {
+        guard MissionControlAXProbe.isTrusted else {
+            record("native_space_permission_missing")
+            completeNativeSpace(
+                status: "failed", verification: "unverified",
+                message: MissionControlAXError.permissionRequired.localizedDescription,
+                details: ["direction": direction.rawValue])
+            return
+        }
         guard let before = SpaceNavigator.snapshot() else {
             completeNativeSpace(
                 status: "failed", verification: "unverified",

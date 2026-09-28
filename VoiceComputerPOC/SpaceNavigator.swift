@@ -132,8 +132,10 @@ enum MissionControlAXError: LocalizedError {
 }
 
 enum MissionControlAXProbe {
+    static var isTrusted: Bool { AXIsProcessTrusted() }
+
     static func pressDesktop(number: Int, expectedCount: Int) throws {
-        guard AXIsProcessTrusted() else { throw MissionControlAXError.permissionRequired }
+        guard isTrusted else { throw MissionControlAXError.permissionRequired }
         guard
             let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock")
                 .first
