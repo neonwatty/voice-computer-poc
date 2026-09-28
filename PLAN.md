@@ -25,6 +25,24 @@ background listening.
 | Switch desktop Space | macOS reports an active Space change | Failed in both directions: macOS reported no change. This Mac has six configured Spaces, the current one was the first, and left/right Space shortcuts were enabled. A direct `Control-Right` through Computer Use also left the current Space unchanged. |
 | Open TextEdit | TextEdit opens with an empty document | Passed through the app; blank `Untitled 2` window independently checked |
 
+## MacBook Air smoke run, September 27, 2026
+
+The next explicit commands were queued on the MacBook Air through a bounded
+app-server smoke driver: open Safari; calculate `9 × 7 =` in Calculator; create
+an unsaved TextEdit document with a known phrase; and foreground Finder. None
+could be verified in this run. Computer Use returned `cgWindowNotFound` for
+Safari, Calculator, TextEdit, and Finder. The first driver revision also
+declined Finder access during recovery, which was a test-driver restriction
+rather than a Computer Use result.
+
+The Air's console reported `CGSSessionScreenIsLocked=Yes`. The existing Screen
+Sharing view was stale and reconnecting required the user's password. The smoke
+driver now checks the console lock before sending any command and records a
+clear blocked result. Rerun these commands after the Air is unlocked; do not
+count the locked-session tool failures as evidence that the commands fail on an
+unlocked desktop. Private receipts are under
+`~/Library/Application Support/VoiceComputerPOC/SmokeLogs/` on the Air.
+
 ## What to test next
 
 1. Add a narrow native macOS action layer for app activation and Space switching

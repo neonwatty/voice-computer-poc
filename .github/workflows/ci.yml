@@ -31,6 +31,8 @@ jobs:
           git diff --exit-code -- VoiceComputerPOC.xcodeproj
       - name: Check Swift formatting
         run: xcrun swift-format lint --strict --recursive VoiceComputerPOC VoiceComputerPOCTests
+      - name: Validate smoke driver
+        run: python3 -m py_compile scripts/smoke_app_server.py
       - name: Build and run unit tests
         run: |
           xcodebuild -quiet \

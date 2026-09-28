@@ -27,9 +27,9 @@ open DerivedData/Build/Products/Debug/VoiceComputerPOC.app
 Run `xcodebuild -project VoiceComputerPOC.xcodeproj -scheme VoiceComputerPOC
 -configuration Debug -destination 'platform=macOS' -derivedDataPath DerivedData
 test CODE_SIGNING_ALLOWED=NO` for the unit tests. GitHub Actions runs this test
-command, checks formatting and generated-project consistency, and scans Swift
-with CodeQL. Interactive desktop behavior is verified manually and documented
-in [PLAN.md](PLAN.md).
+command, checks formatting, smoke-driver syntax, and generated-project
+consistency, and scans Swift with CodeQL. Interactive desktop behavior is
+verified manually and documented in [PLAN.md](PLAN.md).
 
 Type a command or select a sample phrase, then click Run. The app starts a local
 app-server over stdio, chooses an available Codex model, starts a thread with a
@@ -45,8 +45,13 @@ the current app launch in
 `~/Library/Application Support/VoiceComputerPOC/Logs/`. Each line has a timestamp,
 event name, and details. The log records entered commands, final results, server
 startup and exit, request IDs, Computer Use tool names and completion status,
-approval decisions, and error text. It does not record screenshots or full tool
-inputs and outputs. Logs stay on this Mac; they are not uploaded by the app.
+approval decisions, and error text. Related events carry a command ID. Completion
+entries include elapsed time, macOS observations, and a verification status;
+after 90 seconds without a server event, the app records an idle warning. Both
+failed tool calls and tool results marked as errors are recorded. A failed
+connection is reset so the next command can start a fresh session. The log does
+not record screenshots or full tool inputs and outputs. Logs stay on this Mac;
+they are not uploaded by the app.
 They may contain personal information from commands, results, app names, and
 errors, so review them before sharing. Stop interrupts the current turn. The
 Codex session is tied to the app process and is not persisted by this prototype.
@@ -65,16 +70,38 @@ Computer Use could inspect its window, while targeting the other copy returned
 `timeoutReached`. Chrome foreground activation was not independently confirmed.
 
 For commands that explicitly ask to foreground Chrome or Calculator, the app
-also observes macOS app-activation notifications. If the target app never
-activates during the command, the result says foreground focus is unverified.
-The current Computer Use path could inspect those windows but did not produce
-an observed activation on this Mac.
+observes macOS app-activation notifications and checks the final frontmost app.
+If the requested app is not frontmost when the turn ends, the result says focus
+is unverified. The earlier Computer Use test could inspect those windows but
+did not produce an observed activation on this Mac.
 
 The app observes macOS's active-Space-change notification and displays a count.
 If a Space command finishes without that event, the app reports the switch as
 unverified even if the model claimed success. On this Mac, both left and right
 Space commands produced no change despite six configured Spaces and enabled
 shortcuts. The activity log includes available tool error text for diagnostics.
+
+## Interactive smoke test
+
+For a remote Mac with SSH access but no usable Screen Sharing connection, the
+bounded driver in `scripts/smoke_app_server.py` runs four explicit Computer Use
+commands through the same local app-server protocol. It writes a private JSONL
+receipt and prints each result. Select one command with `--case 1` through
+`--case 4`; omit `--case` to run all four.
+
+```sh
+python3 scripts/smoke_app_server.py \
+  --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/manual-$(date +%s).jsonl"
+```
+
+The driver automatically grants **session** Computer Use access to Safari,
+Calculator, TextEdit, Finder, and Voice Computer POC for that test session only.
+It declines other apps and stops if the agent asks for one. Each command is
+limited to 12 tool calls and 180 seconds. This checks the backend path; it does
+not test the app's approval sheet or in-window log viewer. The receipt contains
+commands, responses, errors, and app names, so review it before sharing. A
+preflight check stops the test if the macOS console is locked; Computer Use
+cannot inspect app windows while the desktop session is locked.
 
 ## Scope
 

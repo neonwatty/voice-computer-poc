@@ -39,6 +39,11 @@ final class AppServerClient: ObservableObject {
     private var spaceCountAtTurnStart: Int?
     private var focusTargetBundleID: String?
     private var activatedBundleIDsThisTurn: Set<String> = []
+    private var activeCommandID: String?
+    private var commandStartedUptime: TimeInterval?
+    private var lastServerEventUptime: TimeInterval?
+    private var lastIdleWarningUptime: TimeInterval?
+    private var commandWatchdog: Timer?
     private let diagnosticLog: DiagnosticLog?
 
     var logURL: URL? { diagnosticLog?.fileURL }
@@ -84,6 +89,7 @@ final class AppServerClient: ObservableObject {
     }
 
     deinit {
+        commandWatchdog?.invalidate()
         if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
         if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
         output?.fileHandleForReading.readabilityHandler = nil
@@ -96,6 +102,14 @@ final class AppServerClient: ObservableObject {
         guard !phrase.isEmpty, !isWorking else { return }
         result = ""
         isWorking = true
+        activeCommandID = UUID().uuidString
+        commandStartedUptime = ProcessInfo.processInfo.systemUptime
+        lastServerEventUptime = commandStartedUptime
+        lastIdleWarningUptime = nil
+        commandWatchdog?.invalidate()
+        commandWatchdog = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            self?.checkCommandProgress()
+        }
         queuedPhrase = phrase
         spaceCountAtTurnStart =
             phrase.localizedCaseInsensitiveContains("desktop Space")
@@ -115,7 +129,14 @@ final class AppServerClient: ObservableObject {
             focusTargetBundleID = nil
         }
         append("Requested: \(phrase)")
-        record("command_started", details: ["phrase": phrase])
+        record(
+            "command_started",
+            details: [
+                "phrase": phrase,
+                "frontmost_bundle_id": NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown",
+                "frontmost_app": lastActivatedApp,
+                "space_change_count": String(spaceChangeCount),
+            ])
         if let threadID {
             startTurn(threadID: threadID)
         } else if process == nil {
@@ -136,6 +157,8 @@ final class AppServerClient: ObservableObject {
             queuedPhrase = nil
             isWorking = false
             status = "Stopped"
+            record("command_stopped", details: ["elapsed_ms": commandElapsedMilliseconds])
+            finishCommand()
             process?.terminate()
         }
     }
@@ -211,7 +234,7 @@ final class AppServerClient: ObservableObject {
             DispatchQueue.main.async { self?.consumeError(data) }
         }
         task.terminationHandler = { [weak self] ended in
-            DispatchQueue.main.async { self?.serverEnded(exitCode: ended.terminationStatus) }
+            DispatchQueue.main.async { self?.serverEnded(process: ended) }
         }
 
         do {
@@ -324,6 +347,7 @@ final class AppServerClient: ObservableObject {
     }
 
     private func handle(_ message: [String: Any]) {
+        lastServerEventUptime = ProcessInfo.processInfo.systemUptime
         if let method = message["method"] as? String, let id = message["id"] as? Int {
             handleServerRequest(method: method, id: id, params: message["params"] as? [String: Any] ?? [:])
             return
@@ -338,7 +362,10 @@ final class AppServerClient: ObservableObject {
     }
 
     private func handleResponse(id: Int, message: [String: Any]) {
-        guard let kind = pending.removeValue(forKey: id) else { return }
+        guard let kind = pending.removeValue(forKey: id) else {
+            record("unexpected_rpc_response", details: ["id": String(id)])
+            return
+        }
         if let error = message["error"] as? [String: Any] {
             record(
                 "rpc_failed",
@@ -436,13 +463,15 @@ final class AppServerClient: ObservableObject {
                 let resultError = content?.compactMap { $0["text"] as? String }.first
                 let detail = directError ?? resultError
                 let status = item["status"] as? String ?? "unknown"
+                let resultIsError = toolResult?["isError"] as? Bool ?? false
                 var fields = [
                     "item_id": item["id"] as? String ?? "unknown",
                     "server": item["server"] as? String ?? "tool",
                     "tool": item["tool"] as? String ?? "call",
                     "status": status,
+                    "result_is_error": String(resultIsError),
                 ]
-                if status == "failed" {
+                if status == "failed" || resultIsError {
                     fields["error"] = detail ?? "Unknown tool error"
                     append(
                         detail.map { "Computer Use tool call failed: \(String($0.prefix(500)))" }
@@ -452,7 +481,15 @@ final class AppServerClient: ObservableObject {
             }
         } else if method == "turn/completed" {
             let turn = params["turn"] as? [String: Any] ?? [:]
+            guard isWorking else {
+                record(
+                    "unexpected_turn_completed",
+                    details: ["turn_id": turn["id"] as? String ?? "unknown"])
+                return
+            }
             let outcome = turn["status"] as? String ?? "completed"
+            let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            var verification = "model_report_only"
             status = outcome == "completed" ? "Ready" : "Turn \(outcome)"
             append("Turn \(outcome)")
             if let error = turn["error"] as? [String: Any], let message = error["message"] as? String {
@@ -460,28 +497,47 @@ final class AppServerClient: ObservableObject {
             }
             if let baseline = spaceCountAtTurnStart {
                 if spaceChangeCount > baseline {
+                    verification = "verified"
                     append("Verified: macOS reported an active Space change during this command")
                 } else {
+                    verification = "unverified"
                     append("Unverified: macOS reported no active Space change during this command")
-                    result =
-                        "The shortcut was attempted, but macOS reported no active Space change. The Space switch is unverified."
+                    if outcome == "completed" {
+                        result =
+                            "The shortcut was attempted, but macOS reported no active Space change. The Space switch is unverified."
+                    }
                 }
             }
             spaceCountAtTurnStart = nil
-            if let target = focusTargetBundleID,
-                !activatedBundleIDsThisTurn.contains(target)
-            {
-                append("Unverified: macOS reported no activation of the requested app")
-                result =
-                    "Computer Use inspected the app window, but macOS did not report the requested app becoming active. Foreground focus is unverified."
+            if let target = focusTargetBundleID {
+                if frontmostBundleID == target {
+                    verification = "verified"
+                    append("Verified: requested app is frontmost")
+                } else {
+                    verification = "unverified"
+                    append("Unverified: requested app is not frontmost")
+                    if outcome == "completed" {
+                        result =
+                            "Computer Use inspected the app window, but macOS does not report the requested app as frontmost. Foreground focus is unverified."
+                    }
+                }
             }
             record(
                 "turn_completed",
                 details: [
                     "turn_id": turnID ?? "unknown", "status": outcome, "result": result,
                     "frontmost_app": lastActivatedApp,
+                    "frontmost_bundle_id": frontmostBundleID ?? "unknown",
                     "activated_bundle_ids": activatedBundleIDsThisTurn.sorted().joined(separator: ","),
                     "space_change_count": String(spaceChangeCount),
+                    "verification": verification,
+                    "elapsed_ms": commandElapsedMilliseconds,
+                ])
+            record(
+                "command_finished",
+                details: [
+                    "status": outcome, "verification": verification,
+                    "elapsed_ms": commandElapsedMilliseconds,
                 ])
             focusTargetBundleID = nil
             activatedBundleIDsThisTurn.removeAll()
@@ -489,13 +545,16 @@ final class AppServerClient: ObservableObject {
             turnID = nil
             approval = nil
             queuedApprovals.removeAll()
+            finishCommand()
         } else if method == "error" {
             let error = params["error"] as? [String: Any] ?? [:]
             fail(error["message"] as? String ?? "Codex reported an error")
         }
     }
 
-    private func serverEnded(exitCode: Int32) {
+    private func serverEnded(process ended: Process) {
+        guard process === ended else { return }
+        let exitCode = ended.terminationStatus
         let details =
             String(data: errorBuffer, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !errorLineBuffer.isEmpty && errorLinesLogged < 200 {
@@ -531,6 +590,11 @@ final class AppServerClient: ObservableObject {
 
     private func fail(_ message: String) {
         record("app_error", details: ["message": message])
+        if activeCommandID != nil {
+            record(
+                "command_failed",
+                details: ["message": message, "elapsed_ms": commandElapsedMilliseconds])
+        }
         status = "Error"
         result = message
         append(message)
@@ -539,6 +603,12 @@ final class AppServerClient: ObservableObject {
         spaceCountAtTurnStart = nil
         focusTargetBundleID = nil
         activatedBundleIDsThisTurn.removeAll()
+        if process != nil {
+            record("server_reset_after_error")
+            if process?.isRunning == true { process?.terminate() }
+            cleanupProcess()
+        }
+        finishCommand()
     }
 
     private func append(_ event: String) {
@@ -556,9 +626,42 @@ final class AppServerClient: ObservableObject {
     private func record(_ event: String, details: [String: String] = [:]) {
         guard let diagnosticLog else { return }
         do {
-            diagnosticEntries.append(try diagnosticLog.record(event, details: details))
+            var fields = details
+            if let activeCommandID { fields["command_id"] = activeCommandID }
+            diagnosticEntries.append(try diagnosticLog.record(event, details: fields))
         } catch {
             logError = "Could not write diagnostic log: \(error.localizedDescription)"
         }
+    }
+
+    private var commandElapsedMilliseconds: String {
+        guard let commandStartedUptime else { return "unknown" }
+        return String(Int((ProcessInfo.processInfo.systemUptime - commandStartedUptime) * 1_000))
+    }
+
+    private func checkCommandProgress() {
+        guard isWorking, approval == nil, let lastServerEventUptime else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastServerEventUptime >= 90,
+            lastIdleWarningUptime.map({ now - $0 >= 90 }) ?? true
+        else { return }
+        lastIdleWarningUptime = now
+        append("Still waiting for Codex; no server event for over 90 seconds")
+        record(
+            "command_idle",
+            details: [
+                "idle_ms": String(Int((now - lastServerEventUptime) * 1_000)),
+                "elapsed_ms": commandElapsedMilliseconds,
+                "status": status,
+            ])
+    }
+
+    private func finishCommand() {
+        commandWatchdog?.invalidate()
+        commandWatchdog = nil
+        activeCommandID = nil
+        commandStartedUptime = nil
+        lastServerEventUptime = nil
+        lastIdleWarningUptime = nil
     }
 }
