@@ -100,7 +100,7 @@ activity log includes available tool error text for diagnostics.
 For repeatable interactive checks on a Mac, the bounded driver in
 `scripts/smoke_app_server.py` runs six default Computer Use commands through
 the same local app-server protocol. It writes a private JSONL receipt and prints
-each result. Select one command with `--case 1` through `--case 10`; omit
+each result. Select one command with `--case 1` through `--case 14`; omit
 `--case` to run the original six. Cases 5 and 6 check the app's in-window
 Diagnostic Log and one full Calculator run through the app.
 
