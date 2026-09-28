@@ -25,7 +25,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Voice Computer")
                         .font(.largeTitle.bold())
-                    Text("Text commands through Codex app-server and Computer Use")
+                    Text("Text commands through Codex and native macOS actions")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()

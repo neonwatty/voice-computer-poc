@@ -40,12 +40,18 @@ lets you allow or decline it.
 
 The exact phrases **Switch to the next desktop Space**, **Switch to the previous
 desktop Space**, and **Switch one desktop Space right and then back left** use a
-narrow native macOS keyboard-event path. The app checks that an adjacent Space
-exists, requests macOS permission to post events if needed, and verifies each
-move with both the active-Space notification and the main display's Space ID.
-It logs each step and reports a failure if verification does not arrive. macOS
-may require you to enable Voice Computer POC in **System Settings → Privacy &
-Security → Accessibility** and retry.
+narrow native macOS Accessibility path. The app opens Mission Control and
+presses only the verified adjacent **Desktop N** control in Dock's Accessibility
+tree. It requires both an active-Space notification and the expected live Space
+ID after each move. It logs each step and reports a failure if verification
+does not arrive. Enable Voice Computer POC in **System Settings → Privacy &
+Security → Accessibility** if macOS requests it.
+
+This remains a prototype: it expects English **Desktop N** labels and a simple
+main-display desktop sequence. The current Space ID check uses a private
+SkyLight read because the `com.apple.spaces` preference can be stale. A
+distribution-ready app needs a supported verification method and testing across
+macOS versions and multi-display layouts.
 
 The app stores its Codex working directory under its Application Support folder.
 It shows the final Codex message, a short Activity list, and a live **Diagnostic
@@ -112,18 +118,18 @@ python3 scripts/smoke_app_server.py --case 7 --case 8 \
   --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/spaces-$(date +%s).jsonl"
 ```
 
-Cases 9 and 10 run the native action through the app. Case 10 makes a
-right-and-back round trip, so run it before case 9 when starting on the first
-Space. They require macOS permission for the app to post keyboard events:
+Cases 9, 10, and 14 run the native Accessibility action through the app. Case 10
+makes a right-and-back round trip, so run it before case 9 when starting on the
+first Space. Case 14 tests a one-way left move when an adjacent Space exists:
 
 ```sh
 python3 scripts/smoke_app_server.py --case 10 --case 9 \
   --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/native-spaces-$(date +%s).jsonl"
 ```
 
-Cases 11 and 12 probe Mission Control through Computer Use, first as its own
-app target and then through Finder's F3 key. They independently check the
-resulting Space ID. Both probes failed on the Air; see [PLAN.md](PLAN.md).
+Cases 11 and 12 probe Mission Control through Computer Use; both failed on the
+Air. Case 13 inspects Dock's Mission Control Accessibility tree. The app's
+native case 10 passed on the Air; see [PLAN.md](PLAN.md).
 
 Add `--trace-tool-output` only when diagnosing a failure. It stores up to 3,000
 characters of each tool call's input and text output in the private receipt;
@@ -138,9 +144,9 @@ they do not test the app's approval sheet or in-window log viewer. The receipt
 contains commands, responses, errors, and app names, so review it before sharing. A
 preflight check stops the test if the macOS console is locked; Computer Use
 cannot inspect app windows while the desktop session is locked. The original six
-checks passed on the unlocked MacBook Air. The rightward Space case has not
-passed there, including after the app received Accessibility permission;
-results are in [PLAN.md](PLAN.md).
+checks passed on the unlocked MacBook Air. Computer Use-only Space commands
+failed there, while the native Accessibility round trip passed; results are in
+[PLAN.md](PLAN.md).
 
 ## Scope
 

@@ -76,8 +76,8 @@ narrow native macOS action with explicit permissions and confirm each move with
 
 ## Native Space action, September 28, 2026
 
-The app now recognizes three exact Space phrases and posts native Control-Arrow
-events rather than asking Computer Use to send the shortcut. It checks the
+The first native implementation recognized three exact Space phrases and posted
+Control-Arrow events rather than asking Computer Use to send the shortcut. It checked the
 main display's adjacent Space before posting and requires both the
 `NSWorkspace.activeSpaceDidChangeNotification` event and the expected current
 Space ID afterward. The right-then-left phrase verifies each step separately.
@@ -106,14 +106,31 @@ and sending F3 did not show Mission Control; `fn+F3` was rejected as an
 unsupported key. Neither probe clicked a Space, and both independently read
 ID 3 afterward. The private receipts are in the Air's `SmokeLogs` directory.
 
+## Mission Control Accessibility result, September 28, 2026
+
+The app now opens Mission Control and inspects Dock's Accessibility tree. On
+the Air, it found `Desktop 1` and `Desktop 2` buttons, each with an `AXPress`
+action. The app selects only the adjacent desktop when the complete button
+set matches the ordered Spaces. It performs `AXPress`, then requires both a
+Space-change notification and the expected live Space ID before proceeding.
+
+The original preference-based current ID stayed at 3 after an AX press moved
+the Air to Space 4. A read-only live WindowServer query reported ID 4. The
+prototype now uses that private SkyLight query for verification and keeps the
+ordered IDs from `com.apple.spaces`; this is a distribution limitation.
+
+On the Air, the app verified a one-way left move from ID 4 to ID 3 and three
+right-then-left round trips from ID 3 to 4 to 3. Each step logged an AX press,
+one `NSWorkspace.activeSpaceDidChangeNotification`, and the expected live ID.
+The last round trip also passed the full app-server smoke case 10 with no tool
+errors after targeting the app by bundle ID. Its private receipt is
+`~/Library/Application Support/VoiceComputerPOC/SmokeLogs/mission-ax-roundtrip-bundle-1790619851.jsonl`.
+
 ## What to test next
 
-1. Investigate a different macOS control path for Spaces, such as a scoped
-   Accessibility interaction with Mission Control or a user-approved System
-   Events path. Verify the rightward move and the return separately on the Air
-   before calling either route supported. Current Computer Use reliably
-   inspects and interacts with Calculator, TextEdit, and the resolved Chrome
-   instance, but did not produce an observed Space change.
+1. Replace the private live Space ID query with a supported verification method
+   before distribution. Test the Accessibility path across macOS versions,
+   multi-display layouts, non-English desktop labels, and full-screen Spaces.
 2. Decide how Codex should select the native action beyond the three explicit
    prototype phrases while keeping its scope narrow and verifiable.
 3. Replace the machine-specific Computer Use dependency with a documented

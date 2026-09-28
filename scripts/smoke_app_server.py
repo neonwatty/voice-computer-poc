@@ -7,6 +7,7 @@ app named by the selected case and writes a local JSONL diagnostic receipt.
 """
 
 import argparse
+import ctypes
 import json
 import os
 import plistlib
@@ -34,8 +35,10 @@ COMMANDS = [
     'In Voice Computer POC, enter "Switch one desktop Space right and then back left" in the command field and click Run. Wait for its result, then inspect Diagnostic Log for two native_space_step_verified entries and native_space_finished with verification verified. Report the app result. Do not control other apps.',
     "Use Computer Use with Mission Control as the only app target. Begin with cua.getApp('Mission Control'), then inspect its UI and click the desktop Space immediately to the right of the current one if available. Do not access Voice Computer POC or other apps. Do not send Control-Right or use shell commands or AppleScript. Do not create or remove Spaces. Report whether the desktop changed.",
     "Use Finder as the only Computer Use app target. Press F3 to show Mission Control, inspect the resulting UI, and click the desktop Space immediately to the right of the current one if its thumbnail is available. Do not send Control-Right or use shell commands or AppleScript. Do not create or remove Spaces or access unrelated apps. Report whether the desktop changed.",
+    'In Voice Computer POC, enter "Inspect Mission Control desktop controls" in the command field and click Run. Wait for its result, then inspect Diagnostic Log for mission_control_ax_summary. Report the result and whether any Desktop or Space controls appeared. Do not control other apps.',
+    'In Voice Computer POC, enter "Switch to the previous desktop Space" in the command field and click Run. Wait for its result, then inspect Diagnostic Log for native_space_step_verified and native_space_finished. Report the app result. Do not control other apps.',
 ]
-CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Mission Control", "Finder"]
+CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Mission Control", "Finder", "Voice Computer POC", "Voice Computer POC"]
 EXPECTED_EVIDENCE = [
     re.compile(r"Window:.*Safari|standard window.*Safari", re.IGNORECASE),
     re.compile(r"(?<!\d)63(?!\d)"),
@@ -49,6 +52,8 @@ EXPECTED_EVIDENCE = [
     re.compile(r"native_space_step_verified"),
     None,
     None,
+    re.compile(r"mission_control_ax_summary"),
+    re.compile(r"native_space_step_verified"),
 ]
 INSTRUCTION = (
     "This prototype is for reversible, low-impact desktop tests. For other requests, "
@@ -58,6 +63,7 @@ INSTRUCTION = (
     "result before reporting success. Distinguish a declined access request from "
     "a tool failure; do not call a tool failure an access denial. On macOS, do "
     "not call cua.computer.launch_app; it is unavailable in this connection. "
+    "For Voice Computer POC, bind by bundle ID com.neonwatty.VoiceComputerPOC. "
     "If the requested app has no window or Computer Use reports cgWindowNotFound, "
     "report that after one retry. Do not inspect unrelated apps. User request: "
 )
@@ -82,7 +88,7 @@ def screen_is_locked():
 
 
 def space_state():
-    """Read the current and ordered desktop Space IDs from macOS preferences."""
+    """Read ordered Spaces from preferences and the live ID from WindowServer."""
     if sys.platform != "darwin":
         return None
     try:
@@ -93,11 +99,16 @@ def space_state():
         configuration = plistlib.loads(output)["SpacesDisplayConfiguration"]
         monitors = configuration["Management Data"]["Monitors"]
         main = next(m for m in monitors if m.get("Display Identifier") == "Main")
+        skylight = ctypes.CDLL("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight")
+        skylight._CGSDefaultConnection.restype = ctypes.c_uint32
+        skylight.CGSGetActiveSpace.argtypes = [ctypes.c_uint32]
+        skylight.CGSGetActiveSpace.restype = ctypes.c_uint64
+        current = skylight.CGSGetActiveSpace(skylight._CGSDefaultConnection())
         return {
-            "current": main["Current Space"]["id64"],
+            "current": current,
             "ordered": [space["id64"] for space in main["Spaces"]],
         }
-    except (OSError, subprocess.SubprocessError, KeyError, StopIteration, ValueError):
+    except (OSError, subprocess.SubprocessError, KeyError, StopIteration, ValueError, AttributeError):
         return None
 
 
@@ -233,7 +244,7 @@ class Driver:
         item = params.get("item") or {}
         if method == "item/started" and item.get("type") == "mcpToolCall":
             self.tool_calls += 1
-            limit = 24 if self.command_index in (6, 9, 10) else 12
+            limit = 24 if self.command_index in (6, 9, 10, 14) else 12
             if self.tool_calls > limit:
                 raise RuntimeError("Command exceeded %s Computer Use calls" % limit)
             self.record("tool_started", item_id=item.get("id"), tool=item.get("tool"))
@@ -336,9 +347,9 @@ def main():
         }))["thread"]["id"]
         for index in args.case or range(1, 7):
             phrase = COMMANDS[index - 1]
-            space_before = space_state() if index in (7, 8, 9, 10, 11, 12) else None
+            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 14) else None
             expected_space = None
-            if index in (7, 8, 9, 10, 11, 12):
+            if index in (7, 8, 9, 10, 11, 12, 14):
                 if space_before is None:
                     raise RuntimeError("Cannot read current desktop Space before case %s" % index)
                 ordered = space_before["ordered"]
@@ -387,6 +398,9 @@ def main():
             if index == 10:
                 verified = (verified and bool(driver.evidence_matches)
                             and "returned left to the original Space" in driver.last_result)
+            if index == 14:
+                verified = (verified and bool(driver.evidence_matches)
+                            and "Switched one desktop Space to the left" in driver.last_result)
             success = (turn.get("status") == "completed" and verified
                        and not driver.tool_failures
                        and all(a["allowed"] for a in driver.approvals)

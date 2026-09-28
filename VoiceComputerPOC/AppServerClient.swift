@@ -145,6 +145,10 @@ final class AppServerClient: ObservableObject {
                 roundTripOrigin: nil)
             return
         }
+        if phrase.lowercased() == "inspect mission control desktop controls" {
+            runMissionControlProbe()
+            return
+        }
         if let threadID {
             startTurn(threadID: threadID)
         } else if process == nil {
@@ -157,12 +161,12 @@ final class AppServerClient: ObservableObject {
     func stop() {
         guard isWorking else { return }
         record("stop_requested")
-        if nativeSpacePollTimer != nil {
+        if nativeSpacePollTimer != nil || queuedPhrase.flatMap({ SpaceCommand(phrase: $0) }) != nil {
             nativeSpacePollTimer?.invalidate()
             nativeSpacePollTimer = nil
             completeNativeSpace(
                 status: "stopped", verification: "unverified",
-                message: "Stopped waiting for the desktop Space change.", details: [:])
+                message: "Stopped the desktop Space command.", details: [:])
             return
         }
         if let threadID, let turnID {
@@ -202,24 +206,54 @@ final class AppServerClient: ObservableObject {
                 "space_target_id": String(expected),
             ])
         let baseline = spaceChangeCount
-        do {
-            try SpaceNavigator.post(direction)
-        } catch {
-            if case SpaceNavigatorError.permissionRequired = error {
-                record("native_space_permission_missing")
+        let commandID = activeCommandID
+        let targetNumber = (before.ordered.firstIndex(of: expected) ?? 0) + 1
+        status = "Opening Mission Control…"
+        let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
+        NSWorkspace.shared.openApplication(at: url, configuration: .init()) { [weak self] _, error in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                guard let self, self.isWorking, self.activeCommandID == commandID else { return }
+                do {
+                    if let error { throw error }
+                    try MissionControlAXProbe.pressDesktop(
+                        number: targetNumber, expectedCount: before.ordered.count)
+                    self.record(
+                        "native_space_ax_pressed",
+                        details: [
+                            "direction": direction.rawValue, "desktop_number": String(targetNumber),
+                        ])
+                    self.append("Pressed Desktop \(targetNumber) in Mission Control")
+                    self.startNativeSpaceVerification(
+                        direction, before: before, expected: expected, baseline: baseline,
+                        remaining: remaining, roundTripOrigin: roundTripOrigin)
+                } catch {
+                    let visible = MissionControlAXProbe.inspectDock().nodes
+                        .filter { $0.title.hasPrefix("Desktop ") }
+                        .map { "\($0.path):\($0.title):\($0.description)" }
+                    self.record(
+                        "mission_control_ax_available",
+                        details: ["desktop_controls": visible.joined(separator: "; ")])
+                    if case MissionControlAXError.permissionRequired = error {
+                        self.record("native_space_permission_missing")
+                    }
+                    self.completeNativeSpace(
+                        status: "failed", verification: "unverified",
+                        message: error.localizedDescription,
+                        details: [
+                            "direction": direction.rawValue,
+                            "space_before_id": String(before.current),
+                            "space_target_id": String(expected),
+                        ])
+                }
             }
-            completeNativeSpace(
-                status: "failed", verification: "unverified",
-                message: error.localizedDescription,
-                details: [
-                    "direction": direction.rawValue, "space_before_id": String(before.current),
-                    "space_target_id": String(expected),
-                ])
-            return
         }
+    }
+
+    private func startNativeSpaceVerification(
+        _ direction: SpaceDirection, before: SpaceSnapshot, expected: Int, baseline: Int,
+        remaining: [SpaceDirection], roundTripOrigin: Int?
+    ) {
         status = "Switching Space…"
-        append("Sent native Control-\(direction == .right ? "Right" : "Left") shortcut")
-        record("native_space_posted", details: ["direction": direction.rawValue])
         let deadline = ProcessInfo.processInfo.systemUptime + 3
         nativeSpacePollTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) {
             [weak self] timer in
@@ -264,7 +298,7 @@ final class AppServerClient: ObservableObject {
                 self.completeNativeSpace(
                     status: "unverified", verification: "unverified",
                     message:
-                        "The native shortcut was sent, but macOS did not verify the requested Space change.",
+                        "The Mission Control desktop was pressed, but macOS did not verify the requested Space change.",
                     details: [
                         "direction": direction.rawValue,
                         "space_before_id": String(before.current),
@@ -292,6 +326,53 @@ final class AppServerClient: ObservableObject {
         spaceCountAtTurnStart = nil
         isWorking = false
         finishCommand()
+    }
+
+    private func runMissionControlProbe() {
+        status = "Inspecting Mission Control…"
+        record("mission_control_probe_started")
+        let commandID = activeCommandID
+        let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
+        NSWorkspace.shared.openApplication(at: url, configuration: .init()) { [weak self] _, error in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                guard let self, self.isWorking, self.activeCommandID == commandID else { return }
+                if let error {
+                    self.record(
+                        "mission_control_launch_failed",
+                        details: ["error": error.localizedDescription])
+                }
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let probe = MissionControlAXProbe.inspectDock()
+                    DispatchQueue.main.async {
+                        guard self.isWorking, self.activeCommandID == commandID else { return }
+                        self.record(
+                            "mission_control_ax_summary",
+                            details: [
+                                "trusted": String(probe.trusted),
+                                "dock_found": String(probe.dockFound),
+                                "node_count": String(probe.nodes.count),
+                            ])
+                        for node in probe.nodes {
+                            self.record(
+                                "mission_control_ax_node",
+                                details: [
+                                    "path": node.path, "role": node.role, "title": node.title,
+                                    "description": node.description, "actions": node.actions,
+                                ])
+                        }
+                        self.status = "Ready"
+                        self.result =
+                            "Inspected \(probe.nodes.count) Dock accessibility elements. See Diagnostic Log."
+                        self.record(
+                            "command_finished", details: ["elapsed_ms": self.commandElapsedMilliseconds])
+                        self.queuedPhrase = nil
+                        self.isWorking = false
+                        self.finishCommand()
+                        NSApp.activate(ignoringOtherApps: true)
+                    }
+                }
+            }
+        }
     }
 
     func decideApproval(allow: Bool, forSession: Bool = false) {
