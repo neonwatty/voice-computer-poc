@@ -139,8 +139,10 @@ final class AppServerClient: ObservableObject {
                 "frontmost_app": lastActivatedApp,
                 "space_change_count": String(spaceChangeCount),
             ])
-        if let direction = SpaceDirection(phrase: phrase) {
-            runNativeSpaceChange(direction)
+        if let spaceCommand = SpaceCommand(phrase: phrase) {
+            runNativeSpaceStep(
+                spaceCommand.directions[0], remaining: Array(spaceCommand.directions.dropFirst()),
+                roundTripOrigin: nil)
             return
         }
         if let threadID {
@@ -177,7 +179,9 @@ final class AppServerClient: ObservableObject {
         }
     }
 
-    private func runNativeSpaceChange(_ direction: SpaceDirection) {
+    private func runNativeSpaceStep(
+        _ direction: SpaceDirection, remaining: [SpaceDirection], roundTripOrigin: Int?
+    ) {
         guard let before = SpaceNavigator.snapshot() else {
             completeNativeSpace(
                 status: "failed", verification: "unverified",
@@ -197,9 +201,13 @@ final class AppServerClient: ObservableObject {
                 "direction": direction.rawValue, "space_before_id": String(before.current),
                 "space_target_id": String(expected),
             ])
+        let baseline = spaceChangeCount
         do {
             try SpaceNavigator.post(direction)
         } catch {
+            if case SpaceNavigatorError.permissionRequired = error {
+                record("native_space_permission_missing")
+            }
             completeNativeSpace(
                 status: "failed", verification: "unverified",
                 message: error.localizedDescription,
@@ -212,7 +220,6 @@ final class AppServerClient: ObservableObject {
         status = "Switching Space…"
         append("Sent native Control-\(direction == .right ? "Right" : "Left") shortcut")
         record("native_space_posted", details: ["direction": direction.rawValue])
-        let baseline = spaceChangeCount
         let deadline = ProcessInfo.processInfo.systemUptime + 3
         nativeSpacePollTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) {
             [weak self] timer in
@@ -225,16 +232,32 @@ final class AppServerClient: ObservableObject {
             if after?.current == expected && eventObserved {
                 timer.invalidate()
                 self.nativeSpacePollTimer = nil
-                self.completeNativeSpace(
-                    status: "completed", verification: "verified",
-                    message: "Switched one desktop Space to the \(direction.rawValue).",
-                    details: [
-                        "direction": direction.rawValue,
-                        "space_before_id": String(before.current),
-                        "space_target_id": String(expected),
-                        "space_after_id": String(after?.current ?? -1),
-                        "space_change_events": String(self.spaceChangeCount - baseline),
-                    ])
+                let fields = [
+                    "direction": direction.rawValue,
+                    "space_before_id": String(before.current),
+                    "space_target_id": String(expected),
+                    "space_after_id": String(after?.current ?? -1),
+                    "space_change_events": String(self.spaceChangeCount - baseline),
+                ]
+                self.record("native_space_step_verified", details: fields)
+                if let next = remaining.first {
+                    self.nativeSpacePollTimer = Timer.scheduledTimer(
+                        withTimeInterval: 0.5, repeats: false
+                    ) { [weak self] _ in
+                        self?.nativeSpacePollTimer = nil
+                        self?.runNativeSpaceStep(
+                            next, remaining: Array(remaining.dropFirst()),
+                            roundTripOrigin: roundTripOrigin ?? before.current)
+                    }
+                } else {
+                    let returned = roundTripOrigin == after?.current
+                    self.completeNativeSpace(
+                        status: "completed", verification: "verified",
+                        message: returned
+                            ? "Switched right one desktop Space and returned left to the original Space."
+                            : "Switched one desktop Space to the \(direction.rawValue).",
+                        details: fields)
+                }
             } else if ProcessInfo.processInfo.systemUptime >= deadline {
                 timer.invalidate()
                 self.nativeSpacePollTimer = nil

@@ -17,6 +17,29 @@ enum SpaceDirection: String {
     }
 }
 
+enum SpaceCommand: Equatable {
+    case one(SpaceDirection)
+    case rightThenLeft
+
+    init?(phrase: String) {
+        let normalized = phrase.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalized == "switch one desktop space right and then back left" {
+            self = .rightThenLeft
+        } else if let direction = SpaceDirection(phrase: normalized) {
+            self = .one(direction)
+        } else {
+            return nil
+        }
+    }
+
+    var directions: [SpaceDirection] {
+        switch self {
+        case .one(let direction): return [direction]
+        case .rightThenLeft: return [.right, .left]
+        }
+    }
+}
+
 struct SpaceSnapshot: Equatable {
     let current: Int
     let ordered: [Int]
@@ -36,7 +59,7 @@ enum SpaceNavigatorError: LocalizedError {
         switch self {
         case .permissionRequired:
             return
-                "macOS needs permission to post keyboard events. Allow Voice Computer POC in System Settings, then retry."
+                "macOS needs permission to post keyboard events. Enable Voice Computer POC in System Settings → Privacy & Security → Accessibility, then retry."
         case .eventCreationFailed:
             return "macOS could not create the native Space shortcut events."
         }

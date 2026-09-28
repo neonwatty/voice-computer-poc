@@ -16,6 +16,7 @@ struct ContentView: View {
         "Open Google Chrome",
         "Switch to the next desktop Space",
         "Switch to the previous desktop Space",
+        "Switch one desktop Space right and then back left",
     ]
 
     var body: some View {

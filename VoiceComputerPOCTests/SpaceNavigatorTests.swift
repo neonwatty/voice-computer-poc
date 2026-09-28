@@ -8,6 +8,10 @@ final class SpaceNavigatorTests: XCTestCase {
         XCTAssertEqual(SpaceDirection(phrase: " Switch one desktop Space to the left "), .left)
         XCTAssertNil(SpaceDirection(phrase: "Explain how desktop Spaces work"))
         XCTAssertNil(SpaceDirection(phrase: "Switch to the next desktop Space and delete a file"))
+        XCTAssertEqual(
+            SpaceCommand(phrase: "Switch one desktop Space right and then back left"),
+            .rightThenLeft)
+        XCTAssertNil(SpaceCommand(phrase: "Switch right, then open a private document"))
     }
 
     func testAdjacentSpaceRespectsBothBoundaries() {

@@ -31,12 +31,21 @@ command, checks formatting, smoke-driver syntax, and generated-project
 consistency, and scans Swift with CodeQL. Interactive desktop behavior is
 verified manually and documented in [PLAN.md](PLAN.md).
 
-Type a command or select a sample phrase, then click Run. The app starts a local
-app-server over stdio, chooses an available Codex model, starts a thread with a
+Type a command or select a sample phrase, then click Run. For general commands,
+the app starts a local app-server over stdio, chooses an available Codex model, starts a thread with a
 read-only shell/filesystem sandbox, and sends the phrase as a turn. Desktop operations are constrained
 in the prompt to the configured `cua_repl` Computer Use tool. When app-server
 requests Computer Use access to an app, the prototype displays the request and
 lets you allow or decline it.
+
+The exact phrases **Switch to the next desktop Space**, **Switch to the previous
+desktop Space**, and **Switch one desktop Space right and then back left** use a
+narrow native macOS keyboard-event path. The app checks that an adjacent Space
+exists, requests macOS permission to post events if needed, and verifies each
+move with both the active-Space notification and the main display's Space ID.
+It logs each step and reports a failure if verification does not arrive. macOS
+may require you to enable Voice Computer POC in **System Settings → Privacy &
+Security → Accessibility** and retry.
 
 The app stores its Codex working directory under its Application Support folder.
 It shows the final Codex message, a short Activity list, and a live **Diagnostic
@@ -76,17 +85,16 @@ is unverified. The earlier Computer Use test could inspect those windows but
 did not produce an observed activation on this Mac.
 
 The app observes macOS's active-Space-change notification and displays a count.
-If a Space command finishes without that event, the app reports the switch as
-unverified even if the model claimed success. On this Mac, both left and right
-Space commands produced no change despite six configured Spaces and enabled
-shortcuts. The activity log includes available tool error text for diagnostics.
+The native route also checks the Space ID. The earlier Computer Use-only Space
+commands produced no change on either test Mac despite enabled shortcuts. The
+activity log includes available tool error text for diagnostics.
 
 ## Interactive smoke test
 
 For repeatable interactive checks on a Mac, the bounded driver in
 `scripts/smoke_app_server.py` runs six default Computer Use commands through
 the same local app-server protocol. It writes a private JSONL receipt and prints
-each result. Select one command with `--case 1` through `--case 8`; omit
+each result. Select one command with `--case 1` through `--case 10`; omit
 `--case` to run the original six. Cases 5 and 6 check the app's in-window
 Diagnostic Log and one full Calculator run through the app.
 
@@ -104,6 +112,14 @@ python3 scripts/smoke_app_server.py --case 7 --case 8 \
   --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/spaces-$(date +%s).jsonl"
 ```
 
+Cases 9 and 10 run the native action through the app, including a right-and-back
+round trip. They require macOS permission for the app to post keyboard events:
+
+```sh
+python3 scripts/smoke_app_server.py --case 9 --case 10 \
+  --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/native-spaces-$(date +%s).jsonl"
+```
+
 Add `--trace-tool-output` only when diagnosing a failure. It stores up to 3,000
 characters of each tool call's input and text output in the private receipt;
 those excerpts may contain visible desktop text. The normal receipt omits them.
@@ -112,7 +128,7 @@ The driver automatically grants **session** Computer Use access only to the app
 named by the selected test case, for that test session. It declines other apps
 and stops if the agent asks for one. Each command is
 limited to 12 tool calls and 180 seconds, except the full app run can use up to
-24 tool calls. The first four and the two Space cases check the backend path;
+24 tool calls. Cases 1–4 and 7–8 check the backend path;
 they do not test the app's approval sheet or in-window log viewer. The receipt
 contains commands, responses, errors, and app names, so review it before sharing. A
 preflight check stops the test if the macOS console is locked; Computer Use

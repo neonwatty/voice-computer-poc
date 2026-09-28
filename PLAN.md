@@ -74,15 +74,32 @@ For reliable back-and-forth Space control, the next experiment should use a
 narrow native macOS action with explicit permissions and confirm each move with
 `NSWorkspace.activeSpaceDidChangeNotification` and the resulting Space ID.
 
+## Native Space action, September 28, 2026
+
+The app now recognizes three exact Space phrases and posts native Control-Arrow
+events rather than asking Computer Use to send the shortcut. It checks the
+main display's adjacent Space before posting and requires both the
+`NSWorkspace.activeSpaceDidChangeNotification` event and the expected current
+Space ID afterward. The right-then-left phrase verifies each step separately.
+The app writes the source, target, resulting ID, event count, and verification
+status to its in-window and private JSONL diagnostics.
+
+The first rightward run on the Air reached the native route but macOS denied
+permission to post keyboard events. The app logged `native_space_requested`
+from ID 3 to ID 4, then `native_space_finished` with `status: failed` and
+`verification: unverified` after 71 ms. No Space change occurred. The native
+right and round-trip behavior remains unverified until the app receives the
+macOS permission and the cases are rerun.
+
 ## What to test next
 
-1. Add a narrow native macOS action layer for app activation and Space switching
-   if those actions are required. Current Computer Use reliably inspects and
-   interacts with Calculator, TextEdit, and the resolved Chrome instance, but
-   did not produce an observed app activation or Space change in these tests.
-   Keep Codex app-server as the command planner and use independent macOS
-   signals to verify each action.
-2. Replace the machine-specific Computer Use dependency with a documented
+1. Grant Voice Computer POC macOS permission to post keyboard events on the Air,
+   then run the native right and right-then-left smoke cases. Current Computer
+   Use reliably inspects and interacts with Calculator, TextEdit, and the
+   resolved Chrome instance, but did not produce an observed Space change.
+2. Decide how Codex should select the native action beyond the three explicit
+   prototype phrases while keeping its scope narrow and verifiable.
+3. Replace the machine-specific Computer Use dependency with a documented
    control layer if this will be distributed to other Macs.
-3. Add Foil or another local transcription source only after text commands are
+4. Add Foil or another local transcription source only after text commands are
    reliable. A transcript should enter the same command path as typed text.

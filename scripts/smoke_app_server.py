@@ -30,8 +30,10 @@ COMMANDS = [
     'In Voice Computer POC, replace its command field with "In Calculator, enter 4 + 5 = and verify the displayed result is 9", then click Run. If Voice Computer POC shows a Computer Use approval for Calculator, choose Allow for session. Wait for the app result, open Diagnostic Log, and verify that command_started, tool_completed, and command_finished are visible. Do not control other apps.',
     "Switch one desktop Space to the right using Control-Right Arrow, then report whether the desktop changed. Use Finder only if Computer Use needs an app target. Do not create or remove Spaces.",
     "Switch one desktop Space to the left using Control-Left Arrow, then report whether the desktop changed. Use Finder only if Computer Use needs an app target. Do not create or remove Spaces.",
+    'In Voice Computer POC, enter "Switch to the next desktop Space" in the command field and click Run. Wait for its result, then inspect Diagnostic Log for native_space_finished. Report the app result. Do not control other apps.',
+    'In Voice Computer POC, enter "Switch one desktop Space right and then back left" in the command field and click Run. Wait for its result, then inspect Diagnostic Log for two native_space_step_verified entries and native_space_finished with verification verified. Report the app result. Do not control other apps.',
 ]
-CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder"]
+CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC"]
 EXPECTED_EVIDENCE = [
     re.compile(r"Window:.*Safari|standard window.*Safari", re.IGNORECASE),
     re.compile(r"(?<!\d)63(?!\d)"),
@@ -41,6 +43,8 @@ EXPECTED_EVIDENCE = [
     re.compile(r"command_finished"),
     None,
     None,
+    re.compile(r"native_space_finished"),
+    re.compile(r"native_space_step_verified"),
 ]
 INSTRUCTION = (
     "This prototype is for reversible, low-impact desktop tests. For other requests, "
@@ -225,7 +229,7 @@ class Driver:
         item = params.get("item") or {}
         if method == "item/started" and item.get("type") == "mcpToolCall":
             self.tool_calls += 1
-            limit = 24 if self.command_index == 6 else 12
+            limit = 24 if self.command_index in (6, 9, 10) else 12
             if self.tool_calls > limit:
                 raise RuntimeError("Command exceeded %s Computer Use calls" % limit)
             self.record("tool_started", item_id=item.get("id"), tool=item.get("tool"))
@@ -328,14 +332,14 @@ def main():
         }))["thread"]["id"]
         for index in args.case or range(1, 7):
             phrase = COMMANDS[index - 1]
-            space_before = space_state() if index in (7, 8) else None
+            space_before = space_state() if index in (7, 8, 9, 10) else None
             expected_space = None
-            if index in (7, 8):
+            if index in (7, 8, 9, 10):
                 if space_before is None:
                     raise RuntimeError("Cannot read current desktop Space before case %s" % index)
                 ordered = space_before["ordered"]
                 position = ordered.index(space_before["current"])
-                destination = position + (1 if index == 7 else -1)
+                destination = position + (1 if index in (7, 9, 10) else -1)
                 if not 0 <= destination < len(ordered):
                     driver.command_index = index
                     driver.record("command_skipped", reason="No adjacent desktop Space",
@@ -344,7 +348,8 @@ def main():
                           flush=True)
                     failed = True
                     continue
-                expected_space = ordered[destination]
+                expected_space = (space_before["current"] if index == 10
+                                  else ordered[destination])
             driver.command_index = index
             driver.last_result = ""
             driver.completed_turn = None
@@ -372,6 +377,9 @@ def main():
             ) is not None
             verified = (space_after is not None and space_after["current"] == expected_space
                         if expected_space is not None else bool(driver.evidence_matches))
+            if index == 10:
+                verified = (verified and bool(driver.evidence_matches)
+                            and "returned left to the original Space" in driver.last_result)
             success = (turn.get("status") == "completed" and verified
                        and not driver.tool_failures
                        and all(a["allowed"] for a in driver.approvals)
