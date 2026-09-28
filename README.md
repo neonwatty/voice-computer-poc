@@ -83,11 +83,12 @@ shortcuts. The activity log includes available tool error text for diagnostics.
 
 ## Interactive smoke test
 
-For a remote Mac with SSH access but no usable Screen Sharing connection, the
-bounded driver in `scripts/smoke_app_server.py` runs four explicit Computer Use
+For repeatable interactive checks on a Mac, the bounded driver in
+`scripts/smoke_app_server.py` runs six explicit Computer Use
 commands through the same local app-server protocol. It writes a private JSONL
 receipt and prints each result. Select one command with `--case 1` through
-`--case 4`; omit `--case` to run all four.
+`--case 6`; omit `--case` to run all six. The last two commands check the app's
+in-window Diagnostic Log and one full Calculator run through the app.
 
 ```sh
 python3 scripts/smoke_app_server.py \
@@ -97,11 +98,13 @@ python3 scripts/smoke_app_server.py \
 The driver automatically grants **session** Computer Use access to Safari,
 Calculator, TextEdit, Finder, and Voice Computer POC for that test session only.
 It declines other apps and stops if the agent asks for one. Each command is
-limited to 12 tool calls and 180 seconds. This checks the backend path; it does
-not test the app's approval sheet or in-window log viewer. The receipt contains
+limited to 12 tool calls and 180 seconds, except the full app run can use up to
+24 tool calls. The first four cases check the backend path; they do not test
+the app's approval sheet or in-window log viewer. The receipt contains
 commands, responses, errors, and app names, so review it before sharing. A
 preflight check stops the test if the macOS console is locked; Computer Use
-cannot inspect app windows while the desktop session is locked.
+cannot inspect app windows while the desktop session is locked. All six checks
+passed on the unlocked MacBook Air; results are in [PLAN.md](PLAN.md).
 
 ## Scope
 

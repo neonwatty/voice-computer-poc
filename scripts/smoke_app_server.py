@@ -25,6 +25,8 @@ COMMANDS = [
     "In Calculator, enter 9 × 7 = and verify that the displayed result is 63.",
     'In TextEdit, create a new unsaved document, type "Voice Computer Air smoke test", and verify the text is visible. Do not save the document.',
     "Bring Finder to the foreground and report the title of its visible window.",
+    'In Voice Computer POC, type "For this log test, reply with one sentence and do not use computer controls." into the command field and click Run. Wait for the result, then open Diagnostic Log and verify that command_started and command_finished are visible. Do not control other apps.',
+    'In Voice Computer POC, replace its command field with "In Calculator, enter 4 + 5 = and verify the displayed result is 9", then click Run. If Voice Computer POC shows a Computer Use approval for Calculator, choose Allow for session. Wait for the app result, open Diagnostic Log, and verify that command_started, tool_completed, and command_finished are visible. Do not control other apps.',
 ]
 ALLOWED_APPS = {"Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC"}
 EXPECTED_EVIDENCE = [
@@ -32,6 +34,8 @@ EXPECTED_EVIDENCE = [
     re.compile(r"(?<!\d)63(?!\d)"),
     re.compile(r"Voice Computer Air smoke test"),
     re.compile(r"Window:.*Finder|standard window.*Finder", re.IGNORECASE),
+    re.compile(r"command_finished"),
+    re.compile(r"command_finished"),
 ]
 INSTRUCTION = (
     "This prototype is for reversible, low-impact desktop tests. For other requests, "
@@ -194,8 +198,9 @@ class Driver:
         item = params.get("item") or {}
         if method == "item/started" and item.get("type") == "mcpToolCall":
             self.tool_calls += 1
-            if self.tool_calls > 12:
-                raise RuntimeError("Command exceeded 12 Computer Use calls")
+            limit = 24 if self.command_index == 6 else 12
+            if self.tool_calls > limit:
+                raise RuntimeError("Command exceeded %s Computer Use calls" % limit)
             self.record("tool_started", item_id=item.get("id"), tool=item.get("tool"))
         elif method == "item/completed":
             if item.get("type") == "agentMessage":
