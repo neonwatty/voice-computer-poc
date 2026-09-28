@@ -9,6 +9,7 @@ app named by the selected case and writes a local JSONL diagnostic receipt.
 import argparse
 import json
 import os
+import plistlib
 import queue
 import re
 import shutil
@@ -27,8 +28,10 @@ COMMANDS = [
     "Bring Finder to the foreground and report the title of its visible window.",
     'In Voice Computer POC, type "For this log test, reply with one sentence and do not use computer controls." into the command field and click Run. Wait for the result, then open Diagnostic Log and verify that command_started and command_finished are visible. Do not control other apps.',
     'In Voice Computer POC, replace its command field with "In Calculator, enter 4 + 5 = and verify the displayed result is 9", then click Run. If Voice Computer POC shows a Computer Use approval for Calculator, choose Allow for session. Wait for the app result, open Diagnostic Log, and verify that command_started, tool_completed, and command_finished are visible. Do not control other apps.',
+    "Switch one desktop Space to the right using Control-Right Arrow, then report whether the desktop changed. Use Finder only if Computer Use needs an app target. Do not create or remove Spaces.",
+    "Switch one desktop Space to the left using Control-Left Arrow, then report whether the desktop changed. Use Finder only if Computer Use needs an app target. Do not create or remove Spaces.",
 ]
-CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC"]
+CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder"]
 EXPECTED_EVIDENCE = [
     re.compile(r"Window:.*Safari|standard window.*Safari", re.IGNORECASE),
     re.compile(r"(?<!\d)63(?!\d)"),
@@ -36,6 +39,8 @@ EXPECTED_EVIDENCE = [
     re.compile(r"Window:.*Finder|standard window.*Finder", re.IGNORECASE),
     re.compile(r"command_finished"),
     re.compile(r"command_finished"),
+    None,
+    None,
 ]
 INSTRUCTION = (
     "This prototype is for reversible, low-impact desktop tests. For other requests, "
@@ -68,6 +73,26 @@ def screen_is_locked():
     return match.group(1) == "Yes" if match else None
 
 
+def space_state():
+    """Read the current and ordered desktop Space IDs from macOS preferences."""
+    if sys.platform != "darwin":
+        return None
+    try:
+        output = subprocess.run(
+            ["defaults", "export", "com.apple.spaces", "-"],
+            capture_output=True, timeout=5, check=True,
+        ).stdout
+        configuration = plistlib.loads(output)["SpacesDisplayConfiguration"]
+        monitors = configuration["Management Data"]["Monitors"]
+        main = next(m for m in monitors if m.get("Display Identifier") == "Main")
+        return {
+            "current": main["Current Space"]["id64"],
+            "ordered": [space["id64"] for space in main["Spaces"]],
+        }
+    except (OSError, subprocess.SubprocessError, KeyError, StopIteration, ValueError):
+        return None
+
+
 def default_codex():
     candidates = [
         Path.home() / ".local/bin/codex",
@@ -81,7 +106,7 @@ def default_codex():
 
 
 class Driver:
-    def __init__(self, executable, log_path):
+    def __init__(self, executable, log_path, trace_tool_output=False):
         self.log = log_path.open("x", encoding="utf-8")
         self.events = queue.Queue()
         self.next_id = 0
@@ -93,6 +118,7 @@ class Driver:
         self.tool_calls = 0
         self.approvals = []
         self.stderr_lines = 0
+        self.trace_tool_output = trace_tool_output
         self.process = subprocess.Popen(
             [executable, "app-server"],
             stdin=subprocess.PIPE,
@@ -203,6 +229,9 @@ class Driver:
             if self.tool_calls > limit:
                 raise RuntimeError("Command exceeded %s Computer Use calls" % limit)
             self.record("tool_started", item_id=item.get("id"), tool=item.get("tool"))
+            if self.trace_tool_output:
+                self.record("tool_input_trace", item_id=item.get("id"),
+                            arguments=str(item.get("arguments") or item.get("input") or "")[:3000])
         elif method == "item/completed":
             if item.get("type") == "agentMessage":
                 self.last_result = item.get("text") or ""
@@ -210,13 +239,16 @@ class Driver:
                 result = item.get("result") or {}
                 error = (item.get("error") or {}).get("message")
                 content = result.get("content") or []
+                if self.trace_tool_output:
+                    self.record("tool_output_trace", item_id=item.get("id"),
+                                excerpt="\n".join(str(part.get("text") or "") for part in content)[:3000])
                 if item.get("status") == "failed" or result.get("isError"):
                     error = error or next((part.get("text") for part in content if part.get("text")), None)
                     self.tool_failures.append(str(error or "Unknown tool error")[:500])
                 elif self.command_index is not None:
                     pattern = EXPECTED_EVIDENCE[self.command_index - 1]
                     for part in content:
-                        if pattern.search(part.get("text") or ""):
+                        if pattern and pattern.search(part.get("text") or ""):
                             self.evidence_matches.append(item.get("id"))
                             self.record("verification_evidence", item_id=item.get("id"),
                                         pattern=pattern.pattern)
@@ -266,12 +298,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--codex", default=default_codex())
     parser.add_argument("--log", type=Path, required=True)
+    parser.add_argument("--trace-tool-output", action="store_true",
+                        help="Record bounded tool input/output excerpts; may contain private UI text")
     parser.add_argument("--case", type=int, action="append", choices=range(1, len(COMMANDS) + 1),
                         help="Run one numbered command; repeat to select multiple")
     args = parser.parse_args()
     os.umask(0o077)
     args.log.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    driver = Driver(args.codex, args.log)
+    driver = Driver(args.codex, args.log, trace_tool_output=args.trace_tool_output)
     failed = False
     try:
         locked = screen_is_locked()
@@ -292,8 +326,25 @@ def main():
         thread = driver.wait_rpc(driver.rpc("thread/start", {
             "model": model, "cwd": str(support), "approvalPolicy": "on-request", "sandbox": "read-only",
         }))["thread"]["id"]
-        for index in args.case or range(1, len(COMMANDS) + 1):
+        for index in args.case or range(1, 7):
             phrase = COMMANDS[index - 1]
+            space_before = space_state() if index in (7, 8) else None
+            expected_space = None
+            if index in (7, 8):
+                if space_before is None:
+                    raise RuntimeError("Cannot read current desktop Space before case %s" % index)
+                ordered = space_before["ordered"]
+                position = ordered.index(space_before["current"])
+                destination = position + (1 if index == 7 else -1)
+                if not 0 <= destination < len(ordered):
+                    driver.command_index = index
+                    driver.record("command_skipped", reason="No adjacent desktop Space",
+                                  space_before=space_before)
+                    print("%s. SKIP: no adjacent desktop Space for this direction" % index,
+                          flush=True)
+                    failed = True
+                    continue
+                expected_space = ordered[destination]
             driver.command_index = index
             driver.last_result = ""
             driver.completed_turn = None
@@ -301,22 +352,36 @@ def main():
             driver.evidence_matches = []
             driver.tool_calls = 0
             driver.approvals = []
-            driver.record("command_started", phrase=phrase)
+            driver.record("command_started", phrase=phrase,
+                          space_before=space_before, expected_space=expected_space)
             started = time.monotonic()
             response = driver.wait_rpc(driver.rpc("turn/start", {
                 "threadId": thread, "input": [{"type": "text", "text": INSTRUCTION + phrase}],
             }))
             turn = driver.wait_turn()
+            space_after = None
+            if expected_space is not None:
+                for _ in range(10):
+                    space_after = space_state()
+                    if space_after and space_after["current"] == expected_space:
+                        break
+                    time.sleep(0.5)
             negative_result = re.search(
                 r"couldn.t|cannot|can.t|declined|unverified|failed|unable to",
                 driver.last_result, re.IGNORECASE,
             ) is not None
-            success = (turn.get("status") == "completed" and bool(driver.evidence_matches)
-                       and not negative_result and all(a["allowed"] for a in driver.approvals))
+            verified = (space_after is not None and space_after["current"] == expected_space
+                        if expected_space is not None else bool(driver.evidence_matches))
+            success = (turn.get("status") == "completed" and verified
+                       and not driver.tool_failures
+                       and all(a["allowed"] for a in driver.approvals)
+                       and (expected_space is not None or not negative_result))
             driver.record("command_finished", success=success,
                           elapsed_ms=round((time.monotonic() - started) * 1000),
                           tool_failures=driver.tool_failures, approvals=driver.approvals,
                           evidence_matches=driver.evidence_matches,
+                          space_before=space_before, space_after=space_after,
+                          expected_space=expected_space,
                           turn_id=(response.get("turn") or {}).get("id"))
             print("%s. %s: %s" % (index, "PASS" if success else "FAIL", phrase), flush=True)
             print("   %s" % driver.last_result.replace("\n", " ")[:500], flush=True)

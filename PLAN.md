@@ -55,6 +55,25 @@ macOS signal for the displayed value; the smoke driver checked Computer Use
 output for `9`. Private smoke receipts are under
 `~/Library/Application Support/VoiceComputerPOC/SmokeLogs/` on the Air.
 
+## MacBook Air Space tests, September 28, 2026
+
+The Air has two desktop Spaces on its main display. The current Space was ID 3,
+with ID 4 adjacent to its right, and the macOS left/right Space shortcuts were
+enabled. The bounded app-server smoke driver attempted to move right twice
+through Computer Use. A traced run confirmed `finder.pressKey("ctrl+Right")`
+was sent. Neither run changed the current Space ID (it remained 3); the running
+app also logged no `space_changed` event. The first agent response incorrectly
+treated a disappearing Finder window as proof of a switch. The second response
+correctly reported that the desktop had not changed. Both runs failed the
+independent Space-ID check. The leftward case was skipped because ID 3 was the
+first Space, so it had no left neighbor after the rightward attempt failed.
+
+The Computer Use API exposes key presses, clicks, drags, and scrolling for app
+targets; it does not expose a dedicated desktop Space switch or trackpad swipe.
+For reliable back-and-forth Space control, the next experiment should use a
+narrow native macOS action with explicit permissions and confirm each move with
+`NSWorkspace.activeSpaceDidChangeNotification` and the resulting Space ID.
+
 ## What to test next
 
 1. Add a narrow native macOS action layer for app activation and Space switching
