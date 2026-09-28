@@ -14,7 +14,9 @@ struct ContentView: View {
         "Open Calculator",
         "In Calculator, enter 2 + 3 = and verify the result",
         "Open Google Chrome",
+        "Switch to the next desktop Space",
         "Switch to the previous desktop Space",
+        "Switch one desktop Space right and then back left",
     ]
 
     var body: some View {
@@ -23,7 +25,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Voice Computer")
                         .font(.largeTitle.bold())
-                    Text("Text commands through Codex app-server and Computer Use")
+                    Text("Text commands through Codex and native macOS actions")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()

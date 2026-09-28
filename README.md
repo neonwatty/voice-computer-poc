@@ -31,12 +31,27 @@ command, checks formatting, smoke-driver syntax, and generated-project
 consistency, and scans Swift with CodeQL. Interactive desktop behavior is
 verified manually and documented in [PLAN.md](PLAN.md).
 
-Type a command or select a sample phrase, then click Run. The app starts a local
-app-server over stdio, chooses an available Codex model, starts a thread with a
+Type a command or select a sample phrase, then click Run. For general commands,
+the app starts a local app-server over stdio, chooses an available Codex model, starts a thread with a
 read-only shell/filesystem sandbox, and sends the phrase as a turn. Desktop operations are constrained
 in the prompt to the configured `cua_repl` Computer Use tool. When app-server
 requests Computer Use access to an app, the prototype displays the request and
 lets you allow or decline it.
+
+The exact phrases **Switch to the next desktop Space**, **Switch to the previous
+desktop Space**, and **Switch one desktop Space right and then back left** use a
+narrow native macOS Accessibility path. The app opens Mission Control and
+presses only the verified adjacent **Desktop N** control in Dock's Accessibility
+tree. It requires both an active-Space notification and the expected live Space
+ID after each move. It logs each step and reports a failure if verification
+does not arrive. Enable Voice Computer POC in **System Settings → Privacy &
+Security → Accessibility** if macOS requests it.
+
+This remains a prototype: it expects English **Desktop N** labels and a simple
+main-display desktop sequence. The current Space ID check uses a private
+SkyLight read because the `com.apple.spaces` preference can be stale. A
+distribution-ready app needs a supported verification method and testing across
+macOS versions and multi-display layouts.
 
 The app stores its Codex working directory under its Application Support folder.
 It shows the final Codex message, a short Activity list, and a live **Diagnostic
@@ -76,17 +91,16 @@ is unverified. The earlier Computer Use test could inspect those windows but
 did not produce an observed activation on this Mac.
 
 The app observes macOS's active-Space-change notification and displays a count.
-If a Space command finishes without that event, the app reports the switch as
-unverified even if the model claimed success. On this Mac, both left and right
-Space commands produced no change despite six configured Spaces and enabled
-shortcuts. The activity log includes available tool error text for diagnostics.
+The native route also checks the Space ID. The earlier Computer Use-only Space
+commands produced no change on either test Mac despite enabled shortcuts. The
+activity log includes available tool error text for diagnostics.
 
 ## Interactive smoke test
 
 For repeatable interactive checks on a Mac, the bounded driver in
 `scripts/smoke_app_server.py` runs six default Computer Use commands through
 the same local app-server protocol. It writes a private JSONL receipt and prints
-each result. Select one command with `--case 1` through `--case 8`; omit
+each result. Select one command with `--case 1` through `--case 14`; omit
 `--case` to run the original six. Cases 5 and 6 check the app's in-window
 Diagnostic Log and one full Calculator run through the app.
 
@@ -104,6 +118,19 @@ python3 scripts/smoke_app_server.py --case 7 --case 8 \
   --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/spaces-$(date +%s).jsonl"
 ```
 
+Cases 9, 10, and 14 run the native Accessibility action through the app. Case 10
+makes a right-and-back round trip, so run it before case 9 when starting on the
+first Space. Case 14 tests a one-way left move when an adjacent Space exists:
+
+```sh
+python3 scripts/smoke_app_server.py --case 10 --case 9 \
+  --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/native-spaces-$(date +%s).jsonl"
+```
+
+Cases 11 and 12 probe Mission Control through Computer Use; both failed on the
+Air. Case 13 inspects Dock's Mission Control Accessibility tree. The app's
+native case 10 passed on the Air; see [PLAN.md](PLAN.md).
+
 Add `--trace-tool-output` only when diagnosing a failure. It stores up to 3,000
 characters of each tool call's input and text output in the private receipt;
 those excerpts may contain visible desktop text. The normal receipt omits them.
@@ -112,13 +139,14 @@ The driver automatically grants **session** Computer Use access only to the app
 named by the selected test case, for that test session. It declines other apps
 and stops if the agent asks for one. Each command is
 limited to 12 tool calls and 180 seconds, except the full app run can use up to
-24 tool calls. The first four and the two Space cases check the backend path;
+24 tool calls. Cases 1–4 and 7–8 check the backend path;
 they do not test the app's approval sheet or in-window log viewer. The receipt
 contains commands, responses, errors, and app names, so review it before sharing. A
 preflight check stops the test if the macOS console is locked; Computer Use
 cannot inspect app windows while the desktop session is locked. The original six
-checks passed on the unlocked MacBook Air. The rightward Space case has not
-passed there; results are in [PLAN.md](PLAN.md).
+checks passed on the unlocked MacBook Air. Computer Use-only Space commands
+failed there, while the native Accessibility round trip passed; results are in
+[PLAN.md](PLAN.md).
 
 ## Scope
 

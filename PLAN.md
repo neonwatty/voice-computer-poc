@@ -74,15 +74,66 @@ For reliable back-and-forth Space control, the next experiment should use a
 narrow native macOS action with explicit permissions and confirm each move with
 `NSWorkspace.activeSpaceDidChangeNotification` and the resulting Space ID.
 
+## Native Space action, September 28, 2026
+
+The first native implementation recognized three exact Space phrases and posted
+Control-Arrow events rather than asking Computer Use to send the shortcut. It checked the
+main display's adjacent Space before posting and requires both the
+`NSWorkspace.activeSpaceDidChangeNotification` event and the expected current
+Space ID afterward. The right-then-left phrase verifies each step separately.
+The app writes the source, target, resulting ID, event count, and verification
+status to its in-window and private JSONL diagnostics.
+
+The first rightward run on the Air reached the native route but macOS denied
+permission to post keyboard events. After Accessibility permission was granted
+and the app restarted, the permission check passed. We tested direct event
+posting, Control modifier `flagsChanged` events, and a delayed Control release.
+All three runs posted the shortcut, but Space ID 3 remained current, ID 4 was
+not reached, and the app observed zero active-Space-change notifications. The
+round-trip command stopped after its first, unverified rightward step. Its
+diagnostic log reported `native_space_finished` with `status: unverified`,
+`space_after_id: 3`, and `space_change_events: 0`. The user confirmed that
+physical Control-Right and Control-Left switch Spaces on this Air. We then
+tried posting through the session event tap while Voice Computer POC was
+frontmost; the result was still ID 3 and zero change notifications. A separate
+System Events command stalled without a result and was stopped. These results
+isolate the problem to software control on this machine, not the configured
+keyboard shortcut.
+
+Two bounded Computer Use Mission Control probes also failed. Targeting the
+Mission Control app timed out twice without exposing a window. Targeting Finder
+and sending F3 did not show Mission Control; `fn+F3` was rejected as an
+unsupported key. Neither probe clicked a Space, and both independently read
+ID 3 afterward. The private receipts are in the Air's `SmokeLogs` directory.
+
+## Mission Control Accessibility result, September 28, 2026
+
+The app now opens Mission Control and inspects Dock's Accessibility tree. On
+the Air, it found `Desktop 1` and `Desktop 2` buttons, each with an `AXPress`
+action. The app selects only the adjacent desktop when the complete button
+set matches the ordered Spaces. It performs `AXPress`, then requires both a
+Space-change notification and the expected live Space ID before proceeding.
+
+The original preference-based current ID stayed at 3 after an AX press moved
+the Air to Space 4. A read-only live WindowServer query reported ID 4. The
+prototype now uses that private SkyLight query for verification and keeps the
+ordered IDs from `com.apple.spaces`; this is a distribution limitation.
+
+On the Air, the app verified a one-way left move from ID 4 to ID 3 and three
+right-then-left round trips from ID 3 to 4 to 3. Each step logged an AX press,
+one `NSWorkspace.activeSpaceDidChangeNotification`, and the expected live ID.
+The last round trip also passed the full app-server smoke case 10 with no tool
+errors after targeting the app by bundle ID. Its private receipt is
+`~/Library/Application Support/VoiceComputerPOC/SmokeLogs/mission-ax-roundtrip-bundle-1790619851.jsonl`.
+
 ## What to test next
 
-1. Add a narrow native macOS action layer for app activation and Space switching
-   if those actions are required. Current Computer Use reliably inspects and
-   interacts with Calculator, TextEdit, and the resolved Chrome instance, but
-   did not produce an observed app activation or Space change in these tests.
-   Keep Codex app-server as the command planner and use independent macOS
-   signals to verify each action.
-2. Replace the machine-specific Computer Use dependency with a documented
+1. Replace the private live Space ID query with a supported verification method
+   before distribution. Test the Accessibility path across macOS versions,
+   multi-display layouts, non-English desktop labels, and full-screen Spaces.
+2. Decide how Codex should select the native action beyond the three explicit
+   prototype phrases while keeping its scope narrow and verifiable.
+3. Replace the machine-specific Computer Use dependency with a documented
    control layer if this will be distributed to other Macs.
-3. Add Foil or another local transcription source only after text commands are
+4. Add Foil or another local transcription source only after text commands are
    reliable. A transcript should enter the same command path as typed text.
