@@ -44,6 +44,7 @@ final class AppServerClient: ObservableObject {
     private var lastServerEventUptime: TimeInterval?
     private var lastIdleWarningUptime: TimeInterval?
     private var commandWatchdog: Timer?
+    private var nativeSpacePollTimer: Timer?
     private let diagnosticLog: DiagnosticLog?
 
     var logURL: URL? { diagnosticLog?.fileURL }
@@ -90,6 +91,7 @@ final class AppServerClient: ObservableObject {
 
     deinit {
         commandWatchdog?.invalidate()
+        nativeSpacePollTimer?.invalidate()
         if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
         if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
         output?.fileHandleForReading.readabilityHandler = nil
@@ -137,6 +139,10 @@ final class AppServerClient: ObservableObject {
                 "frontmost_app": lastActivatedApp,
                 "space_change_count": String(spaceChangeCount),
             ])
+        if let direction = SpaceDirection(phrase: phrase) {
+            runNativeSpaceChange(direction)
+            return
+        }
         if let threadID {
             startTurn(threadID: threadID)
         } else if process == nil {
@@ -149,6 +155,14 @@ final class AppServerClient: ObservableObject {
     func stop() {
         guard isWorking else { return }
         record("stop_requested")
+        if nativeSpacePollTimer != nil {
+            nativeSpacePollTimer?.invalidate()
+            nativeSpacePollTimer = nil
+            completeNativeSpace(
+                status: "stopped", verification: "unverified",
+                message: "Stopped waiting for the desktop Space change.", details: [:])
+            return
+        }
         if let threadID, let turnID {
             _ = send(
                 "turn/interrupt", params: ["threadId": threadID, "turnId": turnID], pendingKind: .interrupt)
@@ -161,6 +175,100 @@ final class AppServerClient: ObservableObject {
             finishCommand()
             process?.terminate()
         }
+    }
+
+    private func runNativeSpaceChange(_ direction: SpaceDirection) {
+        guard let before = SpaceNavigator.snapshot() else {
+            completeNativeSpace(
+                status: "failed", verification: "unverified",
+                message: "Could not read the current desktop Space.", details: [:])
+            return
+        }
+        guard let expected = before.adjacent(direction) else {
+            completeNativeSpace(
+                status: "no_adjacent_space", verification: "no_action",
+                message: "There is no desktop Space to the \(direction.rawValue).",
+                details: ["space_before_id": String(before.current)])
+            return
+        }
+        record(
+            "native_space_requested",
+            details: [
+                "direction": direction.rawValue, "space_before_id": String(before.current),
+                "space_target_id": String(expected),
+            ])
+        do {
+            try SpaceNavigator.post(direction)
+        } catch {
+            completeNativeSpace(
+                status: "failed", verification: "unverified",
+                message: error.localizedDescription,
+                details: [
+                    "direction": direction.rawValue, "space_before_id": String(before.current),
+                    "space_target_id": String(expected),
+                ])
+            return
+        }
+        status = "Switching Space…"
+        append("Sent native Control-\(direction == .right ? "Right" : "Left") shortcut")
+        record("native_space_posted", details: ["direction": direction.rawValue])
+        let baseline = spaceChangeCount
+        let deadline = ProcessInfo.processInfo.systemUptime + 3
+        nativeSpacePollTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) {
+            [weak self] timer in
+            guard let self else {
+                timer.invalidate()
+                return
+            }
+            let after = SpaceNavigator.snapshot()
+            let eventObserved = self.spaceChangeCount > baseline
+            if after?.current == expected && eventObserved {
+                timer.invalidate()
+                self.nativeSpacePollTimer = nil
+                self.completeNativeSpace(
+                    status: "completed", verification: "verified",
+                    message: "Switched one desktop Space to the \(direction.rawValue).",
+                    details: [
+                        "direction": direction.rawValue,
+                        "space_before_id": String(before.current),
+                        "space_target_id": String(expected),
+                        "space_after_id": String(after?.current ?? -1),
+                        "space_change_events": String(self.spaceChangeCount - baseline),
+                    ])
+            } else if ProcessInfo.processInfo.systemUptime >= deadline {
+                timer.invalidate()
+                self.nativeSpacePollTimer = nil
+                self.completeNativeSpace(
+                    status: "unverified", verification: "unverified",
+                    message:
+                        "The native shortcut was sent, but macOS did not verify the requested Space change.",
+                    details: [
+                        "direction": direction.rawValue,
+                        "space_before_id": String(before.current),
+                        "space_target_id": String(expected),
+                        "space_after_id": after.map { String($0.current) } ?? "unknown",
+                        "space_change_events": String(self.spaceChangeCount - baseline),
+                    ])
+            }
+        }
+    }
+
+    private func completeNativeSpace(
+        status outcome: String, verification: String, message: String, details: [String: String]
+    ) {
+        status = outcome == "completed" ? "Ready" : "Space \(outcome)"
+        result = message
+        append(message)
+        var fields = details
+        fields["status"] = outcome
+        fields["verification"] = verification
+        fields["elapsed_ms"] = commandElapsedMilliseconds
+        record("native_space_finished", details: fields)
+        record("command_finished", details: fields)
+        queuedPhrase = nil
+        spaceCountAtTurnStart = nil
+        isWorking = false
+        finishCommand()
     }
 
     func decideApproval(allow: Bool, forSession: Bool = false) {

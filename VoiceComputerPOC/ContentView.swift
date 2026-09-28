@@ -14,6 +14,7 @@ struct ContentView: View {
         "Open Calculator",
         "In Calculator, enter 2 + 3 = and verify the result",
         "Open Google Chrome",
+        "Switch to the next desktop Space",
         "Switch to the previous desktop Space",
     ]
 
