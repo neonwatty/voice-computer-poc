@@ -6,10 +6,15 @@ final class SpaceNavigatorTests: XCTestCase {
     func testOnlyExplicitSpacePhrasesSelectNativeAction() {
         XCTAssertEqual(SpaceDirection(phrase: "Switch to the next desktop Space"), .right)
         XCTAssertEqual(SpaceDirection(phrase: " Switch one desktop Space to the left "), .left)
+        XCTAssertEqual(SpaceDirection(phrase: "Switch to the next desktop Space."), .right)
         XCTAssertNil(SpaceDirection(phrase: "Explain how desktop Spaces work"))
+        XCTAssertNil(SpaceDirection(phrase: "Switch to the next desktop Space?"))
         XCTAssertNil(SpaceDirection(phrase: "Switch to the next desktop Space and delete a file"))
         XCTAssertEqual(
             SpaceCommand(phrase: "Switch one desktop Space right and then back left"),
+            .rightThenLeft)
+        XCTAssertEqual(
+            SpaceCommand(phrase: "Switch one desktop Space right and then back left!"),
             .rightThenLeft)
         XCTAssertNil(SpaceCommand(phrase: "Switch right, then open a private document"))
     }

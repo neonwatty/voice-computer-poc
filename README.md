@@ -54,13 +54,14 @@ its managed local service or a cloud provider instead of the advanced external
 server on port 8080, start the external local server before trying this voice
 path. The endpoint is fixed for this first experiment.
 
-The exact phrases **Switch to the next desktop Space**, **Switch to the previous
+The phrases **Switch to the next desktop Space**, **Switch to the previous
 desktop Space**, and **Switch one desktop Space right and then back left** use a
 narrow native macOS Accessibility path. The app opens Mission Control and
 presses only the verified adjacent **Desktop N** control in Dock's Accessibility
 tree. It requires both an active-Space notification and the expected live Space
 ID after each move. It logs each step and reports a failure if verification
-does not arrive. Enable Voice Computer POC in **System Settings → Privacy &
+does not arrive. Sentence-ending punctuation from transcription is accepted.
+Enable Voice Computer POC in **System Settings → Privacy &
 Security → Accessibility** if macOS requests it.
 
 This remains a prototype: it expects English **Desktop N** labels and a simple

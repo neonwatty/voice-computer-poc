@@ -8,7 +8,7 @@ enum SpaceDirection: String {
     case right
 
     init?(phrase: String) {
-        switch phrase.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        switch Self.normalizedPhrase(phrase) {
         case "switch to the previous desktop space", "switch one desktop space to the left":
             self = .left
         case "switch to the next desktop space", "switch one desktop space to the right":
@@ -17,6 +17,13 @@ enum SpaceDirection: String {
             return nil
         }
     }
+
+    static func normalizedPhrase(_ phrase: String) -> String {
+        phrase.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
 }
 
 enum SpaceCommand: Equatable {
@@ -24,7 +31,7 @@ enum SpaceCommand: Equatable {
     case rightThenLeft
 
     init?(phrase: String) {
-        let normalized = phrase.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalized = SpaceDirection.normalizedPhrase(phrase)
         if normalized == "switch one desktop space right and then back left" {
             self = .rightThenLeft
         } else if let direction = SpaceDirection(phrase: normalized) {
