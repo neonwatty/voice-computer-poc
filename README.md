@@ -3,14 +3,18 @@
 [![CI](https://github.com/neonwatty/voice-computer-poc/actions/workflows/ci.yml/badge.svg)](https://github.com/neonwatty/voice-computer-poc/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/neonwatty/voice-computer-poc/actions/workflows/codeql.yml/badge.svg)](https://github.com/neonwatty/voice-computer-poc/actions/workflows/codeql.yml)
 
-A text-only macOS prototype for sending desktop commands to `codex app-server`.
-It uses the Computer Use tool configured in the local Codex installation. It does
-not record audio or perform transcription.
+A macOS prototype for sending typed or spoken desktop commands to `codex app-server`.
+It uses the Computer Use tool configured in the local Codex installation. The
+voice-input experiment records a short command and sends it only to a local
+OpenAI-compatible transcription server.
 
 ## Build and run
 
 Requirements: macOS 14+, Xcode, a signed-in Codex CLI, and a working
-Computer Use installation. The app looks for `codex` in `~/.local/bin`,
+Computer Use installation. Voice input also needs microphone permission and a
+local transcription server at `http://127.0.0.1:8080/v1/audio/transcriptions`.
+Foil's advanced External local server setup can start a compatible
+`whisper-server` on this address. The app looks for `codex` in `~/.local/bin`,
 the installed Codex or ChatGPT app, `/opt/homebrew/bin`, and `/usr/local/bin`.
 
 ```sh
@@ -37,6 +41,18 @@ read-only shell/filesystem sandbox, and sends the phrase as a turn. Desktop oper
 in the prompt to the configured `cua_repl` Computer Use tool. When app-server
 requests Computer Use access to an app, the prototype displays the request and
 lets you allow or decline it.
+
+For voice input, click **Record**, speak, then click **Stop Recording**. The app
+records a temporary mono WAV file, posts it to the local server with model
+`whisper-1`, deletes the audio file after loading it, and puts the transcript in
+the command field. Review or edit the text and click **Run** to execute it.
+Transcription does not run a command automatically. Recording and transcription
+status appear in the window. Diagnostic events record permission, recording,
+request, and error states without storing raw audio or transcript text; the
+existing command log records the text once you click **Run**. If Foil is using
+its managed local service or a cloud provider instead of the advanced external
+server on port 8080, start the external local server before trying this voice
+path. The endpoint is fixed for this first experiment.
 
 The exact phrases **Switch to the next desktop Space**, **Switch to the previous
 desktop Space**, and **Switch one desktop Space right and then back left** use a

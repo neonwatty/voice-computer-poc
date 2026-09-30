@@ -126,6 +126,24 @@ The last round trip also passed the full app-server smoke case 10 with no tool
 errors after targeting the app by bundle ID. Its private receipt is
 `~/Library/Application Support/VoiceComputerPOC/SmokeLogs/mission-ax-roundtrip-bundle-1790619851.jsonl`.
 
+## Local voice-input experiment, September 30, 2026
+
+The Mac app now has Record and Stop Recording controls. It captures a temporary
+mono WAV file, posts it to the local OpenAI-compatible transcription endpoint
+used by Foil's advanced external local-server setup at `127.0.0.1:8080`, and
+places the recognized text in the editable command field. The user must click
+Run separately. A failed or empty transcription leaves the command untouched.
+
+On the development Mac, Foil's running `whisper-server` returned HTTP 200 and
+the expected transcript for Foil's test WAV. Two live app recordings completed
+through the same endpoint. The app's JSONL log contains permission, recording,
+request, and completion events with duration, audio size, and transcript length;
+it contains no raw audio or transcript from either capture. The temporary WAV
+files were removed, and neither capture produced a `command_started` event.
+The second capture did not match the target command, so it was cleared without
+execution. A full spoken-command-to-computer-action test remains to be done
+with a deliberate utterance.
+
 ## What to test next
 
 1. Replace the private live Space ID query with a supported verification method
@@ -135,5 +153,6 @@ errors after targeting the app by bundle ID. Its private receipt is
    prototype phrases while keeping its scope narrow and verifiable.
 3. Replace the machine-specific Computer Use dependency with a documented
    control layer if this will be distributed to other Macs.
-4. Add Foil or another local transcription source only after text commands are
-   reliable. A transcript should enter the same command path as typed text.
+4. Test a deliberate spoken phrase through transcription, review, Run, and an
+   independently verified computer action on the Air. Make the transcription
+   endpoint configurable if the Air uses a different local Foil setup.
