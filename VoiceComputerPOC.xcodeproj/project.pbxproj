@@ -13,6 +13,7 @@
 		4B783A83A2C9EC4A3D90A251 /* SpaceNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4892574811141080E9E93FE /* SpaceNavigator.swift */; };
 		8832F6771617F802E160B22F /* ApprovalProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0021295ABADC32033A3EDE68 /* ApprovalProtocolTests.swift */; };
 		8C8E6085BEBB050DAC7DE0EB /* AppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5685373ED6C8075DD282EA /* AppServerClient.swift */; };
+		B00819EC5F0AB40C9AEDB658 /* LocalVoiceInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */; };
 		BC4753D6EC07F923ED6AE722 /* DiagnosticLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BDB7479844A824CE79FA957 /* DiagnosticLogTests.swift */; };
 		CA907AAE2B1E537AD1A8EDF4 /* ApprovalProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF54FE5EDD2D827D67E8AF4 /* ApprovalProtocol.swift */; };
 		E807A0BA7ED80F13CE2784C6 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C9F9324497C1AD7B0B64440 /* ContentView.swift */; };
@@ -36,6 +37,7 @@
 		3E5685373ED6C8075DD282EA /* AppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClient.swift; sourceTree = "<group>"; };
 		4DF54FE5EDD2D827D67E8AF4 /* ApprovalProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalProtocol.swift; sourceTree = "<group>"; };
 		5C9F9324497C1AD7B0B64440 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalVoiceInput.swift; sourceTree = "<group>"; };
 		7BDB7479844A824CE79FA957 /* DiagnosticLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogTests.swift; sourceTree = "<group>"; };
 		94DE2CF9444DF65BD537012E /* VoiceComputerPOC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VoiceComputerPOC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4892574811141080E9E93FE /* SpaceNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceNavigator.swift; sourceTree = "<group>"; };
@@ -78,6 +80,7 @@
 				3E5685373ED6C8075DD282EA /* AppServerClient.swift */,
 				5C9F9324497C1AD7B0B64440 /* ContentView.swift */,
 				0F9746E05DAF2F18E2164AE0 /* DiagnosticLog.swift */,
+				7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */,
 				B4892574811141080E9E93FE /* SpaceNavigator.swift */,
 				03E832F80A1C092C60825323 /* VoiceComputerPOCApp.swift */,
 			);
@@ -172,6 +175,7 @@
 				CA907AAE2B1E537AD1A8EDF4 /* ApprovalProtocol.swift in Sources */,
 				E807A0BA7ED80F13CE2784C6 /* ContentView.swift in Sources */,
 				0233268CC94C9A26838D022C /* DiagnosticLog.swift in Sources */,
+				B00819EC5F0AB40C9AEDB658 /* LocalVoiceInput.swift in Sources */,
 				4B783A83A2C9EC4A3D90A251 /* SpaceNavigator.swift in Sources */,
 				0E6B219B0F072ED018D3065B /* VoiceComputerPOCApp.swift in Sources */,
 			);
@@ -291,6 +295,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Voice Computer POC";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Voice Computer POC records a spoken command for local transcription.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -312,6 +317,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Voice Computer POC";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Voice Computer POC records a spoken command for local transcription.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

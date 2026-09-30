@@ -17,6 +17,7 @@ targets:
         CODE_SIGNING_ALLOWED: NO
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Voice Computer POC
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Voice Computer POC records a spoken command for local transcription."
   VoiceComputerPOCTests:
     type: bundle.unit-test
     platform: macOS

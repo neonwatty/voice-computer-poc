@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var client: AppServerClient
+    @ObservedObject private var voice: LocalVoiceInput
     @State private var phrase = ""
     @State private var activityTab: ActivityTab = .activity
 
@@ -19,13 +20,18 @@ struct ContentView: View {
         "Switch one desktop Space right and then back left",
     ]
 
+    init(client: AppServerClient) {
+        self.client = client
+        voice = client.voiceInput
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Voice Computer")
                         .font(.largeTitle.bold())
-                    Text("Text commands through Codex and native macOS actions")
+                    Text("Voice and text commands through Codex and native macOS actions")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -40,15 +46,36 @@ struct ContentView: View {
                     TextField("What should the computer do?", text: $phrase)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit(run)
+                        .disabled(voice.state != .idle)
                         .accessibilityIdentifier("commandField")
+                    if voice.state == .recording {
+                        Button("Stop Recording") { voice.stop { phrase = $0 } }
+                            .accessibilityIdentifier("stopRecordingButton")
+                    } else if voice.state == .transcribing {
+                        Button("Cancel Transcription") { voice.cancel() }
+                            .accessibilityIdentifier("cancelTranscriptionButton")
+                    } else {
+                        Button("Record") { voice.start() }
+                            .disabled(client.isWorking || voice.state != .idle)
+                            .accessibilityIdentifier("recordButton")
+                    }
                     Button("Run", action: run)
                         .keyboardShortcut(.return, modifiers: .command)
                         .disabled(
-                            client.isWorking || phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            client.isWorking || voice.state != .idle
+                                || phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                         )
                         .accessibilityIdentifier("runButton")
                     Button("Stop") { client.stop() }
                         .disabled(!client.canStop)
+                }
+                Text(voice.statusMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if !voice.errorMessage.isEmpty {
+                    Text(voice.errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
             }
 

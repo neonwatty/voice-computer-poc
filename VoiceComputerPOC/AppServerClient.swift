@@ -3,6 +3,7 @@ import Combine
 import Foundation
 
 final class AppServerClient: ObservableObject {
+    let voiceInput = LocalVoiceInput()
     @Published private(set) var status = "Ready"
     @Published private(set) var isWorking = false
     @Published private(set) var result = ""
@@ -62,6 +63,9 @@ final class AppServerClient: ObservableObject {
             logError = "Could not create diagnostic log: \(error.localizedDescription)"
         }
         record("app_started")
+        voiceInput.onEvent = { [weak self] event, details in
+            self?.record(event, details: details)
+        }
         let center = NSWorkspace.shared.notificationCenter
         lastActivatedApp = NSWorkspace.shared.frontmostApplication?.localizedName ?? "Unknown"
         spaceObserver = center.addObserver(
@@ -90,6 +94,7 @@ final class AppServerClient: ObservableObject {
     }
 
     deinit {
+        voiceInput.cancel()
         commandWatchdog?.invalidate()
         nativeSpacePollTimer?.invalidate()
         if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
