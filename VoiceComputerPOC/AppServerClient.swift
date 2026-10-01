@@ -61,12 +61,16 @@ final class AppServerClient: ObservableObject {
     var nativeSpacePollTimer: Timer?
     var toolCallTimeoutTimer: Timer?
     var spaceToolBridge: SpaceToolBridge?
+    var desktopToolPreflight: DesktopToolPreflight?
     var expectedToolDirection: SpaceDirection?
     var requestedToolDirection: SpaceDirection?
     var activeToolDirection: SpaceDirection?
     var toolReply: ((SpaceToolResult) -> Void)?
     var toolCallObserved = false
     var activeMCPToolItemID: String?
+    var activeMCPToolTurnID: String?
+    var activeMCPToolDirection: SpaceDirection?
+    var spaceToolApproval: SpaceToolApproval?
     var toolCallCompleted = false
     var toolResult: SpaceToolResult?
     var generalTurnFailure: GeneralTurnFailure?
@@ -109,9 +113,7 @@ final class AppServerClient: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.spaceChangeCount += 1
-            self?.append("macOS reported an active Space change")
-            self?.record("space_changed", details: ["count": String(self?.spaceChangeCount ?? 0)])
+            self?.observeSystemSpaceNotification()
         }
         activationObserver = center.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
@@ -134,6 +136,7 @@ final class AppServerClient: ObservableObject {
         commandWatchdog?.invalidate()
         nativeSpacePollTimer?.invalidate()
         toolCallTimeoutTimer?.invalidate()
+        desktopToolPreflight?.cancel()
         spaceToolBridge?.stop()
         if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
         if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
@@ -177,6 +180,7 @@ final class AppServerClient: ObservableObject {
                 "frontmost_app": lastActivatedApp,
                 "space_change_count": String(spaceChangeCount),
             ])
+        recordLiveSpaceObservation("before_command")
         if source == .reviewedVoice {
             routePhrase(phrase)
             return
@@ -204,6 +208,10 @@ final class AppServerClient: ObservableObject {
         activeToolDirection = nil
         toolCallObserved = false
         activeMCPToolItemID = nil
+        activeMCPToolTurnID = nil
+        activeMCPToolDirection = nil
+        spaceToolApproval = nil
+        spaceToolBridge?.revoke()
         toolCallCompleted = false
         toolResult = nil
         generalTurnFailure = nil
@@ -233,6 +241,8 @@ final class AppServerClient: ObservableObject {
 
     func stop() {
         guard isWorking else { return }
+        spaceToolApproval = nil
+        spaceToolBridge?.revoke()
         record("stop_requested")
         if queuedPhrase?.lowercased() == "inspect mission control desktop controls" {
             status = "Stopped"

@@ -5,17 +5,17 @@ final class SpaceToolBridge {
     let sessionID = UUID().uuidString
     let socketPath: String
     var serverPID: pid_t?
-    private(set) var helperPID: pid_t?
-    private var helperStartSecond: UInt64?
-    var onRequest: ((SpaceToolRequest, @escaping (SpaceToolResult) -> Void) -> Void)?
+    var expectedExecutablePath: String?
+    var onRequest: ((SpaceToolRequest, PeerIdentity, @escaping (SpaceToolResult) -> Void) -> Void)?
     private let directory: URL
     private let socket: Int32
     private var running = true
+    private var binding: (peer: PeerIdentity, commandID: String, itemID: String)?
 
-    private var helperBuildDirectory: String {
-        URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("DesktopToolServer/.build")
-            .resolvingSymlinksInPath().path + "/"
+    struct PeerIdentity: Equatable {
+        let pid: pid_t
+        let startSecond: UInt64
+        let startMicrosecond: UInt64
     }
 
     init?() {
@@ -48,6 +48,7 @@ final class SpaceToolBridge {
     func stop() {
         guard running else { return }
         running = false
+        revoke()
         Darwin.shutdown(socket, SHUT_RDWR)
         Darwin.close(socket)
         try? FileManager.default.removeItem(at: directory)
@@ -75,20 +76,6 @@ final class SpaceToolBridge {
         }
     }
 
-    private func isServerChild(_ peer: pid_t) -> Bool {
-        guard let serverPID, peer > 0 else { return false }
-        var current = peer
-        for _ in 0..<8 {
-            if current == serverPID { return true }
-            var info = proc_bsdinfo()
-            let count = proc_pidinfo(
-                current, PROC_PIDTBSDINFO, 0, &info, Int32(MemoryLayout.size(ofValue: info)))
-            guard count == MemoryLayout.size(ofValue: info), info.pbi_ppid > 1 else { break }
-            current = pid_t(info.pbi_ppid)
-        }
-        return false
-    }
-
     private func processInfo(_ pid: pid_t) -> proc_bsdinfo? {
         var info = proc_bsdinfo()
         let count = proc_pidinfo(
@@ -96,44 +83,78 @@ final class SpaceToolBridge {
         return count == MemoryLayout.size(ofValue: info) ? info : nil
     }
 
-    private func isExpectedHelperExecutable(_ pid: pid_t) -> Bool {
+    private func executablePath(_ pid: pid_t) -> String? {
         var path = [CChar](repeating: 0, count: 4_096)
-        guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { return false }
-        let resolved = URL(fileURLWithPath: String(cString: path)).resolvingSymlinksInPath().path
-        return resolved.hasPrefix(helperBuildDirectory)
-            && URL(fileURLWithPath: resolved).lastPathComponent == "DesktopToolServer"
+        guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { return nil }
+        return URL(fileURLWithPath: String(cString: path)).resolvingSymlinksInPath().path
     }
 
-    func pinReadyHelper() -> Bool {
-        guard serverPID != nil else { return false }
+    func eligiblePeer(_ peer: pid_t) -> PeerIdentity? {
+        guard let serverPID, let expectedExecutablePath,
+            let info = processInfo(peer), pid_t(info.pbi_ppid) == serverPID,
+            executablePath(peer) == expectedExecutablePath
+        else { return nil }
         let capacity = max(1, Int(proc_listpids(UInt32(PROC_ALL_PIDS), 0, nil, 0)) / MemoryLayout<pid_t>.size)
         var pids = [pid_t](repeating: 0, count: capacity + 32)
         let bytes = pids.withUnsafeMutableBytes {
             proc_listpids(UInt32(PROC_ALL_PIDS), 0, $0.baseAddress, Int32($0.count))
         }
-        guard bytes > 0 else { return false }
-        let matches = pids.prefix(Int(bytes) / MemoryLayout<pid_t>.size).filter {
-            $0 > 0 && isServerChild($0) && isExpectedHelperExecutable($0)
+        guard bytes > 0 else { return nil }
+        let matches = pids.prefix(Int(bytes) / MemoryLayout<pid_t>.size).filter { candidate in
+            guard let candidateInfo = processInfo(candidate) else { return false }
+            return pid_t(candidateInfo.pbi_ppid) == serverPID
+                && executablePath(candidate) == expectedExecutablePath
         }
-        guard matches.count == 1, let info = processInfo(matches[0]) else { return false }
-        helperPID = matches[0]
-        helperStartSecond = info.pbi_start_tvsec
+        guard matches.count == 1, matches[0] == peer else { return nil }
+        return PeerIdentity(
+            pid: peer, startSecond: info.pbi_start_tvsec,
+            startMicrosecond: info.pbi_start_tvusec)
+    }
+
+    func bind(_ peer: PeerIdentity, commandID: String, itemID: String) -> Bool {
+        guard binding == nil, !commandID.isEmpty, !itemID.isEmpty,
+            eligiblePeer(peer.pid) == peer
+        else { return false }
+        binding = (peer, commandID, itemID)
         return true
     }
 
-    private func isPinnedHelper(_ peer: pid_t) -> Bool {
-        guard peer == helperPID, let helperStartSecond,
-            isServerChild(peer), isExpectedHelperExecutable(peer),
-            processInfo(peer)?.pbi_start_tvsec == helperStartSecond
-        else { return false }
-        return true
+    func revoke() { binding = nil }
+
+    func isBoundPeerAlive(commandID: String, itemID: String) -> Bool {
+        guard let binding, binding.commandID == commandID, binding.itemID == itemID else {
+            return false
+        }
+        return eligiblePeer(binding.peer.pid) == binding.peer
     }
+
+    var helperIdentityDetails: [String: String] {
+        [
+            "pid": String(binding?.peer.pid ?? -1),
+            "path_matches_preflight": String(
+                binding.flatMap { executablePath($0.peer.pid) } == expectedExecutablePath),
+            "start_sec": binding.map { String($0.peer.startSecond) } ?? "unknown",
+            "start_usec": binding.map { String($0.peer.startMicrosecond) } ?? "unknown",
+        ]
+    }
+
+    #if DEBUG
+        func invalidateStartIdentityForTesting() {
+            guard let binding else { return }
+            self.binding = (
+                PeerIdentity(
+                    pid: binding.peer.pid, startSecond: binding.peer.startSecond,
+                    startMicrosecond: binding.peer.startMicrosecond + 1),
+                binding.commandID, binding.itemID
+            )
+        }
+    #endif
 
     private func handle(_ client: Int32) {
         var peer: pid_t = 0
         var peerLength = socklen_t(MemoryLayout<pid_t>.size)
         guard getsockopt(client, SOL_LOCAL, LOCAL_PEERPID, &peer, &peerLength) == 0,
-            isPinnedHelper(peer)
+            let identity = eligiblePeer(peer)
         else {
             respond(
                 client,
@@ -174,7 +195,7 @@ final class SpaceToolBridge {
                         direction: request.direction, message: "App session is unavailable."))
                 return
             }
-            onRequest(request) { [weak self] result in self?.respond(client, result) }
+            onRequest(request, identity) { [weak self] result in self?.respond(client, result) }
         }
     }
 

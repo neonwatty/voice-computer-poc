@@ -4,11 +4,14 @@ import Foundation
 extension AppServerClient {
     func decideApproval(allow: Bool, forSession: Bool = false) {
         guard let request = approval else { return }
-        sendRaw(request.response(allow: allow, forSession: forSession))
-        if !allow, request.serverName == "cua_repl" {
+        let accepted =
+            request.serverName == "desktop_tool"
+            ? decideSpaceApproval(request, allow: allow, forSession: forSession) : allow
+        sendRaw(request.response(allow: accepted, forSession: forSession))
+        if !accepted, request.serverName == "cua_repl" {
             generalTurnFailure = .accessDeclined
         }
-        let decision = allow ? (forSession ? "Allowed for session" : "Allowed once") : "Declined"
+        let decision = accepted ? (forSession ? "Allowed for session" : "Allowed once") : "Declined"
         append("\(decision): \(request.serverName)")
         record(
             "approval_decided",
@@ -21,7 +24,31 @@ extension AppServerClient {
     }
 
     func startServer() {
-        guard let (task, executable) = makeServerProcess() else { return }
+        let commandID = activeCommandID
+        status = "Preparing desktop tool…"
+        record("mcp_preflight_started")
+        let preflight = DesktopToolPreflight()
+        desktopToolPreflight = preflight
+        preflight.start { [weak self] outcome in
+            guard let self, self.isWorking, self.activeCommandID == commandID else { return }
+            self.desktopToolPreflight = nil
+            switch outcome {
+            case .ready(let path):
+                self.record("mcp_preflight_ready", details: ["path_kind": "resolved_build_executable"])
+                self.launchServer(helperExecutable: path)
+            case .failed(let reason):
+                self.record("mcp_preflight_failed", details: ["reason": reason])
+                if self.requestedToolDirection == nil {
+                    self.launchServer(helperExecutable: nil)
+                } else {
+                    self.fail("The desktop tool could not be prepared (\(reason)).")
+                }
+            }
+        }
+    }
+
+    private func launchServer(helperExecutable: String?) {
+        guard let (task, executable) = makeServerProcess(helperExecutable: helperExecutable) else { return }
         process = task
         observeServerProcess(task)
         do {
@@ -39,7 +66,7 @@ extension AppServerClient {
                 details: [
                     "server": spaceToolBridge == nil ? "unavailable" : "desktop_tool",
                     "startup_grace_ms": "0", "startup_timeout_sec": "30",
-                    "launcher": "/usr/bin/swift run",
+                    "launcher": helperExecutable == nil ? "none" : "direct_executable",
                     "safe_probe": String(Self.safeSpaceProbe),
                 ])
             _ = send(
@@ -57,10 +84,11 @@ extension AppServerClient {
         }
     }
 
-    func makeServerProcess() -> (Process, String)? {
-        let bridge = SpaceToolBridge()
-        bridge?.onRequest = { [weak self] request, reply in
-            self?.handleSpaceToolRequest(request, reply: reply)
+    func makeServerProcess(helperExecutable: String?) -> (Process, String)? {
+        let bridge = helperExecutable == nil ? nil : SpaceToolBridge()
+        bridge?.expectedExecutablePath = helperExecutable
+        bridge?.onRequest = { [weak self] request, peer, reply in
+            self?.handleSpaceToolRequest(request, peer: peer, reply: reply)
         }
         spaceToolBridge = bridge
         if bridge == nil { record("mcp_bridge_unavailable") }
@@ -93,7 +121,9 @@ extension AppServerClient {
         task.executableURL = URL(fileURLWithPath: executable)
         task.arguments =
             ["app-server", "-c", "mcp_optional_startup_grace_ms=0"]
-            + (bridge.map { ["-c", toolServerConfig($0)] } ?? [])
+            + (bridge.flatMap { bridge in
+                helperExecutable.map { ["-c", toolServerConfig(bridge, executable: $0)] }
+            } ?? [])
         task.currentDirectoryURL = directory
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = [
@@ -114,9 +144,7 @@ extension AppServerClient {
         return (task, executable)
     }
 
-    private func toolServerConfig(_ bridge: SpaceToolBridge) -> String {
-        let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("DesktopToolServer").path
+    private func toolServerConfig(_ bridge: SpaceToolBridge, executable: String) -> String {
         func quoted(_ text: String) -> String {
             guard
                 let data = try? JSONSerialization.data(
@@ -128,15 +156,7 @@ extension AppServerClient {
             Self.safeSpaceProbe
             ? "/tmp/voice-computer-safe-probe-no-bridge.sock" : bridge.socketPath
         return
-            "mcp_servers.desktop_tool={command=\"/usr/bin/swift\",args=[\"run\",\"--package-path\",\(quoted(package)),\"DesktopToolServer\"],env={SPACE_SESSION_ID=\(quoted(bridge.sessionID)),SPACE_BRIDGE_PATH=\(quoted(bridgePath))},enabled=true,startup_timeout_sec=30,tool_timeout_sec=15}"
-    }
-
-    private static var safeSpaceProbe: Bool {
-        #if DEBUG
-            return ProcessInfo.processInfo.environment["VOICE_COMPUTER_SAFE_MCP_PROBE"] == "1"
-        #else
-            return false
-        #endif
+            "mcp_servers.desktop_tool={command=\(quoted(executable)),args=[],env={SPACE_SESSION_ID=\(quoted(bridge.sessionID)),SPACE_BRIDGE_PATH=\(quoted(bridgePath))},enabled=true,startup_timeout_sec=30,tool_timeout_sec=15}"
     }
 
     func observeServerProcess(_ task: Process) {

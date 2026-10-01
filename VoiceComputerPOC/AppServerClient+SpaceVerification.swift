@@ -1,6 +1,28 @@
 import Foundation
 
 extension AppServerClient {
+    @discardableResult
+    func recordLiveSpaceObservation(_ phase: String) -> Int? {
+        let liveID = SpaceNavigator.liveSpaceID()
+        record(
+            "live_space_observed",
+            details: ["phase": phase, "live_space_id": liveID.map(String.init) ?? "unknown"])
+        return liveID
+    }
+
+    func observeSystemSpaceNotification() {
+        spaceChangeCount += 1
+        let liveID = recordLiveSpaceObservation("system_notification")
+        append("macOS reported an active Space change")
+        record(
+            "space_changed",
+            details: [
+                "count": String(spaceChangeCount),
+                "live_space_id": liveID.map(String.init) ?? "unknown",
+                "causality": "system_observation",
+            ])
+    }
+
     func completeVerifiedNativeSpaceStep(
         _ direction: SpaceDirection, before: SpaceSnapshot, after: SpaceSnapshot?, baseline: Int,
         remaining: [SpaceDirection], roundTripOrigin: Int?, commandID: String?, expected: Int

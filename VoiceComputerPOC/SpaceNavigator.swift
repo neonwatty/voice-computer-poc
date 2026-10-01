@@ -92,7 +92,7 @@ enum SpaceNavigator {
 
     // com.apple.spaces can retain a stale Current Space; this prototype reads the live ID.
     // SkyLight is private API, so distribution needs a supported verification strategy.
-    private static func liveSpaceID() -> Int? {
+    static func liveSpaceID() -> Int? {
         guard
             let library = dlopen(
                 "/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY)

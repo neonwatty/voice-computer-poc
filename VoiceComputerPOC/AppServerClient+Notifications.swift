@@ -5,7 +5,9 @@ extension AppServerClient {
     func handleNotification(method: String, params: [String: Any]) {
         switch method {
         case "item/started":
-            if let item = params["item"] as? [String: Any] { handleItemStarted(item) }
+            if let item = params["item"] as? [String: Any] {
+                handleItemStarted(item, eventTurnID: params["turnId"] as? String)
+            }
         case "item/completed":
             if let item = params["item"] as? [String: Any] { handleItemCompleted(item) }
         case "turn/completed":
@@ -18,17 +20,21 @@ extension AppServerClient {
         }
     }
 
-    func handleItemStarted(_ item: [String: Any]) {
+    func handleItemStarted(_ item: [String: Any], eventTurnID: String? = nil) {
         guard item["type"] as? String == "mcpToolCall" else { return }
         let server = item["server"] as? String ?? "tool"
         let tool = item["tool"] as? String ?? "call"
+        let direction = SpaceToolRequest.direction(fromArguments: item["arguments"])
         if server == "desktop_tool" && tool == "switch_space",
-            requestedToolDirection != nil, isWorking,
+            direction == requestedToolDirection, isWorking, activeCommandID != nil,
+            let turnID, let eventTurnID, eventTurnID == turnID,
             let itemID = item["id"] as? String, !itemID.isEmpty,
             activeMCPToolItemID == nil
         {
             toolCallObserved = true
             activeMCPToolItemID = itemID
+            activeMCPToolTurnID = turnID
+            activeMCPToolDirection = direction
         } else if server == "cua_repl" {
             generalToolObserved = true
         }
@@ -38,6 +44,8 @@ extension AppServerClient {
             details: [
                 "item_id": item["id"] as? String ?? "unknown",
                 "server": server, "tool": tool,
+                "event_turn_id": eventTurnID ?? "missing",
+                "turn_matches": String(eventTurnID != nil && eventTurnID == turnID),
             ])
     }
 
@@ -106,7 +114,11 @@ extension AppServerClient {
         }
         record("tool_completed", details: fields)
         if isSpaceTool, item["id"] as? String == activeMCPToolItemID {
+            spaceToolApproval = nil
             activeMCPToolItemID = nil
+            activeMCPToolTurnID = nil
+            activeMCPToolDirection = nil
+            spaceToolBridge?.revoke()
         }
     }
 
@@ -143,15 +155,7 @@ extension AppServerClient {
             let next = remainingRoutedDirections.removeFirst()
             record("router_step_finished", details: ["verification": verification])
             record("router_next_step", details: ["direction": next.rawValue])
-            requestedToolDirection = next
-            expectedToolDirection = next
-            toolCallObserved = false
-            toolCallCompleted = false
-            toolResult = nil
-            activeToolDirection = nil
-            queuedPhrase = phrase
-            threadID = nil
-            turnID = nil
+            prepareNextSpaceStep(next, phrase: phrase)
             beginActingTurn()
             return
         }
@@ -171,6 +175,23 @@ extension AppServerClient {
         approval = nil
         queuedApprovals.removeAll()
         finishCommand()
+    }
+
+    private func prepareNextSpaceStep(_ direction: SpaceDirection, phrase: String) {
+        spaceToolApproval = nil
+        requestedToolDirection = direction
+        expectedToolDirection = direction
+        toolCallObserved = false
+        toolCallCompleted = false
+        toolResult = nil
+        activeToolDirection = nil
+        activeMCPToolItemID = nil
+        activeMCPToolTurnID = nil
+        activeMCPToolDirection = nil
+        spaceToolBridge?.revoke()
+        queuedPhrase = phrase
+        threadID = nil
+        turnID = nil
     }
 
     func applyTurnResult(_ outcome: String, verification: String) -> String {

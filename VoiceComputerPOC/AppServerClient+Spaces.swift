@@ -3,13 +3,19 @@ import Foundation
 
 extension AppServerClient {
     func handleSpaceToolRequest(
-        _ request: SpaceToolRequest, reply: @escaping (SpaceToolResult) -> Void
+        _ request: SpaceToolRequest, peer: SpaceToolBridge.PeerIdentity,
+        reply: @escaping (SpaceToolResult) -> Void
     ) {
-        guard request.sessionID == spaceToolBridge?.sessionID,
+        guard let bridge = spaceToolBridge, request.sessionID == bridge.sessionID,
             let expectedToolDirection,
             request.direction == expectedToolDirection.rawValue,
             isWorking, toolReply == nil, toolCallObserved,
-            activeMCPToolItemID != nil
+            let activeCommandID, let itemID = activeMCPToolItemID,
+            activeMCPToolTurnID == turnID, turnID != nil,
+            activeMCPToolDirection == expectedToolDirection,
+            hasAcceptedSpaceApproval(commandID: activeCommandID, itemID: itemID),
+            bridge.bind(peer, commandID: activeCommandID, itemID: itemID),
+            bridge.isBoundPeerAlive(commandID: activeCommandID, itemID: itemID)
         else {
             reply(
                 .failure(
@@ -17,7 +23,10 @@ extension AppServerClient {
                     message: "No matching one-step command is active."))
             return
         }
+        consumeSpaceApproval()
         toolReply = reply
+        record("mcp_helper_bound", details: bridge.helperIdentityDetails)
+        if finishLiveBridgeProbe(request, reply: reply) { return }
         activeToolDirection = expectedToolDirection
         self.expectedToolDirection = nil
         let commandID = activeCommandID

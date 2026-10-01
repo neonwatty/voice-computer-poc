@@ -75,7 +75,8 @@ final class SpaceToolContractTests: XCTestCase {
         client.isWorking = true
         var result: SpaceToolResult?
         client.handleSpaceToolRequest(
-            .init(sessionID: "stale", direction: "right")
+            .init(sessionID: "stale", direction: "right"),
+            peer: .init(pid: getpid(), startSecond: 0, startMicrosecond: 0)
         ) { result = $0 }
         XCTAssertEqual(result?.status, "rejected")
         XCTAssertNil(client.toolReply)
@@ -102,13 +103,15 @@ final class SpaceToolContractTests: XCTestCase {
         client.isWorking = true
         var response: SpaceToolResult?
         client.handleSpaceToolRequest(
-            .init(sessionID: bridge.sessionID, direction: "left")
+            .init(sessionID: bridge.sessionID, direction: "left"),
+            peer: .init(pid: getpid(), startSecond: 0, startMicrosecond: 0)
         ) { response = $0 }
         XCTAssertEqual(response?.status, "rejected")
         XCTAssertNil(client.toolReply)
         client.isWorking = false
         client.handleSpaceToolRequest(
-            .init(sessionID: bridge.sessionID, direction: "right")
+            .init(sessionID: bridge.sessionID, direction: "right"),
+            peer: .init(pid: getpid(), startSecond: 0, startMicrosecond: 0)
         ) { response = $0 }
         XCTAssertEqual(response?.status, "rejected")
         bridge.stop()
@@ -155,12 +158,13 @@ final class SpaceToolContractTests: XCTestCase {
         client.activeCommandID = "one"
         client.requestedToolDirection = .right
         client.toolCallObserved = true
+        client.activeMCPToolItemID = "item-one"
         let failure = SpaceToolResult.failure(
             "bridge_unavailable", commandID: "unknown", direction: "right",
             message: "Bridge connect failed or timed out.")
         let text = String(decoding: try JSONEncoder().encode(failure), as: UTF8.self)
         client.handleToolCompleted([
-            "type": "mcpToolCall", "server": "desktop_tool", "tool": "switch_space",
+            "type": "mcpToolCall", "id": "item-one", "server": "desktop_tool", "tool": "switch_space",
             "status": "failed", "result": ["content": [["type": "text", "text": text]]],
         ])
         client.handleTurnCompleted(["status": "completed"])
@@ -228,7 +232,7 @@ final class SpaceToolContractTests: XCTestCase {
     func testBridgeAcceptsOnlyServerDescendant() throws {
         let bridge = try XCTUnwrap(SpaceToolBridge())
         defer { bridge.stop() }
-        bridge.onRequest = { request, reply in
+        bridge.onRequest = { request, _, reply in
             reply(
                 .failure(
                     "rejected", commandID: "one", direction: request.direction,

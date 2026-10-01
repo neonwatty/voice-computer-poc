@@ -74,13 +74,26 @@ Security → Accessibility** if macOS requests it.
 The explicit test commands **agent switch desktop space right** and **agent
 switch desktop space left** start an acting Codex turn instructed to call the
 local Swift MCP `desktop_tool.switch_space` tool once. The app configures this
-stdio server only for its own app-server process. The helper checks the tool
-arguments and sends one adjacent direction over a loopback bridge with a fresh
+stdio server only for its own app-server process. It builds the helper before
+launch and checks the live caller's exact executable, direct app-server parent,
+and process start identity when the bridge request arrives. The helper checks the tool
+arguments and sends one adjacent direction over a local Unix socket bridge with a fresh
 session token. The app accepts the request only during a matching active test
-command, performs Accessibility work in its own process, and returns a typed
-result. A `verified` result requires the target live Space ID and an active
+command and after a visible **Allow once** approval for that exact MCP item,
+turn, and direction. Space-tool session approval is unavailable; each routed
+Space step needs its own approval. The app performs Accessibility work in its
+own process and returns a typed result. A `verified` result requires the target
+live Space ID and an active
 Space notification. The existing exact phrases above still use their direct
 native path. General Computer Use commands retain their approval flow.
+
+One local Debug no-action probe (command `98DAB011-EE9A-4D3A-86EC-F29F3C46AA19`)
+completed through the live MCP bridge on a stable Space ID 3. Its visible
+approval used **Allow once**; the authentic tool item reached
+`mcp_helper_bound` and `mcp_bridge_accepted`, then returned typed
+`probe_no_action`. No native Space request, Accessibility press, or Space-change
+event occurred. This proves the guarded bridge path without moving a Space;
+unlocked MacBook Air acceptance is still pending.
 
 ### Routed commands
 

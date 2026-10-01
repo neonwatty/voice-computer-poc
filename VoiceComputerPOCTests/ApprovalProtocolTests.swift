@@ -103,7 +103,8 @@ final class ApprovalProtocolTests: XCTestCase {
             ApprovalRequest.parse(
                 method: "mcpServer/elicitation/request", id: requestID, params: request))
         XCTAssertEqual(parsed.detail, "Space tool · switch_space · right")
-        XCTAssertTrue(parsed.supportsSessionGrant)
+        XCTAssertFalse(parsed.supportsSessionGrant)
+        XCTAssertEqual(parsed.spaceDirection, .right)
         XCTAssertEqual(
             try result(of: parsed.response(allow: false, forSession: false))["action"] as? String,
             "decline")
@@ -178,6 +179,94 @@ final class ApprovalProtocolTests: XCTestCase {
         failed.handleTurnCompleted(["status": "completed"])
         XCTAssertEqual(failed.status, "tool_failed")
         XCTAssertTrue(failed.result.contains("not verified"))
+    }
+
+    func testSpaceApprovalBindsOneItemTurnAndDirection() throws {
+        let client = spaceClient()
+        let right = try XCTUnwrap(spaceRequest(direction: "right"))
+        let left = try XCTUnwrap(spaceRequest(direction: "left"))
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        XCTAssertFalse(client.stageSpaceApproval(left))
+        XCTAssertTrue(client.stageSpaceApproval(right))
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.approval = right
+        client.input = Pipe()
+        client.decideApproval(allow: true)
+        XCTAssertTrue(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.activeMCPToolItemID = "other-item"
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.activeMCPToolItemID = "item-one"
+        client.turnID = "stale-turn"
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.turnID = "turn-one"
+        client.requestedToolDirection = .left
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.requestedToolDirection = .right
+        client.consumeSpaceApproval()
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.activeMCPToolItemID = "item-two"
+        client.activeMCPToolTurnID = "turn-two"
+        client.turnID = "turn-two"
+        client.requestedToolDirection = .left
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-two"))
+    }
+
+    func testSpaceApprovalDeclineSessionAttemptAndFailureRevoke() throws {
+        let client = spaceClient()
+        let right = try XCTUnwrap(spaceRequest(direction: "right"))
+        XCTAssertTrue(client.stageSpaceApproval(right))
+        client.approval = right
+        client.input = Pipe()
+        client.decideApproval(allow: true, forSession: true)
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        XCTAssertNil(client.spaceToolApproval)
+        client.spaceToolApproval = nil
+        XCTAssertTrue(client.stageSpaceApproval(right))
+        client.approval = right
+        client.decideApproval(allow: false)
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.spaceToolApproval = nil
+        XCTAssertTrue(client.stageSpaceApproval(right))
+        client.approval = right
+        client.decideApproval(allow: true)
+        client.fail("test failure")
+        XCTAssertNil(client.spaceToolApproval)
+
+        let interrupted = spaceClient()
+        XCTAssertTrue(interrupted.stageSpaceApproval(right))
+        interrupted.approval = right
+        interrupted.decideApproval(allow: true)
+        XCTAssertTrue(interrupted.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        interrupted.stop()
+        XCTAssertNil(interrupted.spaceToolApproval)
+    }
+
+    private func spaceClient() -> AppServerClient {
+        let client = AppServerClient()
+        client.isWorking = true
+        client.activeCommandID = "one"
+        client.turnID = "turn-one"
+        client.requestedToolDirection = .right
+        client.expectedToolDirection = .right
+        client.handleItemStarted(
+            [
+                "type": "mcpToolCall", "id": "item-one", "server": "desktop_tool",
+                "tool": "switch_space", "arguments": ["direction": "right"],
+            ], eventTurnID: "turn-one")
+        return client
+    }
+
+    private func spaceRequest(direction: String) -> ApprovalRequest? {
+        ApprovalRequest.parse(
+            method: "mcpServer/elicitation/request", id: requestID,
+            params: [
+                "serverName": "desktop_tool", "mode": "form",
+                "requestedSchema": ["properties": [String: Any]()],
+                "_meta": [
+                    "codex_approval_kind": "mcp_tool_call",
+                    "tool_params": ["direction": direction], "persist": ["session"],
+                ],
+            ])
     }
 
     private func result(of response: [String: Any]) throws -> [String: Any] {

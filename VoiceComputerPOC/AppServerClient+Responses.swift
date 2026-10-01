@@ -89,6 +89,25 @@ extension AppServerClient {
         let servers = payload["data"] as? [[String: Any]] ?? []
         let desktop = servers.first { $0["name"] as? String == "desktop_tool" }
         let tools = desktop?["tools"] as? [String: Any] ?? [:]
+        let error = desktop?["error"] as? [String: Any] ?? [:]
+        let errorText = (error["message"] as? String ?? "").lowercased()
+        let errorKind =
+            errorText.contains("timeout")
+            ? "timeout"
+            : errorText.contains("exit")
+                ? "exited"
+                : errorText.contains("transport")
+                    ? "transport"
+                    : error.isEmpty ? "none" : "other"
+        record(
+            "mcp_server_status_observed",
+            details: [
+                "state": desktop?["status"] as? String ?? "unknown",
+                "tool_count": String(tools.count),
+                "fields": desktop?.keys.sorted().joined(separator: ",") ?? "none",
+                "error_kind": errorKind,
+                "error_code": String(describing: error["code"] ?? "none"),
+            ])
         guard tools["switch_space"] != nil else {
             if requestedToolDirection == nil {
                 record("mcp_tool_unavailable_for_general_turn")
@@ -98,17 +117,8 @@ extension AppServerClient {
             }
             return
         }
-        guard spaceToolBridge?.pinReadyHelper() == true else {
-            if requestedToolDirection == nil {
-                record("mcp_helper_unavailable_for_general_turn")
-                startThread()
-            } else {
-                fail("The desktop_tool helper identity could not be confirmed.")
-            }
-            return
-        }
+        record("mcp_tool_status_ready", details: ["server": "desktop_tool", "tool": "switch_space"])
         record("mcp_tool_ready", details: ["server": "desktop_tool", "tool": "switch_space"])
-        record("mcp_helper_bound", details: ["pid": String(spaceToolBridge?.helperPID ?? -1)])
         startThread()
     }
 
@@ -130,6 +140,14 @@ extension AppServerClient {
                 ])
         }
         if let request = ApprovalRequest.parse(method: method, id: id, params: params) {
+            if request.serverName == "desktop_tool" {
+                guard stageSpaceApproval(request) else {
+                    sendRaw(["id": id, "error": ["code": -32601, "message": "Unmatched Space approval"]])
+                    record("space_approval_rejected", details: ["request_id": String(id)])
+                    return
+                }
+                recordLiveSpaceObservation("approval_requested")
+            }
             if approval == nil { approval = request } else { queuedApprovals.append(request) }
             status = "Waiting for your approval"
             append("Approval needed for \(request.serverName)")

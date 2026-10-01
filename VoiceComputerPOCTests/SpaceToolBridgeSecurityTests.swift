@@ -10,7 +10,7 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         defer { bridge.stop() }
         bridge.serverPID = getpid()
         var callbacks = 0
-        bridge.onRequest = { request, reply in
+        bridge.onRequest = { request, _, reply in
             callbacks += 1
             reply(
                 .failure("unexpected", commandID: "one", direction: request.direction, message: "No action"))
@@ -18,7 +18,24 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         XCTAssertEqual(try queryFromPython(bridge)["status"] as? String, "unauthorized")
         XCTAssertEqual(callbacks, 0)
     }
-
+    func testExactBinaryWithWrongParentCannotReachBridgeCallback() throws {
+        let bridge = try XCTUnwrap(SpaceToolBridge())
+        defer { bridge.stop() }
+        bridge.serverPID = getppid()
+        var callbacks = 0
+        bridge.onRequest = { _, _, _ in callbacks += 1 }
+        let (task, input, output) = try launchHelper(bridge)
+        defer { if task.isRunning { task.terminate() } }
+        XCTAssertNil(bridge.eligiblePeer(task.processIdentifier))
+        let call = try callTool(input: input, output: output)
+        let result = try XCTUnwrap(call["result"] as? [String: Any])
+        let content = try XCTUnwrap(result["content"] as? [[String: Any]])
+        let text = try XCTUnwrap(content.first?["text"] as? String)
+        let typed = try JSONDecoder().decode(SpaceToolResult.self, from: Data(text.utf8))
+        XCTAssertFalse(typed.verified)
+        XCTAssertNotEqual(typed.status, "verified")
+        XCTAssertEqual(callbacks, 0)
+    }
     func testMatchingCommandWithoutObservedMCPItemCannotStartNativeAction() throws {
         let client = AppServerClient()
         let bridge = try XCTUnwrap(SpaceToolBridge())
@@ -27,17 +44,22 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         client.activeCommandID = "one"
         client.expectedToolDirection = .right
         client.requestedToolDirection = .right
+        client.turnID = "turn-one"
         client.isWorking = true
         var response: SpaceToolResult?
-        client.handleSpaceToolRequest(.init(sessionID: bridge.sessionID, direction: "right")) {
+        client.handleSpaceToolRequest(
+            .init(sessionID: bridge.sessionID, direction: "right"),
+            peer: .init(pid: getpid(), startSecond: 0, startMicrosecond: 0)
+        ) {
             response = $0
         }
         XCTAssertEqual(response?.status, "rejected")
         XCTAssertNil(client.toolReply)
-        client.handleItemStarted([
-            "type": "mcpToolCall", "id": "item-one", "server": "desktop_tool",
-            "tool": "switch_space",
-        ])
+        client.handleItemStarted(
+            [
+                "type": "mcpToolCall", "id": "item-one", "server": "desktop_tool",
+                "tool": "switch_space", "arguments": ["direction": "right"],
+            ], eventTurnID: "turn-one")
         XCTAssertEqual(client.activeMCPToolItemID, "item-one")
         let typed = SpaceToolResult.failure(
             "rejected", commandID: "one", direction: "right", message: "No action")
@@ -50,28 +72,20 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         XCTAssertFalse(client.toolCallCompleted)
         XCTAssertNil(client.toolResult)
     }
-
-    func testPinnedMCPHelperCanReturnTypedNoAction() throws {
+    func testLiveMCPHelperCanReturnTypedNoAction() throws {
         let bridge = try XCTUnwrap(SpaceToolBridge())
         defer { bridge.stop() }
         bridge.serverPID = getpid()
         var callbacks = 0
-        bridge.onRequest = { request, reply in
+        bridge.onRequest = { request, peer, reply in
             callbacks += 1
+            XCTAssertTrue(bridge.bind(peer, commandID: "one", itemID: "item-one"))
+            XCTAssertTrue(bridge.isBoundPeerAlive(commandID: "one", itemID: "item-one"))
             reply(.failure("rejected", commandID: "one", direction: request.direction, message: "No action"))
         }
         let (task, input, output) = try launchHelper(bridge)
         defer { if task.isRunning { task.terminate() } }
-        var pinned = false
-        for _ in 0..<100 {
-            if bridge.pinReadyHelper() {
-                pinned = true
-                break
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
-        }
-        XCTAssertTrue(pinned)
-        XCTAssertEqual(bridge.helperPID, task.processIdentifier)
+        XCTAssertNotNil(bridge.eligiblePeer(task.processIdentifier))
         XCTAssertEqual(try queryFromPython(bridge)["status"] as? String, "unauthorized")
 
         let callResponse = try callTool(input: input, output: output)
@@ -82,6 +96,115 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         XCTAssertEqual(typed.status, "rejected")
         XCTAssertFalse(typed.verified)
         XCTAssertEqual(callbacks, 1)
+    }
+    func testWrongPathAndStaleStartIdentityFailClosed() throws {
+        let bridge = try XCTUnwrap(SpaceToolBridge())
+        defer { bridge.stop() }
+        bridge.serverPID = getpid()
+        let (task, _, _) = try launchHelper(bridge)
+        defer { if task.isRunning { task.terminate() } }
+        let correctPath = try XCTUnwrap(bridge.expectedExecutablePath)
+        bridge.expectedExecutablePath = "/tmp/not-the-desktop-tool/DesktopToolServer"
+        XCTAssertNil(bridge.eligiblePeer(task.processIdentifier))
+        bridge.expectedExecutablePath = correctPath
+        let identity = try XCTUnwrap(bridge.eligiblePeer(task.processIdentifier))
+        XCTAssertTrue(bridge.bind(identity, commandID: "one", itemID: "item-one"))
+        XCTAssertTrue(bridge.isBoundPeerAlive(commandID: "one", itemID: "item-one"))
+        #if DEBUG
+            bridge.invalidateStartIdentityForTesting()
+            XCTAssertFalse(bridge.isBoundPeerAlive(commandID: "one", itemID: "item-one"))
+        #endif
+    }
+    func testMultipleMatchingHelpersCannotBePinned() throws {
+        let bridge = try XCTUnwrap(SpaceToolBridge())
+        defer { bridge.stop() }
+        bridge.serverPID = getpid()
+        let (first, _, _) = try launchHelper(bridge)
+        defer { if first.isRunning { first.terminate() } }
+        let (second, _, _) = try launchHelper(bridge)
+        defer { if second.isRunning { second.terminate() } }
+        XCTAssertNil(bridge.eligiblePeer(first.processIdentifier))
+        XCTAssertNil(bridge.eligiblePeer(second.processIdentifier))
+    }
+    func testStatusHelperMayExitBeforeActingHelperBinds() throws {
+        let bridge = try XCTUnwrap(SpaceToolBridge())
+        defer { bridge.stop() }
+        bridge.serverPID = getpid()
+        let (statusHelper, _, _) = try launchHelper(bridge)
+        XCTAssertNotNil(bridge.eligiblePeer(statusHelper.processIdentifier))
+        statusHelper.terminate()
+        statusHelper.waitUntilExit()
+        XCTAssertNil(bridge.eligiblePeer(statusHelper.processIdentifier))
+        let (actingHelper, _, _) = try launchHelper(bridge)
+        defer { if actingHelper.isRunning { actingHelper.terminate() } }
+        let identity = try XCTUnwrap(bridge.eligiblePeer(actingHelper.processIdentifier))
+        XCTAssertTrue(bridge.bind(identity, commandID: "one", itemID: "item-one"))
+        XCTAssertFalse(bridge.bind(identity, commandID: "one", itemID: "item-one"))
+        XCTAssertTrue(bridge.isBoundPeerAlive(commandID: "one", itemID: "item-one"))
+        bridge.revoke()
+        XCTAssertFalse(bridge.isBoundPeerAlive(commandID: "one", itemID: "item-one"))
+    }
+    func testPendingAndDeclinedApprovalRejectLivePeer() throws {
+        let bridge = try XCTUnwrap(SpaceToolBridge())
+        defer { bridge.stop() }
+        bridge.serverPID = getpid()
+        let (task, _, _) = try launchHelper(bridge)
+        defer { if task.isRunning { task.terminate() } }
+        let peer = try XCTUnwrap(bridge.eligiblePeer(task.processIdentifier))
+        let client = AppServerClient()
+        client.spaceToolBridge = bridge
+        client.isWorking = true
+        client.activeCommandID = "one"
+        client.turnID = "turn-one"
+        client.expectedToolDirection = .right
+        client.requestedToolDirection = .right
+        client.handleItemStarted(
+            [
+                "type": "mcpToolCall", "id": "item-one", "server": "desktop_tool",
+                "tool": "switch_space", "arguments": ["direction": "right"],
+            ], eventTurnID: "turn-one")
+        client.spaceToolApproval = SpaceToolApproval(
+            requestID: 42, commandID: "one", itemID: "item-one",
+            turnID: "turn-one", direction: .right)
+        var result: SpaceToolResult?
+        client.handleSpaceToolRequest(.init(sessionID: bridge.sessionID, direction: "right"), peer: peer) {
+            result = $0
+        }
+        XCTAssertEqual(result?.status, "rejected")
+        client.spaceToolApproval?.state = .declined
+        client.handleSpaceToolRequest(.init(sessionID: bridge.sessionID, direction: "right"), peer: peer) {
+            result = $0
+        }
+        XCTAssertEqual(result?.status, "rejected")
+        XCTAssertFalse(bridge.isBoundPeerAlive(commandID: "one", itemID: "item-one"))
+    }
+
+    func testColdPreflightRunsOffMainAndResolvesExecutable() {
+        let preflight = DesktopToolPreflight()
+        let responsive = expectation(description: "main queue remained responsive")
+        let finished = expectation(description: "preflight completed")
+        var resolved: String?
+        preflight.start { outcome in
+            if case .ready(let path) = outcome { resolved = path }
+            finished.fulfill()
+        }
+        DispatchQueue.main.async { responsive.fulfill() }
+        wait(for: [responsive, finished], timeout: 90)
+        XCTAssertNotNil(resolved)
+        XCTAssertTrue(resolved.map(FileManager.default.isExecutableFile(atPath:)) ?? false)
+    }
+
+    func testPreflightTimeoutAndCancellationFailClosed() {
+        for (timeout, cancel) in [(0.05, false), (2.0, true)] {
+            let preflight = DesktopToolPreflight(
+                command: URL(fileURLWithPath: "/bin/sleep"), arguments: ["2"], timeout: timeout)
+            let finished = expectation(description: "preflight failed closed")
+            preflight.start { outcome in
+                if case .failed = outcome { finished.fulfill() }
+            }
+            if cancel { preflight.cancel() }
+            wait(for: [finished], timeout: 3)
+        }
     }
 
     private func launchHelper(_ bridge: SpaceToolBridge) throws -> (Process, Pipe, Pipe) {
@@ -101,6 +224,7 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         environment["SPACE_BRIDGE_PATH"] = bridge.socketPath
         task.environment = environment
         try task.run()
+        bridge.expectedExecutablePath = binary.resolvingSymlinksInPath().path
         return (task, input, output)
     }
 

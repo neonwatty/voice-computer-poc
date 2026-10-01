@@ -90,6 +90,7 @@ struct ContentView: View {
 
             HStack(spacing: 16) {
                 Text("Space changes observed: \(client.spaceChangeCount)")
+                Text("Live Space ID: \(SpaceNavigator.liveSpaceID().map(String.init) ?? "unknown")")
                 Text("Last activated app: \(client.lastActivatedApp)")
             }
             .font(.caption)
@@ -203,6 +204,11 @@ struct ContentView: View {
                 Text(approval.detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Text(
+                    "Live Space ID: \(SpaceNavigator.liveSpaceID().map(String.init) ?? "unknown") · Notifications: \(client.spaceChangeCount)"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
                 HStack {
                     Spacer()
                     Button("Decline") { client.decideApproval(allow: false) }

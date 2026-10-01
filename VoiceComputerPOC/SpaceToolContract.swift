@@ -11,6 +11,23 @@ struct SpaceToolRequest: Codable {
         default: return nil
         }
     }
+
+    static func direction(fromArguments value: Any?) -> SpaceDirection? {
+        let object: [String: Any]?
+        if let dictionary = value as? [String: Any] {
+            object = dictionary
+        } else if let text = value as? String,
+            let data = text.data(using: .utf8)
+        {
+            object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        } else {
+            object = nil
+        }
+        guard let object, object.count == 1,
+            let direction = object["direction"] as? String
+        else { return nil }
+        return SpaceDirection(rawValue: direction)
+    }
 }
 
 struct SpaceToolResult: Codable, Equatable {

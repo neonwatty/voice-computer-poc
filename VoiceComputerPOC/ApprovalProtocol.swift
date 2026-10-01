@@ -6,6 +6,7 @@ struct ApprovalRequest: Identifiable {
     let message: String
     let detail: String
     let supportsSessionGrant: Bool
+    let spaceDirection: SpaceDirection?
 
     static func parse(method: String, id: Int, params: [String: Any]) -> ApprovalRequest? {
         let metadata = params["_meta"] as? [String: Any] ?? [:]
@@ -23,13 +24,13 @@ struct ApprovalRequest: Identifiable {
                 let direction = arguments["direction"] as? String,
                 direction == "left" || direction == "right"
             else { return nil }
-            let scopes = metadata["persist"] as? [String] ?? []
             return ApprovalRequest(
                 id: id,
                 serverName: "desktop_tool",
                 message: params["message"] as? String ?? "Allow the Space tool to continue?",
                 detail: "Space tool · switch_space · \(direction)",
-                supportsSessionGrant: scopes.contains("session"))
+                supportsSessionGrant: false,
+                spaceDirection: SpaceDirection(rawValue: direction))
         }
 
         guard params["serverName"] as? String == "cua_repl",
@@ -46,7 +47,7 @@ struct ApprovalRequest: Identifiable {
             serverName: "cua_repl",
             message: params["message"] as? String ?? "Allow \(connector) to continue?",
             detail: detail,
-            supportsSessionGrant: scopes.contains("session")
+            supportsSessionGrant: scopes.contains("session"), spaceDirection: nil
         )
     }
 
@@ -59,5 +60,61 @@ struct ApprovalRequest: Identifiable {
             result["_meta"] = ["persist": "session"]
         }
         return ["id": id, "result": result]
+    }
+}
+
+struct SpaceToolApproval {
+    enum State: Equatable { case pending, accepted, declined, consumed }
+
+    let requestID: Int
+    let commandID: String
+    let itemID: String
+    let turnID: String
+    let direction: SpaceDirection
+    var state: State = .pending
+}
+
+extension AppServerClient {
+    func stageSpaceApproval(_ request: ApprovalRequest) -> Bool {
+        guard let direction = request.spaceDirection, spaceToolApproval == nil,
+            isWorking, let activeCommandID, let itemID = activeMCPToolItemID,
+            let turnID, activeMCPToolTurnID == turnID,
+            activeMCPToolDirection == direction, requestedToolDirection == direction
+        else { return false }
+        spaceToolApproval = SpaceToolApproval(
+            requestID: request.id, commandID: activeCommandID, itemID: itemID,
+            turnID: turnID, direction: direction)
+        return true
+    }
+
+    func spaceApprovalMatchesCurrent(_ grant: SpaceToolApproval) -> Bool {
+        grant.commandID == activeCommandID && grant.itemID == activeMCPToolItemID
+            && grant.turnID == turnID && grant.turnID == activeMCPToolTurnID
+            && grant.direction == activeMCPToolDirection
+            && grant.direction == requestedToolDirection
+    }
+
+    func decideSpaceApproval(_ request: ApprovalRequest, allow: Bool, forSession: Bool) -> Bool {
+        recordLiveSpaceObservation("approval_decided")
+        guard var grant = spaceToolApproval, grant.requestID == request.id,
+            grant.state == .pending, spaceApprovalMatchesCurrent(grant), !forSession
+        else {
+            spaceToolApproval = nil
+            return false
+        }
+        grant.state = allow ? .accepted : .declined
+        spaceToolApproval = grant
+        return allow
+    }
+
+    func hasAcceptedSpaceApproval(commandID: String, itemID: String) -> Bool {
+        guard let grant = spaceToolApproval, grant.state == .accepted,
+            grant.commandID == commandID, grant.itemID == itemID
+        else { return false }
+        return spaceApprovalMatchesCurrent(grant)
+    }
+
+    func consumeSpaceApproval() {
+        spaceToolApproval?.state = .consumed
     }
 }
