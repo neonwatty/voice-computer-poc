@@ -31,8 +31,13 @@ jobs:
           git diff --exit-code -- VoiceComputerPOC.xcodeproj
       - name: Check Swift formatting
         run: xcrun swift-format lint --strict --recursive VoiceComputerPOC VoiceComputerPOCTests
+      - name: Check Swift source limits
+        run: |
+          python3 scripts/check-swift-file-length.py
+          binary="$(scripts/install-quality-tool.sh swiftlint)"
+          "$binary" lint --strict --no-cache
       - name: Validate smoke driver
-        run: python3 -m py_compile scripts/smoke_app_server.py
+        run: python3 -m py_compile scripts/smoke_app_server.py scripts/check-swift-file-length.py
       - name: Build and run unit tests
         run: |
           xcodebuild -quiet \
@@ -42,3 +47,13 @@ jobs:
             -destination 'platform=macOS' \
             -derivedDataPath DerivedData \
             test CODE_SIGNING_ALLOWED=NO
+      - name: Check for unused Swift code
+        run: |
+          binary="$(scripts/install-quality-tool.sh periphery)"
+          "$binary" scan \
+            --project VoiceComputerPOC.xcodeproj \
+            --schemes VoiceComputerPOC \
+            --skip-build \
+            --index-store-path DerivedData/Index.noindex/DataStore \
+            --strict \
+            --disable-update-check

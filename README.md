@@ -31,8 +31,9 @@ open DerivedData/Build/Products/Debug/VoiceComputerPOC.app
 Run `xcodebuild -project VoiceComputerPOC.xcodeproj -scheme VoiceComputerPOC
 -configuration Debug -destination 'platform=macOS' -derivedDataPath DerivedData
 test CODE_SIGNING_ALLOWED=NO` for the unit tests. GitHub Actions runs this test
-command, checks formatting, smoke-driver syntax, and generated-project
-consistency, and scans Swift with CodeQL. Interactive desktop behavior is
+command, checks formatting, source and function size, unused Swift declarations,
+smoke-driver syntax, and generated-project consistency, and scans Swift with
+CodeQL. Interactive desktop behavior is
 verified manually and documented in [PLAN.md](PLAN.md).
 
 Type a command or select a sample phrase, then click Run. For general commands,

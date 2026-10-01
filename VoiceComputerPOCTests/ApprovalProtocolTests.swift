@@ -6,7 +6,7 @@ import XCTest
 final class ApprovalProtocolTests: XCTestCase {
     private let requestID = 42
 
-    func testOnlyComputerUseEmptyFormIsPresented() {
+    func testOnlyComputerUseEmptyFormIsPresented() throws {
         let valid = makeRequest(sessionGrant: true)
         let parsed = ApprovalRequest.parse(
             method: "mcpServer/elicitation/request",
@@ -18,7 +18,7 @@ final class ApprovalProtocolTests: XCTestCase {
         XCTAssertTrue(parsed?.supportsSessionGrant == true)
 
         var otherConnector = valid
-        var metadata = otherConnector["_meta"] as! [String: Any]
+        var metadata = try XCTUnwrap(otherConnector["_meta"] as? [String: Any])
         metadata["connector_id"] = "some-other-connector"
         otherConnector["_meta"] = metadata
         XCTAssertNil(
