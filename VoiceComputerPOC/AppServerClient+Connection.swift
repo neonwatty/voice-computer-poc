@@ -34,7 +34,7 @@ extension AppServerClient {
             self.desktopToolPreflight = nil
             switch outcome {
             case .ready(let path):
-                self.record("mcp_preflight_ready", details: ["path_kind": "resolved_build_executable"])
+                self.record("mcp_preflight_ready", details: ["path_kind": "verified_bundle_helper"])
                 self.launchServer(helperExecutable: path)
             case .failed(let reason):
                 self.record("mcp_preflight_failed", details: ["reason": reason])

@@ -30,11 +30,19 @@ open DerivedData/Build/Products/Debug/VoiceComputerPOC.app
 
 Run `xcodebuild -project VoiceComputerPOC.xcodeproj -scheme VoiceComputerPOC
 -configuration Debug -destination 'platform=macOS' -derivedDataPath DerivedData
-test CODE_SIGNING_ALLOWED=NO` for the unit tests. GitHub Actions runs this test
-command, checks formatting, source and function size, unused Swift declarations,
+test CODE_SIGNING_ALLOWED=NO` for the unit tests. GitHub Actions runs the tests
+in Debug and Release, checks formatting, source and function size, unused Swift declarations,
 smoke-driver syntax, and generated-project consistency, and scans Swift with
 CodeQL. Interactive desktop behavior is
 verified manually and documented in [PLAN.md](PLAN.md).
+
+Each app build compiles the pinned Swift MCP package into Xcode's derived-data
+scratch directory and installs the current configuration's executable at
+`VoiceComputerPOC.app/Contents/Helpers/DesktopToolServer`. The build fails if
+compilation, copying, or byte comparison fails. At launch the app verifies that
+exact regular executable and its build-time SHA-256 manifest before offering
+the Space tool. It never builds a helper at command time or launches one from
+the source checkout.
 
 Type a command or select a sample phrase, then click Run. For general commands,
 the app starts a local app-server over stdio, chooses an available Codex model, starts a thread with a
@@ -74,8 +82,8 @@ Security → Accessibility** if macOS requests it.
 The explicit test commands **agent switch desktop space right** and **agent
 switch desktop space left** start an acting Codex turn instructed to call the
 local Swift MCP `desktop_tool.switch_space` tool once. The app configures this
-stdio server only for its own app-server process. It builds the helper before
-launch and checks the live caller's exact executable, direct app-server parent,
+stdio server only for its own app-server process. It validates the packaged helper
+before launch and checks the live caller's exact executable, direct app-server parent,
 and process start identity when the bridge request arrives. The helper checks the tool
 arguments and sends one adjacent direction over a local Unix socket bridge with a fresh
 session token. The app accepts the request only during a matching active test

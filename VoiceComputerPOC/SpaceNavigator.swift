@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import CoreFoundation
 import Darwin
 import Foundation
 
@@ -78,16 +79,44 @@ enum SpaceNavigator {
                 let configuration = plist["SpacesDisplayConfiguration"] as? [String: Any],
                 let management = configuration["Management Data"] as? [String: Any],
                 let monitors = management["Monitors"] as? [[String: Any]],
-                monitors.count == 1,
-                let main = monitors.first(where: { $0["Display Identifier"] as? String == "Main" }),
-                let spaces = main["Spaces"] as? [[String: Any]]
+                let current = liveSpaceID()
             else { return nil }
-            let ordered = spaces.compactMap { $0["id64"] as? Int }
-            guard let current = liveSpaceID() else { return nil }
-            return ordered.contains(current) ? SpaceSnapshot(current: current, ordered: ordered) : nil
+            return parseMonitors(monitors, current: current)
         } catch {
             return nil
         }
+    }
+
+    static func parseMonitors(_ monitors: [[String: Any]], current: Int) -> SpaceSnapshot? {
+        guard current > 0 else { return nil }
+        var identifiers = Set<String>()
+        var mainIDs: [Int]?
+        for monitor in monitors {
+            guard let identifier = monitor["Display Identifier"] as? String,
+                !identifier.isEmpty, identifiers.insert(identifier).inserted,
+                let spaces = monitor["Spaces"] as? [[String: Any]]
+            else { return nil }
+            if identifier != "Main" {
+                guard spaces.isEmpty else { return nil }
+                continue
+            }
+            guard mainIDs == nil, !spaces.isEmpty else { return nil }
+            var ordered: [Int] = []
+            var seen = Set<Int>()
+            for space in spaces {
+                guard let number = space["id64"] as? NSNumber,
+                    CFGetTypeID(number) != CFBooleanGetTypeID(),
+                    ["c", "C", "s", "S", "i", "I", "l", "L", "q", "Q"]
+                        .contains(String(cString: number.objCType)),
+                    number.int64Value > 0,
+                    let id = Int(exactly: number.int64Value), seen.insert(id).inserted
+                else { return nil }
+                ordered.append(id)
+            }
+            mainIDs = ordered
+        }
+        guard let mainIDs, mainIDs.contains(current) else { return nil }
+        return SpaceSnapshot(current: current, ordered: mainIDs)
     }
 
     // com.apple.spaces can retain a stale Current Space; this prototype reads the live ID.

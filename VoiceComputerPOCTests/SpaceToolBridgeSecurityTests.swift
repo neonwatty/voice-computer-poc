@@ -179,38 +179,8 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         XCTAssertFalse(bridge.isBoundPeerAlive(commandID: "one", itemID: "item-one"))
     }
 
-    func testColdPreflightRunsOffMainAndResolvesExecutable() {
-        let preflight = DesktopToolPreflight()
-        let responsive = expectation(description: "main queue remained responsive")
-        let finished = expectation(description: "preflight completed")
-        var resolved: String?
-        preflight.start { outcome in
-            if case .ready(let path) = outcome { resolved = path }
-            finished.fulfill()
-        }
-        DispatchQueue.main.async { responsive.fulfill() }
-        wait(for: [responsive, finished], timeout: 90)
-        XCTAssertNotNil(resolved)
-        XCTAssertTrue(resolved.map(FileManager.default.isExecutableFile(atPath:)) ?? false)
-    }
-
-    func testPreflightTimeoutAndCancellationFailClosed() {
-        for (timeout, cancel) in [(0.05, false), (2.0, true)] {
-            let preflight = DesktopToolPreflight(
-                command: URL(fileURLWithPath: "/bin/sleep"), arguments: ["2"], timeout: timeout)
-            let finished = expectation(description: "preflight failed closed")
-            preflight.start { outcome in
-                if case .failed = outcome { finished.fulfill() }
-            }
-            if cancel { preflight.cancel() }
-            wait(for: [finished], timeout: 3)
-        }
-    }
-
     private func launchHelper(_ bridge: SpaceToolBridge) throws -> (Process, Pipe, Pipe) {
-        let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("DesktopToolServer")
-        let binary = package.appendingPathComponent(".build/debug/DesktopToolServer")
+        let binary = Bundle.main.bundleURL.appendingPathComponent(DesktopToolPreflight.helperRelativePath)
         XCTAssertTrue(FileManager.default.isExecutableFile(atPath: binary.path))
         let task = Process()
         task.executableURL = binary

@@ -1,4 +1,5 @@
 import AppKit
+import CryptoKit
 import Foundation
 
 extension AppServerClient {
@@ -191,39 +192,25 @@ final class DesktopToolPreflight {
         case failed(String)
     }
 
-    static var packageURL: URL {
-        URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("DesktopToolServer")
-    }
-
-    private let command: URL
-    private let arguments: [String]
-    private let binaryURL: URL
-    private let buildRoot: String
+    static let helperRelativePath = "Contents/Helpers/DesktopToolServer"
+    private let bundleURL: URL
+    private let helperURL: URL
     private let timeout: TimeInterval
+    private let validationDelay: TimeInterval
     private let lock = NSLock()
-    private var process: Process?
     private var completed = false
     private var callback: ((Outcome) -> Void)?
 
     init(
-        command: URL = URL(fileURLWithPath: "/usr/bin/swift"),
-        arguments: [String]? = nil,
-        binaryURL: URL? = nil,
-        buildRoot: String? = nil,
-        timeout: TimeInterval = 90
+        bundleURL: URL = Bundle.main.bundleURL,
+        helperURL: URL? = nil,
+        timeout: TimeInterval = 2,
+        validationDelay: TimeInterval = 0
     ) {
-        let package = Self.packageURL
-        self.command = command
-        self.arguments =
-            arguments ?? [
-                "build", "--package-path", package.path, "--product", "DesktopToolServer",
-            ]
-        self.binaryURL = binaryURL ?? package.appendingPathComponent(".build/debug/DesktopToolServer")
-        self.buildRoot =
-            buildRoot ?? package.appendingPathComponent(".build")
-            .resolvingSymlinksInPath().path + "/"
+        self.bundleURL = bundleURL
+        self.helperURL = helperURL ?? bundleURL.appendingPathComponent(Self.helperRelativePath)
         self.timeout = timeout
+        self.validationDelay = validationDelay
     }
 
     func start(_ completion: @escaping (Outcome) -> Void) {
@@ -231,58 +218,41 @@ final class DesktopToolPreflight {
         callback = completion
         lock.unlock()
         DispatchQueue.global(qos: .userInitiated).async { [self] in
-            let task = Process()
-            task.executableURL = command
-            task.arguments = arguments
-            task.standardOutput = FileHandle.nullDevice
-            task.standardError = FileHandle.nullDevice
-            lock.lock()
-            if completed {
-                lock.unlock()
-                return
-            }
-            process = task
-            let launched: Bool
-            do {
-                try task.run()
-                launched = true
-            } catch {
-                launched = false
-            }
-            lock.unlock()
-            if launched {
-                task.waitUntilExit()
-                guard task.terminationStatus == 0 else {
-                    finish(.failed("build_failed"))
-                    return
-                }
-                let resolved = binaryURL.resolvingSymlinksInPath().path
-                guard FileManager.default.isExecutableFile(atPath: resolved) else {
-                    finish(.failed("binary_missing"))
-                    return
-                }
-                guard resolved.hasPrefix(buildRoot),
-                    URL(fileURLWithPath: resolved).lastPathComponent == "DesktopToolServer"
-                else {
-                    finish(.failed("path_mismatch"))
-                    return
-                }
-                finish(.ready(resolved))
-            } else {
-                finish(.failed("build_failed"))
-            }
+            if validationDelay > 0 { Thread.sleep(forTimeInterval: validationDelay) }
+            finish(validate())
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
-            self?.cancel(reason: "build_timeout")
+            self?.cancel(reason: "validation_timeout")
         }
     }
 
-    func cancel(reason: String = "build_cancelled") {
-        lock.lock()
-        let task = process
-        lock.unlock()
-        if task?.isRunning == true { task?.terminate() }
+    func cancel(reason: String = "validation_cancelled") {
         finish(.failed(reason))
+    }
+
+    private func validate() -> Outcome {
+        let bundle = bundleURL.standardizedFileURL.path
+        let resolvedBundle = bundleURL.resolvingSymlinksInPath().standardizedFileURL.path
+        guard bundle == resolvedBundle else { return .failed("bundle_path_mismatch") }
+        let expected = bundleURL.appendingPathComponent(Self.helperRelativePath).standardizedFileURL.path
+        guard helperURL.standardizedFileURL.path == expected,
+            helperURL.resolvingSymlinksInPath().standardizedFileURL.path == expected
+        else { return .failed("path_mismatch") }
+        var info = stat()
+        guard lstat(expected, &info) == 0 else { return .failed("binary_missing") }
+        guard info.st_mode & S_IFMT == S_IFREG, info.st_mode & 0o111 != 0 else {
+            return .failed("binary_not_executable")
+        }
+        let manifest = expected + ".sha256"
+        guard lstat(manifest, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
+            let digest = try? String(contentsOfFile: manifest, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            digest.count == 64, digest.allSatisfy({ $0.isHexDigit && !$0.isUppercase })
+        else { return .failed("manifest_invalid") }
+        guard let data = try? Data(contentsOf: helperURL) else { return .failed("binary_unreadable") }
+        let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        guard actual == digest else { return .failed("binary_mismatch") }
+        return .ready(expected)
     }
 
     private func finish(_ outcome: Outcome) {

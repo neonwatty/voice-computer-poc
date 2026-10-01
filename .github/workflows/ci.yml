@@ -49,6 +49,29 @@ jobs:
             -destination 'platform=macOS' \
             -derivedDataPath DerivedData \
             test CODE_SIGNING_ALLOWED=NO
+      - name: Verify bundled Debug desktop helper
+        run: |
+          helper="DerivedData/Build/Products/Debug/VoiceComputerPOC.app/Contents/Helpers/DesktopToolServer"
+          product="DerivedData/Build/Intermediates.noindex/VoiceComputerPOC.build/Debug/VoiceComputerPOC.build/DerivedSources/DesktopToolServer-Debug/debug/DesktopToolServer"
+          test -f "$helper" && test -x "$helper" && test ! -L "$helper"
+          cmp "$product" "$helper"
+          test "$(shasum -a 256 "$helper" | awk '{print $1}')" = "$(cat "$helper.sha256")"
+      - name: Run Release unit tests
+        run: |
+          xcodebuild -quiet \
+            -project VoiceComputerPOC.xcodeproj \
+            -scheme VoiceComputerPOC \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath DerivedData \
+            test CODE_SIGNING_ALLOWED=NO ENABLE_TESTABILITY=YES
+      - name: Verify bundled Release desktop helper
+        run: |
+          helper="DerivedData/Build/Products/Release/VoiceComputerPOC.app/Contents/Helpers/DesktopToolServer"
+          product="DerivedData/Build/Intermediates.noindex/VoiceComputerPOC.build/Release/VoiceComputerPOC.build/DerivedSources/DesktopToolServer-Release/release/DesktopToolServer"
+          test -f "$helper" && test -x "$helper" && test ! -L "$helper"
+          cmp "$product" "$helper"
+          test "$(shasum -a 256 "$helper" | awk '{print $1}')" = "$(cat "$helper.sha256")"
       - name: Check for unused Swift code
         run: |
           binary="$(scripts/install-quality-tool.sh periphery)"

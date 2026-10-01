@@ -11,8 +11,10 @@
 		0A5EEDD1B1A4032FCBA313DC /* SpaceToolBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB2CE7E2613EEBFB29969E02 /* SpaceToolBridge.swift */; };
 		0E6B219B0F072ED018D3065B /* VoiceComputerPOCApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03E832F80A1C092C60825323 /* VoiceComputerPOCApp.swift */; };
 		0EF5A8F7A156B5D7DA21AB23 /* SpaceToolContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D890B71ED4ECE57D20290F2 /* SpaceToolContract.swift */; };
+		11ABDA561800868B832427D3 /* router-cli-args.json in Resources */ = {isa = PBXBuildFile; fileRef = D478EB08637ACB3628315EC6 /* router-cli-args.json */; };
 		11B249B1108AD14B1E9D8685 /* SpaceToolBridgeSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77A1C0131F46AF8B11A108D1 /* SpaceToolBridgeSecurityTests.swift */; };
 		1903CCB753DCB55130698DD5 /* AppServerClient+SpaceVerification.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BBEAB99B854E808C3A2E50 /* AppServerClient+SpaceVerification.swift */; };
+		2E46C2BD23DBA8D96B16443B /* router-output.schema.json in Resources */ = {isa = PBXBuildFile; fileRef = 6BE7479ACF49C5F779513C79 /* router-output.schema.json */; };
 		2FC0AEA630182A4F6C177E93 /* AppServerClient+Connection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1553759D35311E1698534226 /* AppServerClient+Connection.swift */; };
 		39ED284ACB1970972009A7AE /* CommandRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B74AD102A7A7BE23EB6619A /* CommandRoute.swift */; };
 		45B59E7EEC152F2A6831E556 /* SpaceNavigatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17DD4353727E45891FEF5DAB /* SpaceNavigatorTests.swift */; };
@@ -33,6 +35,7 @@
 		E47F520E49C91E7C1477649E /* AppServerClient+Responses.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEF216825C70926B73579A26 /* AppServerClient+Responses.swift */; };
 		E807A0BA7ED80F13CE2784C6 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C9F9324497C1AD7B0B64440 /* ContentView.swift */; };
 		F4C66D788160D488340A7AAF /* AppServerClient+Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA818DA41010F13056BC0096 /* AppServerClient+Notifications.swift */; };
+		FABA6BB3D1B74125E9834BB6 /* router-instruction.txt in Resources */ = {isa = PBXBuildFile; fileRef = BED1EF7D88AEDFF253DD76FC /* router-instruction.txt */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,6 +59,7 @@
 		4DF54FE5EDD2D827D67E8AF4 /* ApprovalProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalProtocol.swift; sourceTree = "<group>"; };
 		5C9F9324497C1AD7B0B64440 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		6B71C5871C819570F0B56DC8 /* AppServerClientRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClientRoutingTests.swift; sourceTree = "<group>"; };
+		6BE7479ACF49C5F779513C79 /* router-output.schema.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "router-output.schema.json"; sourceTree = "<group>"; };
 		77A1C0131F46AF8B11A108D1 /* SpaceToolBridgeSecurityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolBridgeSecurityTests.swift; sourceTree = "<group>"; };
 		7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalVoiceInput.swift; sourceTree = "<group>"; };
 		7BDB7479844A824CE79FA957 /* DiagnosticLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogTests.swift; sourceTree = "<group>"; };
@@ -64,8 +68,10 @@
 		94DE2CF9444DF65BD537012E /* VoiceComputerPOC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VoiceComputerPOC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AAEE0B9B8B1A5F7E5359DD50 /* AppServerClient+Routing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Routing.swift"; sourceTree = "<group>"; };
 		B4892574811141080E9E93FE /* SpaceNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceNavigator.swift; sourceTree = "<group>"; };
+		BED1EF7D88AEDFF253DD76FC /* router-instruction.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "router-instruction.txt"; sourceTree = "<group>"; };
 		D197EA13232A8EC0DF17BCA1 /* AppServerClientNotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClientNotificationTests.swift; sourceTree = "<group>"; };
 		D3BBEAB99B854E808C3A2E50 /* AppServerClient+SpaceVerification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+SpaceVerification.swift"; sourceTree = "<group>"; };
+		D478EB08637ACB3628315EC6 /* router-cli-args.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "router-cli-args.json"; sourceTree = "<group>"; };
 		D632B99140C3882305A8768D /* CommandRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandRouteTests.swift; sourceTree = "<group>"; };
 		DEF216825C70926B73579A26 /* AppServerClient+Responses.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Responses.swift"; sourceTree = "<group>"; };
 		DF84CDBE5580684B8B7B21D1 /* VoiceComputerPOCTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VoiceComputerPOCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -104,10 +110,21 @@
 		3DD83DDDD48D5008D62CD155 = {
 			isa = PBXGroup;
 			children = (
+				54CC224D8FF1507144F4D34F /* evals */,
 				6AE856DD90282B780D3605A2 /* VoiceComputerPOC */,
 				1D00367AA122FEC3D94DD5E9 /* VoiceComputerPOCTests */,
 				09A1CEB64DEC19D6FFC82214 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		54CC224D8FF1507144F4D34F /* evals */ = {
+			isa = PBXGroup;
+			children = (
+				D478EB08637ACB3628315EC6 /* router-cli-args.json */,
+				BED1EF7D88AEDFF253DD76FC /* router-instruction.txt */,
+				6BE7479ACF49C5F779513C79 /* router-output.schema.json */,
+			);
+			path = evals;
 			sourceTree = "<group>";
 		};
 		6AE856DD90282B780D3605A2 /* VoiceComputerPOC */ = {
@@ -143,6 +160,8 @@
 			buildConfigurationList = B8BB97CADA6DD2C358DB6E30 /* Build configuration list for PBXNativeTarget "VoiceComputerPOC" */;
 			buildPhases = (
 				C20DD4CA692E875357DA25A6 /* Sources */,
+				CF683817B418680F0D6873F3 /* Resources */,
+				B691BB247435BD9E2C1EAB84 /* Package pinned DesktopToolServer */,
 			);
 			buildRules = (
 			);
@@ -203,6 +222,41 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CF683817B418680F0D6873F3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				11ABDA561800868B832427D3 /* router-cli-args.json in Resources */,
+				FABA6BB3D1B74125E9834BB6 /* router-instruction.txt in Resources */,
+				2E46C2BD23DBA8D96B16443B /* router-output.schema.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		B691BB247435BD9E2C1EAB84 /* Package pinned DesktopToolServer */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Package pinned DesktopToolServer";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/scripts/package-desktop-tool.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		3D5170ADD58C224F68A650A5 /* Sources */ = {

@@ -1,18 +1,52 @@
 import Foundation
 
 enum RouterAgent {
-    private static func resource(_ name: String) -> URL {
-        URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("evals/\(name)")
+    struct Resources {
+        let instruction: String
+        let arguments: [String]
+        let schema: URL
     }
 
-    static var instruction: String? {
-        try? String(contentsOf: resource("router-instruction.txt"), encoding: .utf8)
+    static let requiredArguments = [
+        "exec", "--ignore-user-config", "--ignore-rules", "--ephemeral",
+        "--skip-git-repo-check", "--sandbox", "read-only", "--disable", "shell_tool",
+        "--disable", "plugins", "--disable", "multi_agent", "-c",
+        "apps._default.enabled=false", "--json",
+    ]
+
+    static func loadResources(from directory: URL?) -> Resources? {
+        guard let directory,
+            let instruction = try? String(
+                contentsOf: directory.appendingPathComponent("router-instruction.txt"), encoding: .utf8),
+            !instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            let argumentsData = try? Data(
+                contentsOf: directory.appendingPathComponent("router-cli-args.json")),
+            let arguments = try? JSONDecoder().decode([String].self, from: argumentsData),
+            arguments == requiredArguments
+        else { return nil }
+        let schema = directory.appendingPathComponent("router-output.schema.json")
+        guard let schemaData = try? Data(contentsOf: schema), validSchema(schemaData) else {
+            return nil
+        }
+        return Resources(instruction: instruction, arguments: arguments, schema: schema)
     }
 
-    static var isolatedArguments: [String]? {
-        guard let data = try? Data(contentsOf: resource("router-cli-args.json")) else { return nil }
-        return try? JSONDecoder().decode([String].self, from: data)
+    private static func validSchema(_ data: Data) -> Bool {
+        guard let actual = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return false
+        }
+        let expected: [String: Any] = [
+            "type": "object", "additionalProperties": false,
+            "required": ["route", "directions", "target"],
+            "properties": [
+                "route": ["type": "string", "enum": ["space", "computer_use", "clarification"]],
+                "directions": [
+                    "type": "array", "items": ["type": "string", "enum": ["left", "right"]],
+                ],
+                "target": ["type": "string", "enum": ["", "calculator"]],
+            ],
+        ]
+        return NSDictionary(dictionary: actual).isEqual(to: expected)
     }
 
     static func toolFreeTrace(_ data: Data) -> Bool {
@@ -48,11 +82,17 @@ enum RouterAgent {
     }
 
     static func classify(_ phrase: String, completion: @escaping (Data?) -> Void) {
-        guard let instruction, let isolatedArguments, let executable = executable() else {
+        classify(phrase, resourceDirectory: Bundle.main.resourceURL, completion: completion)
+    }
+
+    static func classify(
+        _ phrase: String, resourceDirectory: URL?, completion: @escaping (Data?) -> Void
+    ) {
+        guard let resources = loadResources(from: resourceDirectory), let executable = executable()
+        else {
             completion(nil)
             return
         }
-        let schema = resource("router-output.schema.json")
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("voice-router-\(UUID().uuidString)", isDirectory: true)
         do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) } catch
@@ -71,8 +111,8 @@ enum RouterAgent {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments =
-            isolatedArguments + [
-                "--output-schema", schema.path, "--output-last-message", answer.path, "-",
+            resources.arguments + [
+                "--output-schema", resources.schema.path, "--output-last-message", answer.path, "-",
             ]
         process.currentDirectoryURL = directory
         let input = Pipe()
@@ -94,7 +134,7 @@ enum RouterAgent {
             DispatchQueue.global().asyncAfter(deadline: .now() + 90) {
                 if process.isRunning { process.terminate() }
             }
-            let payload = "\(instruction)\nRequest: \(String(reflecting: phrase))\n"
+            let payload = "\(resources.instruction)\nRequest: \(String(reflecting: phrase))\n"
             try input.fileHandleForWriting.write(contentsOf: Data(payload.utf8))
             try input.fileHandleForWriting.close()
         } catch {
