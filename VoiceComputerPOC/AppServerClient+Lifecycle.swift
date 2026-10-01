@@ -21,6 +21,8 @@ extension AppServerClient {
     }
 
     func cleanupProcess() {
+        spaceToolBridge?.stop()
+        spaceToolBridge = nil
         output?.fileHandleForReading.readabilityHandler = nil
         errorOutput?.fileHandleForReading.readabilityHandler = nil
         process = nil
@@ -28,6 +30,7 @@ extension AppServerClient {
         output = nil
         errorOutput = nil
         threadID = nil
+        selectedModel = nil
         turnID = nil
         pending.removeAll()
         approval = nil
@@ -39,6 +42,17 @@ extension AppServerClient {
     }
 
     func fail(_ message: String) {
+        nativeSpacePollTimer?.invalidate()
+        nativeSpacePollTimer = nil
+        toolCallTimeoutTimer?.invalidate()
+        toolCallTimeoutTimer = nil
+        if let toolReply {
+            self.toolReply = nil
+            toolReply(
+                .failure(
+                    "failed", commandID: activeCommandID ?? "unknown",
+                    direction: activeToolDirection?.rawValue ?? "unknown", message: message))
+        }
         record("app_error", details: ["message": message])
         if activeCommandID != nil {
             record(
@@ -49,6 +63,11 @@ extension AppServerClient {
         result = message
         append(message)
         isWorking = false
+        toolResult = nil
+        activeMCPToolItemID = nil
+        expectedToolDirection = nil
+        activeToolDirection = nil
+        requestedToolDirection = nil
         queuedPhrase = nil
         spaceCountAtTurnStart = nil
         focusTargetBundleID = nil
@@ -64,7 +83,7 @@ extension AppServerClient {
     func append(_ event: String) {
         let stamp = Date().formatted(date: .omitted, time: .shortened)
         events.append("\(stamp)  \(event)")
-        record("activity", details: ["message": event])
+        record("activity")
         if events.count > 60 { events.removeFirst(events.count - 60) }
     }
 
@@ -107,6 +126,7 @@ extension AppServerClient {
     }
 
     func finishCommand() {
+        activeMCPToolItemID = nil
         commandWatchdog?.invalidate()
         commandWatchdog = nil
         activeCommandID = nil

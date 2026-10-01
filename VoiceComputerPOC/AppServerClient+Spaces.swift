@@ -2,10 +2,49 @@ import AppKit
 import Foundation
 
 extension AppServerClient {
+    func handleSpaceToolRequest(
+        _ request: SpaceToolRequest, reply: @escaping (SpaceToolResult) -> Void
+    ) {
+        guard request.sessionID == spaceToolBridge?.sessionID,
+            let expectedToolDirection,
+            request.direction == expectedToolDirection.rawValue,
+            isWorking, toolReply == nil, toolCallObserved,
+            activeMCPToolItemID != nil
+        else {
+            reply(
+                .failure(
+                    "rejected", commandID: activeCommandID ?? "unknown", direction: request.direction,
+                    message: "No matching one-step command is active."))
+            return
+        }
+        toolReply = reply
+        activeToolDirection = expectedToolDirection
+        self.expectedToolDirection = nil
+        let commandID = activeCommandID
+        toolCallTimeoutTimer?.invalidate()
+        toolCallTimeoutTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) {
+            [weak self] _ in
+            self?.handleSpaceToolTimeout(commandID: commandID)
+        }
+        record("mcp_bridge_accepted", details: ["direction": request.direction])
+        runNativeSpaceStep(expectedToolDirection, remaining: [], roundTripOrigin: nil)
+    }
+
+    func handleSpaceToolTimeout(commandID: String?) {
+        guard isWorking, activeCommandID == commandID, toolReply != nil else { return }
+        record("mcp_native_callback_timeout")
+        fail("The native Space callback timed out.")
+    }
+
     func runNativeSpaceStep(
         _ direction: SpaceDirection, remaining: [SpaceDirection], roundTripOrigin: Int?
     ) {
-        guard MissionControlAXProbe.isTrusted else {
+        guard isWorking else { return }
+        let trusted = MissionControlAXProbe.isTrusted
+        let before = trusted ? SpaceNavigator.snapshot() : nil
+        let preflight = SpaceToolSafety.preflight(
+            trusted: trusted, snapshot: before, direction: direction)
+        if preflight == .permissionMissing {
             record("native_space_permission_missing")
             completeNativeSpace(
                 status: "failed", verification: "unverified",
@@ -13,17 +52,21 @@ extension AppServerClient {
                 details: ["direction": direction.rawValue])
             return
         }
-        guard let before = SpaceNavigator.snapshot() else {
+        guard let before else {
             completeNativeSpace(
                 status: "failed", verification: "unverified",
-                message: "Could not read the current desktop Space.", details: [:])
+                message: "Could not read the current desktop Space.",
+                details: ["direction": direction.rawValue])
             return
         }
-        guard let expected = before.adjacent(direction) else {
+        guard case .ready(let expected) = preflight else {
             completeNativeSpace(
                 status: "no_adjacent_space", verification: "no_action",
                 message: "There is no desktop Space to the \(direction.rawValue).",
-                details: ["space_before_id": String(before.current)])
+                details: [
+                    "direction": direction.rawValue,
+                    "space_before_id": String(before.current),
+                ])
             return
         }
         record(
@@ -90,44 +133,31 @@ extension AppServerClient {
     ) {
         status = "Switching Space…"
         let deadline = ProcessInfo.processInfo.systemUptime + 3
+        let commandID = activeCommandID
         nativeSpacePollTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) {
             [weak self] timer in
             guard let self else {
                 timer.invalidate()
                 return
             }
-            let after = SpaceNavigator.snapshot()
-            let eventObserved = self.spaceChangeCount > baseline
-            if after?.current == expected && eventObserved {
+            guard self.isWorking, self.activeCommandID == commandID else {
                 timer.invalidate()
                 self.nativeSpacePollTimer = nil
-                let fields = [
-                    "direction": direction.rawValue,
-                    "space_before_id": String(before.current),
-                    "space_target_id": String(expected),
-                    "space_after_id": String(after?.current ?? -1),
-                    "space_change_events": String(self.spaceChangeCount - baseline),
-                ]
-                self.record("native_space_step_verified", details: fields)
-                if let next = remaining.first {
-                    self.nativeSpacePollTimer = Timer.scheduledTimer(
-                        withTimeInterval: 0.5, repeats: false
-                    ) { [weak self] _ in
-                        self?.nativeSpacePollTimer = nil
-                        self?.runNativeSpaceStep(
-                            next, remaining: Array(remaining.dropFirst()),
-                            roundTripOrigin: roundTripOrigin ?? before.current)
-                    }
-                } else {
-                    let returned = roundTripOrigin == after?.current
-                    self.completeNativeSpace(
-                        status: "completed", verification: "verified",
-                        message: returned
-                            ? "Switched right one desktop Space and returned left to the original Space."
-                            : "Switched one desktop Space to the \(direction.rawValue).",
-                        details: fields)
-                }
-            } else if ProcessInfo.processInfo.systemUptime >= deadline {
+                return
+            }
+            let after = SpaceNavigator.snapshot()
+            let eventObserved = self.spaceChangeCount > baseline
+            let check = SpaceToolSafety.verification(
+                expected: expected, after: after?.current, eventObserved: eventObserved,
+                deadlineReached: ProcessInfo.processInfo.systemUptime >= deadline)
+            if check == .verified {
+                timer.invalidate()
+                self.nativeSpacePollTimer = nil
+                self.completeVerifiedNativeSpaceStep(
+                    direction, before: before, after: after, baseline: baseline,
+                    remaining: remaining, roundTripOrigin: roundTripOrigin,
+                    commandID: commandID, expected: expected)
+            } else if check == .timedOut {
                 timer.invalidate()
                 self.nativeSpacePollTimer = nil
                 self.completeNativeSpace(
@@ -148,6 +178,10 @@ extension AppServerClient {
     func completeNativeSpace(
         status outcome: String, verification: String, message: String, details: [String: String]
     ) {
+        guard isWorking else {
+            record("late_native_result_ignored", details: ["status": outcome])
+            return
+        }
         status = outcome == "completed" ? "Ready" : "Space \(outcome)"
         result = message
         append(message)
@@ -156,6 +190,39 @@ extension AppServerClient {
         fields["verification"] = verification
         fields["elapsed_ms"] = commandElapsedMilliseconds
         record("native_space_finished", details: fields)
+        let finishingTool = toolReply != nil
+        if let toolReply {
+            toolCallTimeoutTimer?.invalidate()
+            toolCallTimeoutTimer = nil
+            let expectedID = details["space_target_id"].flatMap(Int.init)
+            let afterID = details["space_after_id"].flatMap(Int.init)
+            let notificationObserved =
+                (details["space_change_events"].flatMap(Int.init) ?? 0) > 0
+            let response = SpaceToolResult(
+                commandID: activeCommandID ?? "unknown",
+                status: verification == "verified" && expectedID != nil
+                    && afterID == expectedID && notificationObserved ? "verified" : outcome,
+                direction: details["direction"] ?? activeToolDirection?.rawValue ?? "unknown",
+                beforeID: details["space_before_id"].flatMap(Int.init),
+                expectedID: expectedID,
+                afterID: afterID,
+                notificationObserved: notificationObserved,
+                message: message)
+            self.toolResult = response
+            self.toolReply = nil
+            record(
+                "mcp_bridge_result",
+                details: [
+                    "status": response.status,
+                    "verification": response.verified ? "verified" : "unverified",
+                ])
+            toolReply(response)
+        }
+        if finishingTool {
+            activeToolDirection = nil
+            status = "Codex is working…"
+            return
+        }
         record("command_finished", details: fields)
         queuedPhrase = nil
         spaceCountAtTurnStart = nil

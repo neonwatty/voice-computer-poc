@@ -4,6 +4,7 @@ struct ContentView: View {
     @ObservedObject var client: AppServerClient
     @ObservedObject private var voice: LocalVoiceInput
     @State private var phrase = ""
+    @State private var originalTranscript: String?
     @State private var activityTab: ActivityTab = .activity
 
     private enum ActivityTab: String, CaseIterable {
@@ -45,19 +46,27 @@ struct ContentView: View {
                 HStack {
                     TextField("What should the computer do?", text: $phrase)
                         .textFieldStyle(.roundedBorder)
-                        .onSubmit(run)
                         .disabled(voice.state != .idle)
                         .accessibilityIdentifier("commandField")
                     if voice.state == .recording {
-                        Button("Stop Recording") { voice.stop { phrase = $0 } }
-                            .accessibilityIdentifier("stopRecordingButton")
+                        Button("Stop Recording") {
+                            voice.stop {
+                                originalTranscript = $0
+                                phrase = $0
+                            }
+                        }
+                        .accessibilityIdentifier("stopRecordingButton")
                     } else if voice.state == .transcribing {
                         Button("Cancel Transcription") { voice.cancel() }
                             .accessibilityIdentifier("cancelTranscriptionButton")
                     } else {
-                        Button("Record") { voice.start() }
-                            .disabled(client.isWorking || voice.state != .idle)
-                            .accessibilityIdentifier("recordButton")
+                        Button("Record") {
+                            originalTranscript = nil
+                            client.prepareVoiceCapture()
+                            voice.start()
+                        }
+                        .disabled(client.isWorking || voice.state != .idle)
+                        .accessibilityIdentifier("recordButton")
                     }
                     Button("Run", action: run)
                         .keyboardShortcut(.return, modifiers: .command)
@@ -90,9 +99,12 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Try a phrase").font(.headline)
                     ForEach(samples, id: \.self) { sample in
-                        Button(sample) { phrase = sample }
-                            .buttonStyle(.borderless)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button(sample) {
+                            phrase = sample
+                            originalTranscript = nil
+                        }
+                        .buttonStyle(.borderless)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
@@ -208,7 +220,13 @@ struct ContentView: View {
         }
     }
 
-    private func run() { client.run(phrase) }
+    private func run() {
+        let transcript = originalTranscript
+        client.run(
+            phrase, source: transcript == nil ? .typed : .reviewedVoice,
+            transcriptEdited: transcript.map { $0 != phrase } ?? false)
+        originalTranscript = nil
+    }
 }
 
 private struct DiagnosticRow: View {

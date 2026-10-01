@@ -144,6 +144,29 @@ The second capture did not match the target command, so it was cleared without
 execution. A full spoken-command-to-computer-action test remains to be done
 with a deliberate utterance.
 
+## Final acceptance matrix, October 1, 2026
+
+| Criterion | Current evidence | Status |
+| --- | --- | --- |
+| 1. Agent MCP call | Local protocol and app-server discovery tests exist. An acting `switch_space` item on the unlocked Air remains to be captured. | Pending Air |
+| 2. Native verification | Automated result contract requires expected live ID and Space notification. Three independently observed right-left round trips through the agent MCP path remain pending. | Pending Air |
+| 3. Failure truth | Local negative tests cover direction, boundary, permission, stale state, timeout, interruption, and failed first step. Air boundary and permission results remain pending. | Local pass; Air pending |
+| 4. Router behavior | The 51-phrase corpus ran three independent model turns per phrase: 153/153 correct, zero permitted wrong-direction or clarification actions. Production parser and coordinator regression tests and isolation probes passed in T015. | Local pass |
+| 5. Computer Use | Routed Calculator selection and focus checks have local tests. Visible approval and independent foreground observation on the Air remain pending. | Pending Air |
+| 6. Voice handoff | Editable transcript enters the validated router only after Run; a test covers command ID continuity and no actor before Run. Deliberate voice-to-action Air receipt remains pending. | Local pass; Air pending |
+| 7. Diagnostics and CI | Command ID links voice metadata, route, MCP or Computer Use, approval, native observations, result, and elapsed time. Normal logs contain no raw audio or screenshots. Xcode tests, Swift package tests, formatting, file length, SwiftLint, Periphery, smoke-driver syntax, and generated-project consistency passed locally for this slice. Final branch CodeQL remains pending. | Local pass; CodeQL pending |
+
+The Air Screen Sharing display is black. Do not issue desktop actions while it
+cannot be observed. Once the owner wakes and unlocks it, first confirm the
+screen is visible. Then capture the routed Space MCP call and three right-left
+round trips with before/after IDs and notifications; test boundary and
+permission failures; run routed Open Calculator with visible approval and
+independent foreground observation; finally record one deliberate Foil command,
+stop, review or correct the field, confirm no action yet, click Run, and inspect
+one command ID across the in-window and JSONL events. Stop hardware work after
+two unverified actions. Record exact IDs, tool outcomes, observations, errors,
+and elapsed times in the Air receipt.
+
 ## What to test next
 
 1. Replace the private live Space ID query with a supported verification method

@@ -5,17 +5,24 @@ from pathlib import Path
 
 MAX_LINES = 300
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_DIRS = ("VoiceComputerPOC", "VoiceComputerPOCTests")
+SOURCE_DIRS = (
+    "VoiceComputerPOC",
+    "VoiceComputerPOCTests",
+    "DesktopToolServer/Sources",
+    "DesktopToolServer/Tests",
+)
 
 
 def main() -> int:
     violations = []
+    paths = [ROOT / "DesktopToolServer/Package.swift"]
     for directory in SOURCE_DIRS:
-        for path in sorted((ROOT / directory).rglob("*.swift")):
-            with path.open(encoding="utf-8") as source:
-                count = sum(1 for _ in source)
-            if count > MAX_LINES:
-                violations.append(f"{path.relative_to(ROOT)}: {count} lines (max {MAX_LINES})")
+        paths.extend((ROOT / directory).rglob("*.swift"))
+    for path in sorted(paths):
+        with path.open(encoding="utf-8") as source:
+            count = sum(1 for _ in source)
+        if count > MAX_LINES:
+            violations.append(f"{path.relative_to(ROOT)}: {count} lines (max {MAX_LINES})")
     if violations:
         print("\n".join(violations))
         return 1

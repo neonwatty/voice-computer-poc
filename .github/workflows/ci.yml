@@ -30,7 +30,7 @@ jobs:
           "$XCODEGEN_BIN" generate --spec project.yml
           git diff --exit-code -- VoiceComputerPOC.xcodeproj
       - name: Check Swift formatting
-        run: xcrun swift-format lint --strict --recursive VoiceComputerPOC VoiceComputerPOCTests
+        run: xcrun swift-format lint --strict --recursive VoiceComputerPOC VoiceComputerPOCTests DesktopToolServer
       - name: Check Swift source limits
         run: |
           python3 scripts/check-swift-file-length.py
@@ -38,6 +38,8 @@ jobs:
           "$binary" lint --strict --no-cache
       - name: Validate smoke driver
         run: python3 -m py_compile scripts/smoke_app_server.py scripts/check-swift-file-length.py
+      - name: Test Swift MCP tool
+        run: swift test --package-path DesktopToolServer
       - name: Build and run unit tests
         run: |
           xcodebuild -quiet \

@@ -1,6 +1,9 @@
 included:
   - VoiceComputerPOC
   - VoiceComputerPOCTests
+  - DesktopToolServer/Sources
+  - DesktopToolServer/Tests
+  - DesktopToolServer/Package.swift
 
 # swift-format owns whitespace and layout. SwiftLint checks structural limits.
 only_rules:

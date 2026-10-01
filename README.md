@@ -47,10 +47,14 @@ For voice input, click **Record**, speak, then click **Stop Recording**. The app
 records a temporary mono WAV file, posts it to the local server with model
 `whisper-1`, deletes the audio file after loading it, and puts the transcript in
 the command field. Review or edit the text and click **Run** to execute it.
-Transcription does not run a command automatically. Recording and transcription
+Transcription does not run a command automatically; pressing Return in the
+command field also does not run it. Reviewed voice text enters the validated
+router and then its selected acting path. Recording and transcription
 status appear in the window. Diagnostic events record permission, recording,
 request, and error states without storing raw audio or transcript text; the
-existing command log records the text once you click **Run**. If Foil is using
+same command ID links these events to the Run, router, tool, native observation,
+and final status. The command log records the input source and whether the
+transcript was edited; the command text stays in the window. If Foil is using
 its managed local service or a cloud provider instead of the advanced external
 server on port 8080, start the external local server before trying this voice
 path. The endpoint is fixed for this first experiment.
@@ -65,6 +69,56 @@ does not arrive. Sentence-ending punctuation from transcription is accepted.
 Enable Voice Computer POC in **System Settings → Privacy &
 Security → Accessibility** if macOS requests it.
 
+### Agent-called Swift Space tool
+
+The explicit test commands **agent switch desktop space right** and **agent
+switch desktop space left** start an acting Codex turn instructed to call the
+local Swift MCP `desktop_tool.switch_space` tool once. The app configures this
+stdio server only for its own app-server process. The helper checks the tool
+arguments and sends one adjacent direction over a loopback bridge with a fresh
+session token. The app accepts the request only during a matching active test
+command, performs Accessibility work in its own process, and returns a typed
+result. A `verified` result requires the target live Space ID and an active
+Space notification. The existing exact phrases above still use their direct
+native path. General Computer Use commands retain their approval flow.
+
+### Routed commands
+
+Other typed commands first go to a separate Codex router invocation. It starts
+with user configuration ignored, the shell and plugin features disabled, app
+tools disabled, and a read-only sandbox. Its trace must also contain no tool
+items or the app discards the result. Its only accepted output is a JSON
+decision for one Space step, an explicit right-then-left return, Calculator,
+or clarification. The app validates the exact keys, allowed values, direction
+cues in order, negation, uncertainty, and safe target before starting an acting
+turn. Invalid output and
+clarification end with no desktop action. Each routed Space step uses a fresh
+acting turn and the same Swift MCP verification; an unverified first step stops
+the sequence. Calculator keeps the visible Computer Use approval and requires
+an independent frontmost-app observation to report verified.
+
+The versioned corpus is `evals/router-v1.json`. Run
+`python3 scripts/eval-router.py` for three independent model turns per phrase.
+The app and evaluator use the same instruction, schema, and isolated CLI flags.
+The evaluator compiles the production route contract for handoff scoring and
+writes every miss, route accuracy, and the wrong-direction and clarification
+action gates to `evals/router-v1-report.json`. This local model evaluation does
+not replace the unlocked Air action and focus checks.
+
+To review this slice on an unlocked MacBook Air, build and open the app, grant
+the app Accessibility access, and begin on a Space with a neighbor to the
+right. Enter the right test command, then the left test command, three times.
+For each step, require a `desktop_tool.switch_space` item in the Diagnostic
+Log, `mcp_bridge_accepted`, `native_space_step_verified`, and a
+`command_finished` entry with the same command ID. Check the live Space ID
+before and after every move with an independent macOS observer; after each
+pair it must equal the starting ID. `mcp_tool_ready` proves app-server
+discovery. At an edge, the tool must return `no_adjacent_space`; with app
+Accessibility disabled, it must return `failed`. Stop after two unverified
+hardware actions. Record the command IDs, observed IDs, notification counts,
+tool results, and any errors in the review receipt. Do not infer a passed Air
+check from unit tests or an agent message.
+
 This remains a prototype: it expects English **Desktop N** labels and a simple
 main-display desktop sequence. The current Space ID check uses a private
 SkyLight read because the `com.apple.spaces` preference can be stale. A
@@ -76,17 +130,17 @@ It shows the final Codex message, a short Activity list, and a live **Diagnostic
 Log** tab in the same window. **Show File** reveals the persistent JSONL log for
 the current app launch in
 `~/Library/Application Support/VoiceComputerPOC/Logs/`. Each line has a timestamp,
-event name, and details. The log records entered commands, final results, server
+event name, and details. The log records command events, verification status, server
 startup and exit, request IDs, Computer Use tool names and completion status,
-approval decisions, and error text. Related events carry a command ID. Completion
+approval decisions, and error details. Related events carry a command ID. Completion
 entries include elapsed time, macOS observations, and a verification status;
 after 90 seconds without a server event, the app records an idle warning. Both
 failed tool calls and tool results marked as errors are recorded. A failed
 connection is reset so the next command can start a fresh session. The log does
-not record screenshots or full tool inputs and outputs. Logs stay on this Mac;
+not record command text, activity text, screenshots, or full tool inputs and outputs. Logs stay on this Mac;
 they are not uploaded by the app.
-They may contain personal information from commands, results, app names, and
-errors, so review them before sharing. Stop interrupts the current turn. The
+They may contain personal information from app names and errors, so review them
+before sharing. Stop interrupts the current turn. The
 Codex session is tied to the app process and is not persisted by this prototype.
 
 The current Computer Use connection can request approval more than once for an
