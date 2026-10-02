@@ -14,6 +14,7 @@ import plistlib
 import queue
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import threading
@@ -42,6 +43,7 @@ COMMANDS = [
 ]
 CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Mission Control", "Finder", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC"]
 MCP_CASES = {15: "right", 16: "left"}
+EXACT_APP_CASES = {13, *MCP_CASES}
 APP_LOG_DIRECTORY = Path.home() / "Library/Application Support/VoiceComputerPOC/Logs"
 
 
@@ -161,6 +163,59 @@ def running_app_pids(app_path):
             and match.group(2) == expected]
 
 
+def process_start_identity(pid):
+    result = subprocess.run(["ps", "-p", str(pid), "-o", "lstart="], capture_output=True,
+                            text=True, check=True, timeout=5).stdout.strip()
+    if not result:
+        raise ValueError("Exact app process has no start identity")
+    return result
+
+
+def parse_open_session_log(output, pid, directory):
+    """Select one regular mode-0600 JSONL held writable by the exact app PID."""
+    directory = directory.resolve()
+    listed_pid = None
+    access = None
+    candidates = []
+    for line in output.splitlines():
+        if line.startswith("p"):
+            if listed_pid is not None:
+                raise ValueError("Ambiguous PID in open file inventory")
+            listed_pid = line[1:]
+        elif line.startswith("f"):
+            access = None
+        elif line.startswith("a"):
+            access = line[1:]
+        elif line.startswith("n") and access in ("w", "u"):
+            path = Path(line[1:])
+            if path.parent == directory and re.fullmatch(r"session-\d+-[A-Fa-f0-9-]+\.jsonl", path.name):
+                candidates.append(path)
+    if listed_pid != str(pid) or len(candidates) != 1:
+        raise ValueError("Missing or ambiguous PID-owned open session JSONL")
+    path = candidates[0]
+    if path.is_symlink() or path.resolve() != path:
+        raise ValueError("Session JSONL path is not canonical")
+    info = path.stat()
+    if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600 or info.st_uid != os.getuid():
+        raise ValueError("Session JSONL must be owner-held regular mode-0600")
+    return path
+
+
+def open_session_log(pid, directory):
+    output = subprocess.run(["lsof", "-nP", "-a", "-p", str(pid), "-Fpafn"],
+                            capture_output=True, text=True, check=True, timeout=5).stdout
+    return parse_open_session_log(output, pid, directory)
+
+
+def cua_exact_path_call(item, app_path):
+    arguments = item.get("arguments") or item.get("input") or {}
+    code = arguments.get("code", "") if isinstance(arguments, dict) else str(arguments)
+    if "com.neonwatty.VoiceComputerPOC" in code:
+        raise RuntimeError("Exact-app case attempted ambiguous bundle-ID CUA binding")
+    pattern = r"cua\.getApp\(\s*(['\"])" + re.escape(str(app_path)) + r"\1\s*\)"
+    return bool(re.search(pattern, code))
+
+
 def validate_mcp_cases(selected, single_step=False):
     if single_step:
         if selected != [15]:
@@ -170,27 +225,78 @@ def validate_mcp_cases(selected, single_step=False):
         raise ValueError("MCP cases require one to three complete right/left pairs")
 
 
-def app_log_rows(directory, since):
+def app_log_rows(path, since, offset=0):
+    """Read only new rows in the one PID-owned session file."""
     rows = []
-    for path in directory.glob("session-*.jsonl"):
-        if path.stat().st_mtime < since - 2:
-            continue
-        with path.open(encoding="utf-8") as handle:
-            for line in handle:
-                try:
-                    row = json.loads(line)
-                except json.JSONDecodeError:
-                    raise ValueError("Unreadable app JSONL row") from None
-                try:
-                    row_time = datetime.fromisoformat(row["timestamp"].replace("Z", "+00:00")).timestamp()
-                except (KeyError, TypeError, ValueError):
-                    raise ValueError("App JSONL row has no valid timestamp") from None
-                if isinstance(row, dict) and row_time >= since:
-                    rows.append(row)
+    with path.open("rb") as handle:
+        if handle.seek(0, os.SEEK_END) < offset:
+            raise ValueError("Session JSONL was truncated")
+        handle.seek(offset)
+        for line in handle:
+            try:
+                row = json.loads(line)
+                row_time = datetime.fromisoformat(row["timestamp"].replace("Z", "+00:00")).timestamp()
+            except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+                raise ValueError("Unreadable app JSONL row or timestamp") from None
+            if row_time < since - 2:
+                raise ValueError("Stale row appended in command window")
+            rows.append(row)
     return rows
 
 
-def verify_mcp_receipt(rows, phrase, direction, before, expected, after):
+def verify_read_only_receipt(rows, before, after, prior_command_ids=()):
+    """Require fresh trusted exact controls and no native action in one session."""
+    def event(name):
+        return [(index, row.get("details", {})) for index, row in enumerate(rows)
+                if row.get("event") == name]
+
+    starts = event("command_started")
+    if len(starts) != 1 or starts[0][1].get("user_action") != "run":
+        raise ValueError("Missing or ambiguous read-only command start")
+    command_id = starts[0][1].get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("Read-only command ID is missing or stale")
+    if any(row.get("details", {}).get("command_id") not in (None, command_id) for row in rows):
+        raise ValueError("Conflicting command ID in read-only window")
+    if any(row.get("event") in ("mcp_action_requested", "mcp_helper_bound",
+                                    "mcp_bridge_accepted", "native_space_requested",
+                                    "native_space_ax_pressed", "native_space_step_verified",
+                                    "native_space_finished", "space_changed",
+                                    "approval_decided") for row in rows):
+        raise ValueError("Read-only case reached a native action or approval")
+    summaries, finishes, observations = event("mission_control_ax_summary"), event("command_finished"), event("live_space_observed")
+    if len(summaries) != 1 or len(finishes) != 1 or len(observations) != 2:
+        raise ValueError("Read-only AX summary, finish, or live IDs missing")
+    if finishes[0][1].get("status") != "completed":
+        raise ValueError("Read-only command did not finish")
+    summary = summaries[0][1]
+    if summary.get("trusted") != "true" or summary.get("dock_found") != "true":
+        raise ValueError("Accessibility trust or Dock controls missing")
+    controls = [part.strip().split(":", 2) for part in summary.get("controls", "").split(";")]
+    if len(controls) != 2 or any(len(part) != 3 for part in controls):
+        raise ValueError("Expected exactly two Desktop controls")
+    for number, (title, description, actions) in enumerate(controls, 1):
+        if title != f"Desktop {number}" or description != f"exit to Desktop {number}" or "AXPress" not in actions.split(","):
+            raise ValueError("Desktop title, description, or AXPress mismatch")
+    if [(item.get("phase"), item.get("live_space_id")) for _, item in observations] != [
+        ("before_command", str(before)), ("after_completion", str(before))
+    ] or after != before:
+        raise ValueError("Read-only live Space ID changed")
+    if not starts[0][0] < summaries[0][0] < finishes[0][0] < observations[1][0]:
+        raise ValueError("Read-only event order invalid")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "before": before, "after": after,
+            "trusted": True, "controls": 2}
+
+
+def assert_log_privacy(rows):
+    private_keys = {"command_text", "raw_audio", "transcript", "prompt", "screenshot"}
+    if any(private_keys.intersection(row.get("details", {})) for row in rows):
+        raise ValueError("Private command or screen content in normal JSONL")
+
+
+def verify_mcp_receipt(rows, phrase, direction, before, expected, after,
+                       prior_command_ids=()):
     """Fail closed on any missing or ambiguous app-owned MCP/native proof."""
     def matching(event, command_rows):
         return [row.get("details", {}) for row in command_rows if row.get("event") == event]
@@ -204,6 +310,8 @@ def verify_mcp_receipt(rows, phrase, direction, before, expected, after):
     if len(starts) != 1 or len(ids) != 1 or not next(iter(ids)):
         raise ValueError("Ambiguous or missing app command ID")
     command_id = next(iter(ids))
+    if command_id in prior_command_ids:
+        raise ValueError("MCP command ID was not fresh")
     command_rows = [row for row in rows if row.get("details", {}).get("command_id") == command_id]
     if any(row.get("event") in ("tool_started", "native_space_requested", "command_finished")
            and row.get("details", {}).get("command_id") not in (None, command_id)
@@ -282,10 +390,7 @@ def verify_mcp_receipt(rows, phrase, direction, before, expected, after):
                  for event in ordered]
     if any(len(group) != 1 for group in positions) or positions != sorted(positions):
         raise ValueError("MCP approval/native/tool event order invalid")
-    for row in command_rows:
-        detail = row.get("details", {})
-        if any(key in detail for key in ("command_text", "raw_audio", "transcript", "prompt", "screenshot")):
-            raise ValueError("Private command or screen content in normal JSONL")
+    assert_log_privacy(rows)
     return {"command_id": command_id, "item_id": item["item_id"],
             "turn_id": item.get("event_turn_id"), "before": before,
             "expected": expected, "after": after}
@@ -358,7 +463,7 @@ class Driver:
                 continue
             if kind == "stderr":
                 if self.stderr_lines < 200:
-                    self.record("server_stderr", line=line.rstrip()[:2000])
+                    self.record("server_stderr", bytes=min(len(line), 2000))
                 elif self.stderr_lines == 200:
                     self.record("server_stderr_limit_reached")
                 self.stderr_lines += 1
@@ -366,7 +471,7 @@ class Driver:
             try:
                 message = json.loads(line)
             except json.JSONDecodeError:
-                self.record("unreadable_server_message", line=line[:2000])
+                self.record("unreadable_server_message", bytes=min(len(line), 2000))
                 continue
             if "method" in message and "id" in message:
                 self.handle_request(message)
@@ -389,7 +494,7 @@ class Driver:
             and not ((params.get("requestedSchema") or {}).get("properties") or {})
             and self.command_index is not None
             and app in ({CASE_APP[self.command_index - 1], str(self.app_path)}
-                        if self.command_index in MCP_CASES else
+                        if self.command_index in EXACT_APP_CASES else
                         {CASE_APP[self.command_index - 1]})
         )
         self.approvals.append({"app": app, "allowed": allowed})
@@ -414,13 +519,10 @@ class Driver:
         params = message.get("params") or {}
         item = params.get("item") or {}
         if method == "item/started" and item.get("type") == "mcpToolCall":
-            if self.command_index in MCP_CASES and item.get("server") == "cua_repl":
-                arguments = json.dumps(item.get("arguments") or item.get("input") or "")
-                if "cua.getApp" in arguments and str(self.app_path) in arguments:
+            if self.command_index in EXACT_APP_CASES and item.get("server") == "cua_repl":
+                if cua_exact_path_call(item, self.app_path):
                     self.cua_binding_observed = True
                     self.record("cua_exact_path_requested")
-                if "com.neonwatty.VoiceComputerPOC" in arguments:
-                    raise RuntimeError("MCP case attempted ambiguous bundle-ID CUA binding")
             self.tool_calls += 1
             limit = 24 if self.command_index in (6, 9, 10, 14, 15, 16) else 12
             if self.tool_calls > limit:
@@ -441,7 +543,7 @@ class Driver:
                                 excerpt="\n".join(str(part.get("text") or "") for part in content)[:3000])
                 if item.get("status") == "failed" or result.get("isError"):
                     error = error or next((part.get("text") for part in content if part.get("text")), None)
-                    self.tool_failures.append(str(error or "Unknown tool error")[:500])
+                    self.tool_failures.append("tool_failed")
                 elif self.command_index is not None:
                     pattern = EXPECTED_EVIDENCE[self.command_index - 1]
                     for part in content:
@@ -452,12 +554,12 @@ class Driver:
                 self.record(
                     "tool_completed", item_id=item.get("id"), tool=item.get("tool"),
                     status=item.get("status"), is_error=bool(result.get("isError")),
-                    error=str(error or "")[:2000],
+                    error_present=bool(error),
                 )
         elif method == "turn/completed":
             turn = params.get("turn") or {}
             self.record("turn_completed", turn_id=turn.get("id"), status=turn.get("status"),
-                        result=self.last_result[:2000], error=turn.get("error"))
+                        result_present=bool(self.last_result), error_present=bool(turn.get("error")))
             self.completed_turn = turn
 
     def wait_rpc(self, request_id, seconds=60):
@@ -500,22 +602,24 @@ def main():
     parser.add_argument("--case", type=int, action="append", choices=range(1, len(COMMANDS) + 1),
                         help="Run one numbered command; repeat to select multiple")
     parser.add_argument("--app-path", type=Path,
-                        help="Canonical absolute VoiceComputerPOC.app path, required for MCP cases")
+                        help="Canonical absolute VoiceComputerPOC.app path, required for cases 13, 15, and 16")
     parser.add_argument("--single-mcp-step", action="store_true",
                         help="Run only one rightward MCP case and stop regardless of result")
     args = parser.parse_args()
     selected = args.case or list(range(1, 7))
     mcp_selected = any(index in MCP_CASES for index in selected)
+    exact_selected = any(index in EXACT_APP_CASES for index in selected)
     if args.single_mcp_step and not mcp_selected:
         parser.error("--single-mcp-step requires --case 15")
     app_path = None
-    if mcp_selected:
+    if exact_selected:
         if not args.app_path:
-            parser.error("MCP cases require --app-path")
+            parser.error("Cases 13, 15, and 16 require --app-path")
         try:
             app_path = canonical_app_path(args.app_path)
         except (OSError, ValueError) as error:
             parser.error(str(error))
+    if mcp_selected:
         try:
             validate_mcp_cases(selected, single_step=args.single_mcp_step)
         except ValueError as error:
@@ -546,8 +650,10 @@ def main():
         }))["thread"]["id"]
         for index in selected:
             phrase = COMMANDS[index - 1]
-            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 14, 15, 16) else None
+            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 13, 14, 15, 16) else None
             expected_space = None
+            if index == 13 and space_before != {"current": 3, "ordered": [3, 4]}:
+                raise RuntimeError("Read-only case requires Main [3,4] at ID3")
             if index in (7, 8, 9, 10, 11, 12, 14, 15, 16):
                 if space_before is None:
                     raise RuntimeError("Cannot read current desktop Space before case %s" % index)
@@ -568,11 +674,20 @@ def main():
                     continue
                 expected_space = (space_before["current"] if index == 10
                                   else ordered[destination])
-            if index in MCP_CASES:
+            if index in EXACT_APP_CASES:
                 pids = running_app_pids(app_path)
                 if len(pids) != 1:
                     raise RuntimeError("Exact app executable must have one live process; found %s" % len(pids))
-                driver.record("exact_app_bound", app_path=str(app_path), pid=pids[0])
+                app_pid = pids[0]
+                app_start = process_start_identity(app_pid)
+                session_log = open_session_log(app_pid, APP_LOG_DIRECTORY)
+                log_info = session_log.stat()
+                log_identity = (log_info.st_dev, log_info.st_ino)
+                log_offset = log_info.st_size
+                prior_ids = {row.get("details", {}).get("command_id")
+                             for row in app_log_rows(session_log, 0)}
+                driver.record("exact_app_bound", app_path=str(app_path), pid=app_pid,
+                              process_start=app_start, session_log=str(session_log))
                 app_since = time.time()
             driver.command_index = index
             driver.last_result = ""
@@ -582,11 +697,20 @@ def main():
             driver.tool_calls = 0
             driver.approvals = []
             driver.cua_binding_observed = False
-            driver.record("command_started", phrase=phrase,
+            driver.record("command_started",
                           space_before=space_before, expected_space=expected_space)
             started = time.monotonic()
             instruction = INSTRUCTION
-            if index in MCP_CASES:
+            if index == 13:
+                instruction = (
+                    "Use only mcp__cua_repl.js for UI. Bind with cua.getApp to this exact full "
+                    "app path: " + str(app_path) + ". Verify its visible Command and Run controls. "
+                    "Enter the quoted read-only inspection phrase and submit once using Return. "
+                    "Read the app Diagnostic Log and report its new command ID, Accessibility "
+                    "trusted state, Dock found state, and Desktop controls. Do not use a bundle-ID "
+                    "fallback, press a Desktop, change Spaces, or approve an acting tool. User request: "
+                )
+            elif index in MCP_CASES:
                 instruction = (
                     "Use only mcp__cua_repl.js for UI. Bind with cua.getApp to this exact full app path: "
                     + str(app_path) + ". Verify the observed app executable/path and visible command field "
@@ -606,6 +730,8 @@ def main():
                     if space_after and space_after["current"] == expected_space:
                         break
                     time.sleep(0.5)
+            elif index == 13:
+                space_after = space_state()
             negative_result = re.search(
                 r"couldn.t|cannot|can.t|declined|unverified|failed|unable to",
                 driver.last_result, re.IGNORECASE,
@@ -621,21 +747,34 @@ def main():
             if index == 14:
                 verified = (verified and bool(driver.evidence_matches)
                             and "Switched one desktop Space to the left" in driver.last_result)
-            mcp_receipt = None
-            if index in MCP_CASES:
+            exact_receipt = None
+            if index in EXACT_APP_CASES:
                 try:
                     if not driver.cua_binding_observed:
                         raise ValueError("No observed CUA getApp call with exact app path")
-                    if running_app_pids(app_path) != pids:
-                        raise ValueError("Exact app process changed during CUA command")
+                    if running_app_pids(app_path) != [app_pid] or process_start_identity(app_pid) != app_start:
+                        raise ValueError("Exact app PID/start changed during CUA command")
+                    if open_session_log(app_pid, APP_LOG_DIRECTORY) != session_log:
+                        raise ValueError("PID-owned session log changed during CUA command")
+                    current_log_info = session_log.stat()
+                    if (current_log_info.st_dev, current_log_info.st_ino) != log_identity:
+                        raise ValueError("PID-owned session log inode changed")
+                    rows = app_log_rows(session_log, app_since, log_offset)
                     after_id = space_after["current"] if space_after else None
-                    mcp_receipt = verify_mcp_receipt(
-                        app_log_rows(APP_LOG_DIRECTORY, app_since), mcp_case_phrase(index),
-                        MCP_CASES[index], space_before["current"], expected_space, after_id)
-                    driver.record("mcp_receipt_verified", **mcp_receipt)
+                    if index == 13:
+                        exact_receipt = verify_read_only_receipt(
+                            rows, space_before["current"], after_id, prior_ids)
+                        driver.record("read_only_receipt_verified", **exact_receipt)
+                    else:
+                        exact_receipt = verify_mcp_receipt(
+                            rows, mcp_case_phrase(index), MCP_CASES[index],
+                            space_before["current"], expected_space, after_id, prior_ids)
+                        driver.record("mcp_receipt_verified", **exact_receipt)
                 except (OSError, ValueError) as error:
-                    driver.record("mcp_receipt_rejected", reason=str(error))
+                    driver.record("exact_app_receipt_rejected", reason=str(error))
                     verified = False
+                else:
+                    verified = exact_receipt is not None and (verified or index == 13)
             success = (turn.get("status") == "completed" and verified
                        and not driver.tool_failures
                        and all(a["allowed"] for a in driver.approvals)
@@ -648,13 +787,13 @@ def main():
                           expected_space=expected_space,
                           turn_id=(response.get("turn") or {}).get("id"))
             print("%s. %s: %s" % (index, "PASS" if success else "FAIL", phrase), flush=True)
-            print("   %s" % driver.last_result.replace("\n", " ")[:500], flush=True)
+            print("   result present: %s" % bool(driver.last_result), flush=True)
             failed = failed or not success
             if index in MCP_CASES and not success:
                 break
     except Exception as error:
         failed = True
-        driver.record("driver_error", error=str(error))
+        driver.record("driver_error", error_type=type(error).__name__)
         print("SMOKE ERROR: %s" % error, file=sys.stderr)
     except KeyboardInterrupt:
         failed = True

@@ -1,15 +1,19 @@
 """Synthetic fail-closed receipts for the hardware smoke gate."""
 
 import copy
+import json
 import plistlib
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from smoke_app_server import (COMMANDS, Driver, canonical_app_path, mcp_case_phrase,
-                              validate_mcp_cases, verify_mcp_receipt)  # noqa: E402
+from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path,
+                              cua_exact_path_call, mcp_case_phrase, parse_open_session_log,
+                              validate_mcp_cases, verify_mcp_receipt,
+                              verify_read_only_receipt)  # noqa: E402
 
 
 COMMAND_ID = "A1B2C3D4"
@@ -51,6 +55,119 @@ def valid_rows(direction="right", before=3, after=4):
     ]
 
 
+def read_only_rows():
+    return [
+        row("command_started", user_action="run"),
+        row("live_space_observed", phase="before_command", live_space_id="3"),
+        row("mission_control_probe_started"),
+        row("mission_control_ax_summary", trusted="true", dock_found="true",
+            controls="Desktop 1:exit to Desktop 1:AXPress,AXRemoveDesktop; "
+                     "Desktop 2:exit to Desktop 2:AXPress,AXRemoveDesktop"),
+        row("command_finished", status="completed"),
+        row("live_space_observed", phase="after_completion", live_space_id="3"),
+    ]
+
+
+class ExactAirBindingTests(unittest.TestCase):
+    def test_cua_requires_exact_path_without_bundle_fallback(self):
+        path = Path("/Users/jeremywatt/Desktop/VoiceComputerPOC-a8175c4.app")
+        self.assertTrue(cua_exact_path_call({"arguments": {"code":
+            "let app = await cua.getApp('" + str(path) + "');"}}, path))
+        self.assertFalse(cua_exact_path_call({"arguments": {"code":
+            "let app = await cua.getApp('/tmp/other.app');"}}, path))
+        with self.assertRaisesRegex(RuntimeError, "bundle-ID"):
+            cua_exact_path_call({"arguments": {"code":
+                "await cua.getApp('com.neonwatty.VoiceComputerPOC');"}}, path)
+
+    def test_case13_and_15_observe_exact_cua_binding(self):
+        path = Path("/Users/jeremywatt/Desktop/VoiceComputerPOC-a8175c4.app")
+        for case in (13, 15):
+            with self.subTest(case=case):
+                driver = object.__new__(Driver)
+                driver.command_index = case
+                driver.tool_calls = 0
+                driver.app_path = path
+                driver.cua_binding_observed = False
+                driver.trace_tool_output = False
+                driver.record = lambda *args, **kwargs: None
+                driver.handle_notification({"method": "item/started", "params": {"item": {
+                    "type": "mcpToolCall", "server": "cua_repl", "tool": "js",
+                    "arguments": {"code": f"await cua.getApp('{path}')"}, "id": "cua-1",
+                }}})
+                self.assertTrue(driver.cua_binding_observed)
+                with self.assertRaisesRegex(RuntimeError, "bundle-ID"):
+                    driver.handle_notification({"method": "item/started", "params": {"item": {
+                        "type": "mcpToolCall", "server": "cua_repl", "tool": "js",
+                        "arguments": {"code": "await cua.getApp('com.neonwatty.VoiceComputerPOC')"},
+                        "id": "cua-2",
+                    }}})
+
+    def test_open_log_requires_one_pid_owned_writable_mode_0600_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory).resolve() / "session-123-A1B2-C3D4.jsonl"
+            log.write_text("", encoding="utf-8")
+            log.chmod(0o600)
+            listing = f"p70331\nf3\naw\nn{log}\n"
+            self.assertEqual(parse_open_session_log(listing, 70331, Path(directory)), log)
+            for bad in ("", listing.replace("p70331", "p7"), listing + listing,
+                        listing.replace("aw", "ar"), listing + f"f4\naw\nn{log}\n"):
+                with self.subTest(bad=bad), self.assertRaises(ValueError):
+                    parse_open_session_log(bad, 70331, Path(directory))
+            log.chmod(0o644)
+            with self.assertRaisesRegex(ValueError, "0600"):
+                parse_open_session_log(listing, 70331, Path(directory))
+            log.chmod(0o600)
+            alias = log.parent / "session-456-A1B2-C3D4.jsonl"
+            alias.symlink_to(log)
+            with self.assertRaisesRegex(ValueError, "canonical"):
+                parse_open_session_log(f"p70331\nf3\naw\nn{alias}\n", 70331,
+                                       Path(directory))
+
+    def test_log_offset_only_reads_fresh_command_window(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory).resolve() / "session-123-A1B2-C3D4.jsonl"
+            timestamp = datetime.now(timezone.utc).isoformat()
+            log.write_text(json.dumps({"timestamp": timestamp, "event": "old"}) + "\n")
+            offset = log.stat().st_size
+            with log.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps({"timestamp": timestamp, "event": "new"}) + "\n")
+            self.assertEqual([entry["event"] for entry in app_log_rows(
+                log, datetime.now(timezone.utc).timestamp(), offset)], ["new"])
+            with self.assertRaisesRegex(ValueError, "truncated"):
+                app_log_rows(log, 0, log.stat().st_size + 1)
+            with log.open("a", encoding="utf-8") as handle:
+                handle.write("invalid json\n")
+            with self.assertRaisesRegex(ValueError, "Unreadable"):
+                app_log_rows(log, 0, offset)
+
+    def test_read_only_receipt_is_fresh_trusted_exact_and_no_action(self):
+        self.assertEqual(verify_read_only_receipt(read_only_rows(), 3, 3)["command_id"],
+                         COMMAND_ID)
+        cases = [
+            (0, "command_id", "old"), (3, "trusted", "false"),
+            (3, "dock_found", "false"), (3, "controls", "Desktop 1:wrong:AXPress"),
+            (5, "live_space_id", "4"),
+        ]
+        for index, field, value in cases:
+            with self.subTest(field=field):
+                changed = copy.deepcopy(read_only_rows())
+                changed[index]["details"][field] = value
+                with self.assertRaises(ValueError):
+                    verify_read_only_receipt(changed, 3, 3)
+        with self.assertRaisesRegex(ValueError, "stale"):
+            verify_read_only_receipt(read_only_rows(), 3, 3, {COMMAND_ID})
+        with self.assertRaisesRegex(ValueError, "changed"):
+            verify_read_only_receipt(read_only_rows(), 3, 4)
+        for event in ("native_space_requested", "native_space_ax_pressed",
+                      "space_changed", "mcp_bridge_accepted", "approval_decided"):
+            with self.subTest(event=event), self.assertRaisesRegex(ValueError, "native action"):
+                verify_read_only_receipt(read_only_rows() + [row(event)], 3, 3)
+        changed = read_only_rows()
+        changed[3]["details"]["raw_audio"] = "private"
+        with self.assertRaisesRegex(ValueError, "Private"):
+            verify_read_only_receipt(changed, 3, 3)
+
+
 class MCPReceiptTests(unittest.TestCase):
     def check(self, rows, direction="right", before=3, after=4):
         return verify_mcp_receipt(rows, "agent switch desktop space " + direction,
@@ -59,6 +176,9 @@ class MCPReceiptTests(unittest.TestCase):
     def test_valid_right_and_left(self):
         self.assertEqual(self.check(valid_rows())["command_id"], COMMAND_ID)
         self.assertEqual(self.check(valid_rows("left", 4, 3), "left", 4, 3)["after"], 3)
+        with self.assertRaisesRegex(ValueError, "fresh"):
+            verify_mcp_receipt(valid_rows(), mcp_case_phrase(15), "right", 3, 4, 4,
+                               {COMMAND_ID})
 
     def test_mcp_cua_budget_is_finite_and_allows_final_receipt(self):
         for case, limit in ((15, 24), (16, 24), (1, 12)):
