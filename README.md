@@ -157,7 +157,9 @@ Desktop count, titles, target description, and AXPress action. It permits at
 most one press, then allows up to three seconds for independent ID and
 notification verification within the ten-second tool callback limit. If controls do not
 appear, the typed result remains unverified; the normal log records only a
-reason code, attempt count, trust state, and deadline status. The read-only
+reason code, attempt count, Dock presence, and bounded Desktop-control and AX-node counts for
+each strict scan. It also records Mission Control launch completion or failure
+and elapsed time. These diagnostics omit unrelated AX nodes and UI content. The read-only
 inspection command reports only Desktop controls, without the full Dock AX
 tree. The Air smoke verifier uses the exact typed `agent switch desktop space
 right/left` phrase, distinct from its outer CUA instruction.
@@ -254,6 +256,8 @@ on the first failed step. The app must already be running from that exact path
 with one matching process and an unlocked, observable UI. The local app-server
 Computer Use turn requests that full path through CUA. Its inner Space-tool
 approval must be visibly reviewed and set to **Allow once** for each step.
+Each MCP case has a finite 24-call Computer Use budget; the driver still stops
+after the first failed step.
 
 ```sh
 python3 scripts/smoke_app_server.py \

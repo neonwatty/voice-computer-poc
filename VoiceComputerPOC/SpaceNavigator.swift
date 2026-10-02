@@ -13,8 +13,7 @@ enum SpaceDirection: String {
             self = .left
         case "switch to the next desktop space", "switch one desktop space to the right":
             self = .right
-        default:
-            return nil
+        default: return nil
         }
     }
     static func normalizedPhrase(_ phrase: String) -> String {
@@ -181,14 +180,14 @@ enum MissionControlAXError: LocalizedError {
     case permissionRequired
     case dockUnavailable
     case desktopNotFound(String)
+    case scanUnavailable(String, Int, Int)
     case pressFailed(AXError)
     var errorDescription: String? {
         switch self {
         case .permissionRequired:
             return "Voice Computer POC needs Accessibility permission to select a desktop."
-        case .dockUnavailable:
-            return "The macOS Dock process is unavailable."
-        case .desktopNotFound:
+        case .dockUnavailable: return "The macOS Dock process is unavailable."
+        case .desktopNotFound, .scanUnavailable:
             return "Mission Control did not expose the expected desktop controls."
         case .pressFailed(let error):
             return "Mission Control did not accept the desktop press (\(error.rawValue))."
@@ -210,7 +209,7 @@ enum MissionControlAXProbe {
         var largestDesktopCount = 0
         while !queue.isEmpty && visited < 120 {
             guard ProcessInfo.processInfo.systemUptime < deadline else {
-                throw MissionControlAXError.desktopNotFound("readiness_timeout")
+                throw MissionControlAXError.scanUnavailable("readiness_timeout", largestDesktopCount, visited)
             }
             let element = queue.removeFirst()
             visited += 1
@@ -224,8 +223,8 @@ enum MissionControlAXProbe {
                 }
                 largestDesktopCount = max(largestDesktopCount, desktops.count)
                 let expectedTitles = Set((1...expectedCount).map { "Desktop \($0)" })
-                let actualTitles = Set(desktops.map { string($0, attribute: kAXTitleAttribute) })
-                if desktops.count == expectedCount && actualTitles == expectedTitles,
+                if desktops.count == expectedCount
+                    && Set(desktops.map { string($0, attribute: kAXTitleAttribute) }) == expectedTitles,
                     let target = desktops.first(where: {
                         string($0, attribute: kAXTitleAttribute) == "Desktop \(number)"
                             && string($0, attribute: kAXDescriptionAttribute)
@@ -235,10 +234,11 @@ enum MissionControlAXProbe {
                     var actionValue: CFArray?
                     guard AXUIElementCopyActionNames(target, &actionValue) == .success,
                         (actionValue as? [String] ?? []).contains(kAXPressAction as String)
-                    else { throw MissionControlAXError.desktopNotFound("mismatched_controls") }
-                    guard canPress() else {
-                        throw MissionControlAXError.desktopNotFound("stale_command")
+                    else {
+                        throw MissionControlAXError.scanUnavailable(
+                            "mismatched_controls", largestDesktopCount, visited)
                     }
+                    guard canPress() else { throw MissionControlAXError.desktopNotFound("stale_command") }
                     let result = AXUIElementPerformAction(target, kAXPressAction as CFString)
                     guard result == .success else { throw MissionControlAXError.pressFailed(result) }
                     return
@@ -250,18 +250,17 @@ enum MissionControlAXProbe {
             largestDesktopCount == 0
             ? "missing_controls"
             : largestDesktopCount < expectedCount ? "incomplete_controls" : "mismatched_controls"
-        throw MissionControlAXError.desktopNotFound(reason)
+        throw MissionControlAXError.scanUnavailable(reason, largestDesktopCount, visited)
     }
     static func inspectDock(limit: Int = 120) -> (
         trusted: Bool, dockFound: Bool, nodes: [MissionControlAXNode]
     ) {
-        let trusted = AXIsProcessTrusted()
-        guard trusted,
+        guard AXIsProcessTrusted() else { return (false, false, []) }
+        guard
             let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock")
                 .first
-        else { return (trusted, false, []) }
-        let root = AXUIElementCreateApplication(dock.processIdentifier)
-        var queue = [root]
+        else { return (true, false, []) }
+        var queue = [AXUIElementCreateApplication(dock.processIdentifier)]
         var nodes: [MissionControlAXNode] = []
         var visited = 0
         while !queue.isEmpty && visited < limit {
@@ -280,7 +279,7 @@ enum MissionControlAXProbe {
             }
             queue.append(contentsOf: children(of: element))
         }
-        return (trusted, true, nodes)
+        return (true, true, nodes)
     }
     private static func string(_ element: AXUIElement, attribute: String) -> String {
         var value: CFTypeRef?

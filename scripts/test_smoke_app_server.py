@@ -8,8 +8,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from smoke_app_server import (COMMANDS, canonical_app_path, mcp_case_phrase, validate_mcp_cases,
-                              verify_mcp_receipt)  # noqa: E402
+from smoke_app_server import (COMMANDS, Driver, canonical_app_path, mcp_case_phrase,
+                              validate_mcp_cases, verify_mcp_receipt)  # noqa: E402
 
 
 COMMAND_ID = "A1B2C3D4"
@@ -59,6 +59,30 @@ class MCPReceiptTests(unittest.TestCase):
     def test_valid_right_and_left(self):
         self.assertEqual(self.check(valid_rows())["command_id"], COMMAND_ID)
         self.assertEqual(self.check(valid_rows("left", 4, 3), "left", 4, 3)["after"], 3)
+
+    def test_mcp_cua_budget_is_finite_and_allows_final_receipt(self):
+        for case, limit in ((15, 24), (16, 24), (1, 12)):
+            with self.subTest(case=case):
+                driver = object.__new__(Driver)
+                driver.command_index = case
+                driver.tool_calls = 0
+                driver.trace_tool_output = False
+                driver.app_path = Path("/private/tmp/exact.app")
+                driver.record = lambda *args, **kwargs: None
+                notification = {"method": "item/started", "params": {"item": {
+                    "type": "mcpToolCall", "server": "cua_repl", "tool": "js",
+                    "arguments": "", "id": "synthetic-cua",
+                }}}
+                for _ in range(limit):
+                    driver.handle_notification(notification)
+                self.assertEqual(driver.tool_calls, limit)
+                if case in (15, 16):
+                    direction, before, after = ("right", 3, 4) if case == 15 else ("left", 4, 3)
+                    self.assertEqual(verify_mcp_receipt(
+                        valid_rows(direction, before, after), mcp_case_phrase(case),
+                        direction, before, after, after)["after"], after)
+                with self.assertRaisesRegex(RuntimeError, str(limit)):
+                    driver.handle_notification(notification)
 
     def test_real_case_phrase_callsite_rejects_outer_and_legacy(self):
         for case, direction, before, after in ((15, "right", 3, 4), (16, "left", 4, 3)):

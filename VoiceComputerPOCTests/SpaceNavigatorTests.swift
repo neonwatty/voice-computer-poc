@@ -141,11 +141,18 @@ final class SpaceNavigatorTests: XCTestCase {
         var attempts = 0
         client.pressNativeSpace(context, launchError: nil, attempts: 1) {
             attempts += 1
-            if attempts < 3 { throw MissionControlAXError.desktopNotFound("missing_controls") }
+            if attempts < 3 {
+                throw MissionControlAXError.scanUnavailable("missing_controls", 0, 7)
+            }
         }
         let completed = expectation(description: "One synthetic press")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
             XCTAssertEqual(attempts, 3)
+            XCTAssertEqual(
+                client.diagnosticEntries.filter {
+                    $0.event == "mission_control_ax_readiness"
+                        && $0.details["reason"] == "missing_controls"
+                }.count, 2)
             XCTAssertEqual(
                 client.diagnosticEntries.filter { $0.event == "native_space_ax_pressed" }.count, 1)
             client.stop()
@@ -161,19 +168,63 @@ final class SpaceNavigatorTests: XCTestCase {
             client.isWorking = true
             let context = readiness(commandID: reason, after: 4, seconds: 0.2)
             client.pressNativeSpace(context, launchError: nil, attempts: 1) {
-                throw MissionControlAXError.desktopNotFound(reason)
+                throw MissionControlAXError.scanUnavailable(reason, 150, 150)
             }
             let failed = expectation(description: "Readiness failure: \(reason)")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                 XCTAssertEqual(client.status, "Space failed")
                 XCTAssertFalse(client.isWorking)
                 XCTAssertFalse(client.diagnosticEntries.contains { $0.event == "native_space_ax_pressed" })
-                XCTAssertTrue(
-                    client.diagnosticEntries.contains { $0.event == "mission_control_ax_readiness" })
+                let scans = client.diagnosticEntries.filter { $0.event == "mission_control_ax_readiness" }
+                XCTAssertEqual(scans.first?.details["reason"], reason)
+                XCTAssertEqual(scans.first?.details["desktops"], "120")
+                XCTAssertEqual(scans.first?.details["nodes"], "120")
+                XCTAssertEqual(scans.first?.details["dock_count"], "1")
                 failed.fulfill()
             }
             wait(for: [failed], timeout: 1)
         }
+    }
+
+    func testDockUnavailableIsCategorizedWithoutPress() {
+        let client = AppServerClient()
+        client.activeCommandID = "no-dock"
+        client.isWorking = true
+        client.pressNativeSpace(
+            readiness(commandID: "no-dock", after: 4, seconds: 0.2),
+            launchError: nil, attempts: 1
+        ) { throw MissionControlAXError.dockUnavailable }
+        let failed = expectation(description: "Dock unavailable")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            let scans = client.diagnosticEntries.filter { $0.event == "mission_control_ax_readiness" }
+            XCTAssertEqual(scans.first?.details["reason"], "dock_unavailable")
+            XCTAssertEqual(scans.first?.details["desktops"], "0")
+            XCTAssertEqual(scans.first?.details["dock_count"], "0")
+            XCTAssertFalse(client.diagnosticEntries.contains { $0.event == "native_space_ax_pressed" })
+            failed.fulfill()
+        }
+        wait(for: [failed], timeout: 1)
+    }
+
+    func testLaunchErrorIsCategorizedWithoutPress() {
+        let client = AppServerClient()
+        client.activeCommandID = "launch-error"
+        client.isWorking = true
+        var presses = 0
+        client.pressNativeSpace(
+            readiness(commandID: "launch-error", after: 4, seconds: 1),
+            launchError: NSError(domain: "synthetic", code: 1), attempts: 1
+        ) { presses += 1 }
+        XCTAssertEqual(presses, 0)
+        XCTAssertEqual(client.status, "Space failed")
+        XCTAssertEqual(
+            client.diagnosticEntries.last(where: {
+                $0.event == "mission_control_ax_readiness"
+            })?.details["reason"], "launch_error")
+        XCTAssertEqual(
+            client.diagnosticEntries.last(where: {
+                $0.event == "mission_control_ax_readiness"
+            })?.details["dock_count"], "unknown")
     }
 
     func testCancelledOrStaleReadinessCannotPress() {

@@ -422,7 +422,7 @@ class Driver:
                 if "com.neonwatty.VoiceComputerPOC" in arguments:
                     raise RuntimeError("MCP case attempted ambiguous bundle-ID CUA binding")
             self.tool_calls += 1
-            limit = 24 if self.command_index in (6, 9, 10, 14) else 12
+            limit = 24 if self.command_index in (6, 9, 10, 14, 15, 16) else 12
             if self.tool_calls > limit:
                 raise RuntimeError("Command exceeded %s Computer Use calls" % limit)
             self.record("tool_started", item_id=item.get("id"), tool=item.get("tool"))

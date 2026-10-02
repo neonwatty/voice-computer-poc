@@ -1,5 +1,4 @@
 import AppKit
-import Foundation
 
 extension AppServerClient {
     func handleSpaceToolRequest(
@@ -76,29 +75,30 @@ extension AppServerClient {
                 ])
             return
         }
-        record(
-            "native_space_requested",
-            details: [
-                "direction": direction.rawValue, "space_before_id": String(before.current),
-                "space_target_id": String(expected),
-            ])
-        let baseline = spaceChangeCount
+        let requestDetails = [
+            "direction": direction.rawValue, "space_before_id": String(before.current),
+            "space_target_id": String(expected),
+        ]
+        record("native_space_requested", details: requestDetails)
         let commandID = activeCommandID
-        let targetNumber = (before.ordered.firstIndex(of: expected) ?? 0) + 1
         status = "Opening Mission Control…"
-        let deadline = ProcessInfo.processInfo.systemUptime + 4
         let readiness = NativeSpaceReadiness(
-            direction: direction, before: before, expected: expected, baseline: baseline,
-            targetNumber: targetNumber, remaining: remaining,
-            roundTripOrigin: roundTripOrigin, commandID: commandID, deadline: deadline)
+            direction: direction, before: before, expected: expected, baseline: spaceChangeCount,
+            targetNumber: (before.ordered.firstIndex(of: expected) ?? 0) + 1,
+            remaining: remaining, roundTripOrigin: roundTripOrigin,
+            commandID: commandID, deadline: ProcessInfo.processInfo.systemUptime + 4)
         let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
         NSWorkspace.shared.openApplication(at: url, configuration: .init()) { [weak self] _, error in
             DispatchQueue.main.async {
                 guard let self, self.isWorking, self.activeCommandID == commandID else { return }
+                let elapsed = Int((ProcessInfo.processInfo.systemUptime - readiness.deadline + 4) * 1000)
+                let launchEvent =
+                    error == nil ? "mission_control_launch_completed" : "mission_control_launch_failed"
+                self.record(launchEvent, details: ["elapsed_ms": String(elapsed)])
                 self.pressNativeSpace(readiness, launchError: error, attempts: 1) {
                     try MissionControlAXProbe.pressDesktop(
-                        number: targetNumber, expectedCount: before.ordered.count,
-                        deadline: deadline,
+                        number: readiness.targetNumber, expectedCount: before.ordered.count,
+                        deadline: readiness.deadline,
                         canPress: { [weak self] in
                             self?.isWorking == true && self?.activeCommandID == commandID
                         })
@@ -130,13 +130,25 @@ extension AppServerClient {
                 roundTripOrigin: readiness.roundTripOrigin)
         } catch {
             let reason: String
+            var desktopCount = 0
+            var visited = 0
             switch error {
             case MissionControlAXError.permissionRequired: reason = "ax_trust_lost"
             case MissionControlAXError.dockUnavailable: reason = "dock_unavailable"
             case MissionControlAXError.desktopNotFound(let detail): reason = detail
+            case MissionControlAXError.scanUnavailable(let detail, let count, let nodes):
+                reason = detail
+                (desktopCount, visited) = (count, nodes)
             case MissionControlAXError.pressFailed: reason = "ax_press_failed"
             default: reason = "launch_error"
             }
+            record(
+                "mission_control_ax_readiness",
+                details: [
+                    "attempts": String(attempts), "reason": reason,
+                    "desktops": String(min(120, desktopCount)), "nodes": String(min(120, visited)),
+                    "dock_count": reason == "dock_unavailable" ? "0" : (visited > 0 ? "1" : "unknown"),
+                ])
             if ["dock_unavailable", "missing_controls", "incomplete_controls", "mismatched_controls"]
                 .contains(reason), ProcessInfo.processInfo.systemUptime < readiness.deadline
             {
@@ -146,13 +158,6 @@ extension AppServerClient {
                 }
                 return
             }
-            record(
-                "mission_control_ax_readiness",
-                details: [
-                    "reason": reason, "attempts": String(attempts), "deadline_ms": "4000",
-                    "trusted": String(MissionControlAXProbe.isTrusted),
-                    "timed_out": String(ProcessInfo.processInfo.systemUptime >= readiness.deadline),
-                ])
             if case MissionControlAXError.permissionRequired = error {
                 record("native_space_permission_missing")
             }
@@ -175,19 +180,15 @@ extension AppServerClient {
         let commandID = activeCommandID
         nativeSpacePollTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) {
             [weak self] timer in
-            guard let self else {
+            guard let self, self.isWorking, self.activeCommandID == commandID else {
                 timer.invalidate()
-                return
-            }
-            guard self.isWorking, self.activeCommandID == commandID else {
-                timer.invalidate()
-                self.nativeSpacePollTimer = nil
+                self?.nativeSpacePollTimer = nil
                 return
             }
             let after = SpaceNavigator.snapshot()
-            let eventObserved = self.spaceChangeCount > baseline
             let check = SpaceToolSafety.verification(
-                expected: expected, after: after?.current, eventObserved: eventObserved,
+                expected: expected, after: after?.current,
+                eventObserved: self.spaceChangeCount > baseline,
                 deadlineReached: ProcessInfo.processInfo.systemUptime >= deadline)
             if check == .verified {
                 timer.invalidate()
@@ -248,12 +249,11 @@ extension AppServerClient {
                 message: message)
             self.toolResult = response
             self.toolReply = nil
-            record(
-                "mcp_bridge_result",
-                details: [
-                    "status": response.status,
-                    "verification": response.verified ? "verified" : "unverified",
-                ])
+            let bridgeDetails = [
+                "status": response.status,
+                "verification": response.verified ? "verified" : "unverified",
+            ]
+            record("mcp_bridge_result", details: bridgeDetails)
             toolReply(response)
         }
         if finishingTool {
@@ -275,16 +275,15 @@ extension AppServerClient {
         NSWorkspace.shared.openApplication(at: url, configuration: .init()) { [weak self] _, error in
             DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.8) {
                 let probe = MissionControlAXProbe.inspectDock()
-                let controls = probe.nodes.map { "\($0.title):\($0.description):\($0.actions)" }
                 DispatchQueue.main.async {
                     guard let self, self.isWorking, self.activeCommandID == commandID else { return }
                     if error != nil { self.record("mission_control_launch_failed") }
-                    self.record(
-                        "mission_control_ax_summary",
-                        details: [
-                            "trusted": String(probe.trusted), "dock_found": String(probe.dockFound),
-                            "controls": controls.joined(separator: "; "),
-                        ])
+                    let summary = [
+                        "trusted": String(probe.trusted), "dock_found": String(probe.dockFound),
+                        "controls": probe.nodes.map { "\($0.title):\($0.description):\($0.actions)" }
+                            .joined(separator: "; "),
+                    ]
+                    self.record("mission_control_ax_summary", details: summary)
                     self.status = "Ready"
                     self.result = "Inspected Dock desktop controls. See Diagnostic Log."
                     self.record("command_finished", details: ["elapsed_ms": self.commandElapsedMilliseconds])
@@ -296,5 +295,4 @@ extension AppServerClient {
             }
         }
     }
-
 }
