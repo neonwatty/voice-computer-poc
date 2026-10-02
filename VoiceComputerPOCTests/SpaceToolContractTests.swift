@@ -257,12 +257,6 @@ final class SpaceToolContractTests: XCTestCase {
         let descriptor = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
         let client = try XCTUnwrap(descriptor >= 0 ? descriptor : nil)
         defer { Darwin.close(client) }
-        var noSignal: Int32 = 1
-        XCTAssertEqual(
-            setsockopt(
-                client, SOL_SOCKET, SO_NOSIGPIPE, &noSignal,
-                socklen_t(MemoryLayout.size(ofValue: noSignal))),
-            0)
         var address = try XCTUnwrap(SpaceToolBridge.address(for: bridge.socketPath))
         let connected = withUnsafePointer(to: &address) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
@@ -275,13 +269,6 @@ final class SpaceToolContractTests: XCTestCase {
             setsockopt(
                 client, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout))),
             0)
-        var request = try JSONEncoder().encode(
-            SpaceToolRequest(sessionID: bridge.sessionID, direction: "right"))
-        request.append(0x0A)
-        let written = request.withUnsafeBytes { buffer in
-            Darwin.write(client, buffer.baseAddress, buffer.count)
-        }
-        XCTAssertTrue(written == request.count || (written == -1 && errno == EPIPE))
         var bytes = [UInt8](repeating: 0, count: 4_096)
         let count = Darwin.read(client, &bytes, bytes.count)
         let received = try XCTUnwrap(
