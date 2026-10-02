@@ -44,8 +44,9 @@ exact regular executable and its build-time SHA-256 manifest before offering
 the Space tool. It never builds a helper at command time or launches one from
 the source checkout.
 
-Type a command or select a sample phrase, then click Run. For general commands,
-the app starts a local app-server over stdio, chooses an available Codex model, starts a thread with a
+Type a command or select a sample phrase, then click Run or press Return in the
+focused command field. For general commands, the app starts a local app-server
+over stdio, chooses an available Codex model, starts a thread with a
 read-only shell/filesystem sandbox, and sends the phrase as a turn. Desktop operations are constrained
 in the prompt to the configured `cua_repl` Computer Use tool. When app-server
 requests Computer Use access to an app, the prototype displays the request and
@@ -55,9 +56,9 @@ For voice input, click **Record**, speak, then click **Stop Recording**. The app
 records a temporary mono WAV file, posts it to the local server with model
 `whisper-1`, deletes the audio file after loading it, and puts the transcript in
 the command field. Review or edit the text and click **Run** to execute it.
-Transcription does not run a command automatically; pressing Return in the
-command field also does not run it. Reviewed voice text enters the validated
-router and then its selected acting path. Recording and transcription
+Transcription does not run a command automatically; review the text, then click
+Run or press Return in the focused command field. Reviewed voice text enters
+the validated router and then its selected acting path. Recording and transcription
 status appear in the window. Diagnostic events record permission, recording,
 request, and error states without storing raw audio or transcript text; the
 same command ID links these events to the Run, router, tool, native observation,

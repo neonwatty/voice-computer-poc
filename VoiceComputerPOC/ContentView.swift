@@ -47,6 +47,7 @@ struct ContentView: View {
                     TextField("What should the computer do?", text: $phrase)
                         .textFieldStyle(.roundedBorder)
                         .disabled(voice.state != .idle)
+                        .onSubmit { run() }
                         .accessibilityIdentifier("commandField")
                     if voice.state == .recording {
                         Button("Stop Recording") {
@@ -70,10 +71,7 @@ struct ContentView: View {
                     }
                     Button("Run", action: run)
                         .keyboardShortcut(.return, modifiers: .command)
-                        .disabled(
-                            client.isWorking || voice.state != .idle
-                                || phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        )
+                        .disabled(!canRun)
                         .accessibilityIdentifier("runButton")
                     Button("Stop") { client.stop() }
                         .disabled(!client.canStop)
@@ -226,7 +224,13 @@ struct ContentView: View {
         }
     }
 
+    private var canRun: Bool {
+        !client.isWorking && voice.state == .idle
+            && !phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private func run() {
+        guard canRun else { return }
         let transcript = originalTranscript
         client.run(
             phrase, source: transcript == nil ? .typed : .reviewedVoice,
