@@ -236,6 +236,32 @@ Cases 11 and 12 probe Mission Control through Computer Use; both failed on the
 Air. Case 13 inspects Dock's Mission Control Accessibility tree. The app's
 native case 10 passed on the Air; see [PLAN.md](PLAN.md).
 
+Cases 15 and 16 run the **acting MCP** right and left commands through the
+exact installed app. Pass its canonical absolute `.app` path (for example,
+`/private/tmp/...`, because `/tmp` is a symlink on macOS). Select one to three
+complete right/left pairs; the driver rejects other MCP sequences and stops
+on the first failed step. The app must already be running from that exact path
+with one matching process and an unlocked, observable UI. The local app-server
+Computer Use turn requests that full path through CUA. Its inner Space-tool
+approval must be visibly reviewed and set to **Allow once** for each step.
+
+```sh
+python3 scripts/smoke_app_server.py \
+  --app-path /private/tmp/voice-computer-air-derived/Build/Products/Debug/VoiceComputerPOC.app \
+  --case 15 --case 16 --case 15 --case 16 --case 15 --case 16 \
+  --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/mcp-pairs-$(date +%s).jsonl"
+```
+
+Before each step the driver independently reads the live Space ID and checks
+Main `[3,4]`, the expected starting ID, and the exact running executable. It
+then checks the command-correlated app JSONL for one authentic
+`desktop_tool.switch_space` item and turn, Allow once, helper identity, bridge
+acceptance, AX press, notification, typed verified result, and after-ID. A
+native-only trace is rejected. Run this only on an exact-head build after CI
+and CodeQL pass; save the private outer CUA receipt and app command IDs for the
+hardware review. The normal app JSONL must not contain command text, prompt,
+raw audio, transcript, or screenshots.
+
 Add `--trace-tool-output` only when diagnosing a failure. It stores up to 3,000
 characters of each tool call's input and text output in the private receipt;
 those excerpts may contain visible desktop text. The normal receipt omits them.
