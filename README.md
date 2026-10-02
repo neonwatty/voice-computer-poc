@@ -147,6 +147,9 @@ check from unit tests or an agent message.
 This remains a prototype: it expects English **Desktop N** labels and a simple
 main-display desktop sequence. The current Space ID check uses a private
 SkyLight read because the `com.apple.spaces` preference can be stale. A
+monitor record for a disconnected display may contain only a well-formed
+`Collapsed Space` and no `Spaces` array; the parser ignores that stale record
+while rejecting populated secondary displays and ambiguous main records. A
 distribution-ready app needs a supported verification method and testing across
 macOS versions and multi-display layouts.
 

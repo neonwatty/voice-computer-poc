@@ -43,6 +43,57 @@ final class SpaceNavigatorTests: XCTestCase {
         }
     }
 
+    func testParserAcceptsAirCollapsedStaleMonitorShape() {
+        let main = monitor("Main", ids: [3, 4])
+        let stale = (1...8).map { index in
+            collapsedMonitor(index: index, id: index == 1 ? 4 : index * 117)
+        }
+        for split in 0...8 {
+            let monitors = Array(stale.prefix(split)) + [main] + Array(stale.dropFirst(split))
+            XCTAssertEqual(
+                SpaceNavigator.parseMonitors(monitors, current: 3),
+                SpaceSnapshot(current: 3, ordered: [3, 4]))
+        }
+    }
+
+    func testParserRejectsMalformedCollapsedStaleAndPopulatedSecondary() {
+        let main = monitor("Main", ids: [3, 4])
+        let valid = collapsedMonitor(index: 1, id: 4)
+        guard let originalFields = valid["Collapsed Space"] as? [String: Any] else {
+            return XCTFail("Test fixture must contain Collapsed Space")
+        }
+        var missingID = valid
+        var fields = originalFields
+        fields.removeValue(forKey: "id64")
+        missingID["Collapsed Space"] = fields
+        var mismatchedID = valid
+        fields["id64"] = 5
+        mismatchedID["Collapsed Space"] = fields
+        var invalidUUID = valid
+        fields = originalFields
+        fields["uuid"] = "invalid"
+        invalidUUID["Collapsed Space"] = fields
+        var invalidAutoCreated = valid
+        fields["AutoCreated"] = "yes"
+        invalidAutoCreated["Collapsed Space"] = fields
+        var unexpectedField = valid
+        unexpectedField["Extra"] = true
+        var populated = valid
+        populated["Spaces"] = [["id64": 5]]
+        let malformed = [
+            missingID, mismatchedID, invalidUUID, invalidAutoCreated,
+            unexpectedField, populated,
+            ["Display Identifier": "stale", "Collapsed Space": fields],
+            ["Display Identifier": "stale"],
+        ]
+        for record in malformed {
+            XCTAssertNil(SpaceNavigator.parseMonitors([main, record], current: 3))
+        }
+        XCTAssertNil(SpaceNavigator.parseMonitors([valid], current: 3))
+        XCTAssertNil(SpaceNavigator.parseMonitors([main, main, valid], current: 3))
+        XCTAssertNil(SpaceNavigator.parseMonitors([main, valid, valid], current: 3))
+    }
+
     func testParserRejectsMissingEmptyDuplicateOrAmbiguousMain() {
         let main = monitor("Main", ids: [3, 4])
         let empty = monitor("stale", ids: [])
@@ -83,5 +134,17 @@ final class SpaceNavigatorTests: XCTestCase {
 
     private func monitor(_ identifier: String, ids: [Int]) -> [String: Any] {
         ["Display Identifier": identifier, "Spaces": ids.map { ["id64": $0] }]
+    }
+
+    private func collapsedMonitor(index: Int, id: Int) -> [String: Any] {
+        let identifier = String(format: "00000000-0000-4000-8000-%012d", index)
+        var collapsed: [String: Any] = [
+            "ManagedSpaceID": id,
+            "id64": id,
+            "type": 0,
+            "uuid": String(format: "10000000-0000-4000-8000-%012d", index),
+        ]
+        if index == 3 || index == 8 { collapsed["AutoCreated"] = true }
+        return ["Display Identifier": identifier, "Collapsed Space": collapsed]
     }
 }

@@ -93,13 +93,19 @@ enum SpaceNavigator {
         var mainIDs: [Int]?
         for monitor in monitors {
             guard let identifier = monitor["Display Identifier"] as? String,
-                !identifier.isEmpty, identifiers.insert(identifier).inserted,
-                let spaces = monitor["Spaces"] as? [[String: Any]]
+                !identifier.isEmpty, identifiers.insert(identifier).inserted
             else { return nil }
             if identifier != "Main" {
-                guard spaces.isEmpty else { return nil }
+                if let spaces = monitor["Spaces"] as? [[String: Any]] {
+                    guard spaces.isEmpty else { return nil }
+                } else {
+                    guard monitor["Spaces"] == nil,
+                        isCollapsedStaleMonitor(monitor, identifier: identifier)
+                    else { return nil }
+                }
                 continue
             }
+            guard let spaces = monitor["Spaces"] as? [[String: Any]] else { return nil }
             guard mainIDs == nil, !spaces.isEmpty else { return nil }
             var ordered: [Int] = []
             var seen = Set<Int>()
@@ -117,6 +123,35 @@ enum SpaceNavigator {
         }
         guard let mainIDs, mainIDs.contains(current) else { return nil }
         return SpaceSnapshot(current: current, ordered: mainIDs)
+    }
+
+    private static func isCollapsedStaleMonitor(
+        _ monitor: [String: Any], identifier: String
+    ) -> Bool {
+        guard UUID(uuidString: identifier) != nil,
+            Set(monitor.keys) == ["Display Identifier", "Collapsed Space"],
+            let collapsed = monitor["Collapsed Space"] as? [String: Any],
+            Set(collapsed.keys).subtracting(["AutoCreated"])
+                == ["ManagedSpaceID", "id64", "type", "uuid"],
+            let managed = collapsed["ManagedSpaceID"] as? NSNumber,
+            let id = collapsed["id64"] as? NSNumber,
+            let type = collapsed["type"] as? NSNumber,
+            CFGetTypeID(managed) != CFBooleanGetTypeID(),
+            CFGetTypeID(id) != CFBooleanGetTypeID(),
+            CFGetTypeID(type) != CFBooleanGetTypeID(),
+            [managed, id, type].allSatisfy({
+                ["c", "C", "s", "S", "i", "I", "l", "L", "q", "Q"]
+                    .contains(String(cString: $0.objCType))
+            }),
+            managed.int64Value > 0, managed == id, type.int64Value == 0,
+            let uuid = collapsed["uuid"] as? String, UUID(uuidString: uuid) != nil
+        else { return false }
+        if let autoCreated = collapsed["AutoCreated"] {
+            guard let value = autoCreated as? NSNumber,
+                CFGetTypeID(value) == CFBooleanGetTypeID()
+            else { return false }
+        }
+        return true
     }
 
     // com.apple.spaces can retain a stale Current Space; this prototype reads the live ID.
