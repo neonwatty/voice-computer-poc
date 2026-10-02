@@ -74,6 +74,7 @@ final class SpaceNavigatorTests: XCTestCase {
         fields["uuid"] = "invalid"
         invalidUUID["Collapsed Space"] = fields
         var invalidAutoCreated = valid
+        fields = originalFields
         fields["AutoCreated"] = "yes"
         invalidAutoCreated["Collapsed Space"] = fields
         var unexpectedField = valid
