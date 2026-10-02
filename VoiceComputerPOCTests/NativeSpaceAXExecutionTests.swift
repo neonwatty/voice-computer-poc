@@ -138,7 +138,7 @@ final class NativeSpaceAXExecutionTests: XCTestCase {
     }
 
     func testDiscoveryFailuresNeverPress() {
-        for reason in ["missing_controls", "incomplete_controls", "mismatched_controls"] {
+        for reason in ["missing_controls", "incomplete_controls", "mismatched_controls", "changed_live_id"] {
             let client = activeClient(reason)
             let context = readiness(reason, seconds: 0.2)
             let failed = expectation(description: reason)
@@ -221,6 +221,60 @@ final class NativeSpaceAXExecutionTests: XCTestCase {
             },
             revalidate: { _ in }, press: { _ in XCTFail("unexpected press") })
         XCTAssertEqual(launch.status, "Space failed")
+    }
+
+    func testAXFirstExactControlsSkipOpenAndRequireVerification() {
+        let client = activeClient("ax-first-exact")
+        let context = readiness("ax-first-exact")
+        let pressed = expectation(description: "exact controls pressed")
+        var opens = 0
+        client.discoverAndPressNativeSpace(
+            context, launchError: nil, attempts: 0,
+            discover: { self.discovery() },
+            revalidate: { _ in
+                XCTAssertTrue(Thread.isMainThread)
+            }, press: { _ in pressed.fulfill() }, liveSpaceID: { 3 },
+            openOnAbsent: { opens += 1 })
+        wait(for: [pressed], timeout: 1)
+        XCTAssertEqual(opens, 0)
+        XCTAssertEqual(client.diagnosticEntries.filter { $0.event == "native_space_ax_pressed" }.count, 1)
+        XCTAssertFalse(client.result.contains("verified"))
+        XCTAssertEqual(
+            SpaceToolSafety.verification(expected: 4, after: 4, eventObserved: false, deadlineReached: false),
+            .pending)
+        XCTAssertEqual(
+            SpaceToolSafety.verification(expected: 4, after: 3, eventObserved: true, deadlineReached: false),
+            .pending)
+        client.stop()
+    }
+
+    func testAXFirstOpensOnlyForAbsentControls() {
+        for reason in ["missing_controls", "incomplete_controls", "mismatched_controls"] {
+            let client = activeClient(reason)
+            let context = readiness(reason)
+            let settled = expectation(description: reason)
+            var opens = 0
+            var presses = 0
+            client.discoverAndPressNativeSpace(
+                context, launchError: nil, attempts: 0,
+                discover: {
+                    throw MissionControlAXError.scanUnavailable(
+                        reason == "changed_live_id" ? "missing_controls" : reason, 0, 5)
+                },
+                revalidate: { _ in XCTFail("unexpected revalidation") },
+                press: { _ in presses += 1 },
+                liveSpaceID: { reason == "changed_live_id" ? 4 : 3 },
+                openOnAbsent: { opens += 1 })
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                XCTAssertEqual(opens, reason == "missing_controls" ? 1 : 0)
+                XCTAssertEqual(presses, 0)
+                XCTAssertFalse(context.pressGate.attempted)
+                if opens == 0 { XCTAssertEqual(client.status, "Space failed") }
+                client.stop()
+                settled.fulfill()
+            }
+            wait(for: [settled], timeout: 1)
+        }
     }
 
     private func activeClient(_ command: String) -> AppServerClient {

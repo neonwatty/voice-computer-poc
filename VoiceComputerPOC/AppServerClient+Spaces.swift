@@ -1,6 +1,12 @@
 import AppKit
-
 extension AppServerClient {
+    static func controlsAbsent(_ error: Error) -> Bool {
+        if case MissionControlAXError.dockUnavailable = error { return true }
+        if case MissionControlAXError.scanUnavailable("missing_controls", 0, _) = error {
+            return true
+        }
+        return false
+    }
     func handleSpaceToolRequest(
         _ request: SpaceToolRequest, peer: SpaceToolBridge.PeerIdentity,
         reply: @escaping (SpaceToolResult) -> Void
@@ -81,15 +87,19 @@ extension AppServerClient {
         ]
         record("native_space_requested", details: requestDetails)
         let commandID = activeCommandID
-        status = "Opening Mission Control…"
+        status = "Checking Mission Control controls…"
         let readiness = NativeSpaceReadiness(
             direction: direction, before: before, expected: expected, baseline: spaceChangeCount,
             targetNumber: (before.ordered.firstIndex(of: expected) ?? 0) + 1,
             remaining: remaining, roundTripOrigin: roundTripOrigin,
             commandID: commandID, deadline: ProcessInfo.processInfo.systemUptime + 4)
-        requestVoiceForeground(readiness) { [weak self] in
-            self?.launchNativeSpaceDiscovery(readiness)
-        }
+        discoverAndPressNativeSpace(
+            readiness, launchError: nil, attempts: 0,
+            openOnAbsent: { [weak self] in
+                self?.requestVoiceForeground(readiness) { [weak self] in
+                    self?.launchNativeSpaceDiscovery(readiness)
+                }
+            })
     }
     func handleMissionControlLaunchResult(
         _ readiness: NativeSpaceReadiness, applicationPresent: Bool, error: Error?,

@@ -1,13 +1,9 @@
 import AppKit
 import ApplicationServices
-
-// The AX tree is discovered off main, as in the successful read-only probe.
-// Discovery never performs an AX action. The selected element is checked again on main.
 struct MissionControlAXDiscovery {
     let list: AXUIElement
     let target: AXUIElement
 }
-
 enum NativeSpaceAXExecution {
     static func discover(number: Int, expectedCount: Int, deadline: TimeInterval) throws
         -> MissionControlAXDiscovery
@@ -20,6 +16,8 @@ enum NativeSpaceAXExecution {
         var queue = [AXUIElementCreateApplication(dock.processIdentifier)]
         var visited = 0
         var largestCount = 0
+        var candidate: MissionControlAXDiscovery?
+        var malformed = false
         while !queue.isEmpty && visited < 120 {
             guard ProcessInfo.processInfo.systemUptime < deadline else {
                 throw MissionControlAXError.scanUnavailable("readiness_timeout", largestCount, visited)
@@ -31,24 +29,31 @@ enum NativeSpaceAXExecution {
             if string(element, kAXRoleAttribute) == kAXListRole as String {
                 let desktops = desktopButtons(children)
                 largestCount = max(largestCount, desktops.count)
-                if exactTitles(desktops, expectedCount: expectedCount),
+                if !desktops.isEmpty, exactControls(desktops, expectedCount: expectedCount),
                     let target = desktops.first(where: {
                         string($0, kAXTitleAttribute) == "Desktop \(number)"
-                            && string($0, kAXDescriptionAttribute) == "exit to Desktop \(number)"
-                    }), hasPress(target)
+                    })
                 {
-                    return .init(list: element, target: target)
+                    if candidate != nil { malformed = true }
+                    candidate = .init(list: element, target: target)
+                } else if !desktops.isEmpty {
+                    malformed = true
                 }
             }
             queue.append(contentsOf: children)
         }
+        guard queue.isEmpty else {
+            throw MissionControlAXError.scanUnavailable("readiness_timeout", largestCount, visited)
+        }
+        if !malformed, let candidate { return candidate }
         let reason =
             largestCount == 0
             ? "missing_controls"
-            : largestCount < expectedCount ? "incomplete_controls" : "mismatched_controls"
+            : largestCount < expectedCount && candidate == nil
+                ? "incomplete_controls"
+                : "mismatched_controls"
         throw MissionControlAXError.scanUnavailable(reason, largestCount, visited)
     }
-
     static func revalidate(
         _ discovery: MissionControlAXDiscovery, number: Int, expectedCount: Int
     ) throws {
@@ -57,7 +62,7 @@ enum NativeSpaceAXExecution {
             throw MissionControlAXError.desktopNotFound("stale_controls")
         }
         let desktops = desktopButtons(children(of: discovery.list))
-        guard exactTitles(desktops, expectedCount: expectedCount),
+        guard exactControls(desktops, expectedCount: expectedCount),
             desktops.contains(where: { CFEqual($0, discovery.target) }),
             string(discovery.target, kAXRoleAttribute) == kAXButtonRole as String,
             string(discovery.target, kAXTitleAttribute) == "Desktop \(number)",
@@ -69,11 +74,14 @@ enum NativeSpaceAXExecution {
         let result = AXUIElementPerformAction(discovery.target, kAXPressAction as CFString)
         guard result == .success else { throw MissionControlAXError.pressFailed(result) }
     }
-
-    private static func exactTitles(_ desktops: [AXUIElement], expectedCount: Int) -> Bool {
+    private static func exactControls(_ desktops: [AXUIElement], expectedCount: Int) -> Bool {
         guard expectedCount > 0, desktops.count == expectedCount else { return false }
-        return Set(desktops.map { string($0, kAXTitleAttribute) })
-            == Set((1...expectedCount).map { "Desktop \($0)" })
+        let titles = Set(desktops.map { string($0, kAXTitleAttribute) })
+        guard titles == Set((1...expectedCount).map { "Desktop \($0)" }) else { return false }
+        return desktops.allSatisfy {
+            string($0, kAXDescriptionAttribute) == "exit to \(string($0, kAXTitleAttribute))"
+                && hasPress($0)
+        }
     }
     private static func desktopButtons(_ children: [AXUIElement]) -> [AXUIElement] {
         children.filter {
@@ -89,21 +97,21 @@ enum NativeSpaceAXExecution {
     }
     private static func string(_ element: AXUIElement, _ attribute: String) -> String {
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else {
-            return ""
+        if AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success {
+            return value as? String ?? ""
         }
-        return value as? String ?? ""
+        return ""
     }
     private static func children(of element: AXUIElement) -> [AXUIElement] {
         var value: CFTypeRef?
-        guard
-            AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &value)
-                == .success
-        else { return [] }
-        return value as? [AXUIElement] ?? []
+        if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &value)
+            == .success
+        {
+            return value as? [AXUIElement] ?? []
+        }
+        return []
     }
 }
-
 extension AppServerClient {
     func requestVoiceForeground(
         _ readiness: NativeSpaceReadiness,
@@ -129,7 +137,6 @@ extension AppServerClient {
             isActive: isActive, frontmostBundleID: frontmostBundleID,
             launch: launch)
     }
-
     private func pollVoiceForeground(
         _ readiness: NativeSpaceReadiness, started: TimeInterval, cutoff: TimeInterval,
         isActive: @escaping () -> Bool, frontmostBundleID: @escaping () -> String?,
@@ -168,10 +175,9 @@ extension AppServerClient {
                 frontmostBundleID: frontmostBundleID, launch: launch)
         }
     }
-
     func launchNativeSpaceDiscovery(_ readiness: NativeSpaceReadiness) {
         let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
-        var configuration = NSWorkspace.OpenConfiguration()
+        let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
         NSWorkspace.shared.openApplication(at: url, configuration: configuration) {
             [weak self] application, error in
@@ -180,26 +186,11 @@ extension AppServerClient {
                     readiness, applicationPresent: application != nil, error: error
                 ) { [weak self] in
                     self?.discoverAndPressNativeSpace(
-                        readiness, launchError: nil, attempts: 1,
-                        discover: {
-                            try NativeSpaceAXExecution.discover(
-                                number: readiness.targetNumber,
-                                expectedCount: readiness.before.ordered.count,
-                                deadline: readiness.deadline)
-                        },
-                        revalidate: { discovery in
-                            try NativeSpaceAXExecution.revalidate(
-                                discovery, number: readiness.targetNumber,
-                                expectedCount: readiness.before.ordered.count)
-                        },
-                        press: { discovery in
-                            try NativeSpaceAXExecution.press(discovery)
-                        })
+                        readiness, launchError: nil, attempts: 1)
                 }
             }
         }
     }
-
     func completeDiscoveredNativeSpace(
         _ readiness: NativeSpaceReadiness, discovery: MissionControlAXDiscovery, attempts: Int,
         revalidate: (MissionControlAXDiscovery) throws -> Void,
@@ -240,14 +231,27 @@ extension AppServerClient {
             handleNativeSpaceReadinessError(error, readiness: readiness, attempts: attempts)
         }
     }
-
     func discoverAndPressNativeSpace(
         _ readiness: NativeSpaceReadiness, launchError: Error?, attempts: Int,
-        discover: @escaping () throws -> MissionControlAXDiscovery,
-        revalidate: @escaping (MissionControlAXDiscovery) throws -> Void,
-        press: @escaping (MissionControlAXDiscovery) throws -> Void,
-        liveSpaceID: @escaping () -> Int? = { SpaceNavigator.liveSpaceID() }
+        discover: (() throws -> MissionControlAXDiscovery)? = nil,
+        revalidate: ((MissionControlAXDiscovery) throws -> Void)? = nil,
+        press: ((MissionControlAXDiscovery) throws -> Void)? = nil,
+        liveSpaceID: @escaping () -> Int? = { SpaceNavigator.liveSpaceID() },
+        openOnAbsent: (() -> Void)? = nil
     ) {
+        let discover =
+            discover ?? {
+                try NativeSpaceAXExecution.discover(
+                    number: readiness.targetNumber, expectedCount: readiness.before.ordered.count,
+                    deadline: readiness.deadline)
+            }
+        let revalidate =
+            revalidate ?? {
+                try NativeSpaceAXExecution.revalidate(
+                    $0, number: readiness.targetNumber,
+                    expectedCount: readiness.before.ordered.count)
+            }
+        let press = press ?? { try NativeSpaceAXExecution.press($0) }
         guard isWorking, activeCommandID == readiness.commandID else { return }
         if let launchError {
             handleNativeSpaceReadinessError(launchError, readiness: readiness, attempts: attempts)
@@ -267,14 +271,24 @@ extension AppServerClient {
                 }
                 switch outcome {
                 case .failure(let error):
+                    if let openOnAbsent,
+                        Self.controlsAbsent(error),
+                        ProcessInfo.processInfo.systemUptime < readiness.deadline,
+                        liveSpaceID() == readiness.before.current
+                    {
+                        self.record("mission_control_ax_first", details: ["outcome": "absent"])
+                        openOnAbsent()
+                        return
+                    }
                     self.handleNativeSpaceReadinessError(
                         error, readiness: readiness, attempts: attempts,
-                        retry: { [weak self] in
-                            self?.discoverAndPressNativeSpace(
-                                readiness, launchError: nil, attempts: attempts + 1,
-                                discover: discover, revalidate: revalidate, press: press,
-                                liveSpaceID: liveSpaceID)
-                        })
+                        retry: openOnAbsent == nil
+                            ? { [weak self] in
+                                self?.discoverAndPressNativeSpace(
+                                    readiness, launchError: nil, attempts: attempts + 1,
+                                    discover: discover, revalidate: revalidate, press: press,
+                                    liveSpaceID: liveSpaceID)
+                            } : nil)
                 case .success(let discovery):
                     self.completeDiscoveredNativeSpace(
                         readiness, discovery: discovery, attempts: attempts,
