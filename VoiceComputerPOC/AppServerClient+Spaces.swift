@@ -87,89 +87,54 @@ extension AppServerClient {
             targetNumber: (before.ordered.firstIndex(of: expected) ?? 0) + 1,
             remaining: remaining, roundTripOrigin: roundTripOrigin,
             commandID: commandID, deadline: ProcessInfo.processInfo.systemUptime + 4)
-        let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
-        NSWorkspace.shared.openApplication(at: url, configuration: .init()) { [weak self] _, error in
-            DispatchQueue.main.async {
-                guard let self, self.isWorking, self.activeCommandID == commandID else { return }
-                let elapsed = Int((ProcessInfo.processInfo.systemUptime - readiness.deadline + 4) * 1000)
-                let launchEvent =
-                    error == nil ? "mission_control_launch_completed" : "mission_control_launch_failed"
-                self.record(launchEvent, details: ["elapsed_ms": String(elapsed)])
-                self.pressNativeSpace(readiness, launchError: error, attempts: 1) {
-                    try MissionControlAXProbe.pressDesktop(
-                        number: readiness.targetNumber, expectedCount: before.ordered.count,
-                        deadline: readiness.deadline,
-                        canPress: { [weak self] in
-                            self?.isWorking == true && self?.activeCommandID == commandID
-                        })
-                }
-            }
-        }
+        launchNativeSpaceDiscovery(readiness)
     }
-    func pressNativeSpace(
-        _ readiness: NativeSpaceReadiness, launchError: Error?, attempts: Int,
-        press: @escaping () throws -> Void
+    func handleNativeSpaceReadinessError(
+        _ error: Error, readiness: NativeSpaceReadiness, attempts: Int,
+        retry: (() -> Void)? = nil
     ) {
         guard isWorking, activeCommandID == readiness.commandID else { return }
-        do {
-            if let launchError { throw launchError }
-            guard ProcessInfo.processInfo.systemUptime < readiness.deadline else {
-                throw MissionControlAXError.desktopNotFound("readiness_timeout")
-            }
-            try press()
-            record(
-                "native_space_ax_pressed",
-                details: [
-                    "direction": readiness.direction.rawValue,
-                    "desktop_number": String(readiness.targetNumber),
-                ])
-            append("Pressed Desktop \(readiness.targetNumber) in Mission Control")
-            startNativeSpaceVerification(
-                readiness.direction, before: readiness.before, expected: readiness.expected,
-                baseline: readiness.baseline, remaining: readiness.remaining,
-                roundTripOrigin: readiness.roundTripOrigin)
-        } catch {
-            let reason: String
-            var desktopCount = 0
-            var visited = 0
-            switch error {
-            case MissionControlAXError.permissionRequired: reason = "ax_trust_lost"
-            case MissionControlAXError.dockUnavailable: reason = "dock_unavailable"
-            case MissionControlAXError.desktopNotFound(let detail): reason = detail
-            case MissionControlAXError.scanUnavailable(let detail, let count, let nodes):
-                reason = detail
-                (desktopCount, visited) = (count, nodes)
-            case MissionControlAXError.pressFailed: reason = "ax_press_failed"
-            default: reason = "launch_error"
-            }
-            record(
-                "mission_control_ax_readiness",
-                details: [
-                    "attempts": String(attempts), "reason": reason,
-                    "desktops": String(min(120, desktopCount)), "nodes": String(min(120, visited)),
-                    "dock_count": reason == "dock_unavailable" ? "0" : (visited > 0 ? "1" : "unknown"),
-                ])
-            if ["dock_unavailable", "missing_controls", "incomplete_controls", "mismatched_controls"]
-                .contains(reason), ProcessInfo.processInfo.systemUptime < readiness.deadline
-            {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                    self?.pressNativeSpace(
-                        readiness, launchError: nil, attempts: attempts + 1, press: press)
-                }
-                return
-            }
-            if case MissionControlAXError.permissionRequired = error {
-                record("native_space_permission_missing")
-            }
-            completeNativeSpace(
-                status: "failed", verification: "unverified",
-                message: error.localizedDescription,
-                details: [
-                    "direction": readiness.direction.rawValue,
-                    "space_before_id": String(readiness.before.current),
-                    "space_target_id": String(readiness.expected),
-                ])
+        let reason: String
+        var desktopCount = 0
+        var visited = 0
+        switch error {
+        case MissionControlAXError.permissionRequired: reason = "ax_trust_lost"
+        case MissionControlAXError.dockUnavailable: reason = "dock_unavailable"
+        case MissionControlAXError.desktopNotFound(let detail): reason = detail
+        case MissionControlAXError.scanUnavailable(let detail, let count, let nodes):
+            reason = detail
+            (desktopCount, visited) = (count, nodes)
+        case MissionControlAXError.pressFailed: reason = "ax_press_failed"
+        default: reason = "launch_error"
         }
+        record(
+            "mission_control_ax_readiness",
+            details: [
+                "attempts": String(attempts), "reason": reason,
+                "desktops": String(min(120, desktopCount)), "nodes": String(min(120, visited)),
+                "dock_count": reason == "dock_unavailable" ? "0" : (visited > 0 ? "1" : "unknown"),
+            ])
+        if let retry,
+            ["dock_unavailable", "missing_controls", "incomplete_controls", "mismatched_controls"]
+                .contains(reason), ProcessInfo.processInfo.systemUptime < readiness.deadline
+        {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                guard self?.isWorking == true else { return }
+                retry()
+            }
+            return
+        }
+        if case MissionControlAXError.permissionRequired = error {
+            record("native_space_permission_missing")
+        }
+        completeNativeSpace(
+            status: "failed", verification: "unverified",
+            message: error.localizedDescription,
+            details: [
+                "direction": readiness.direction.rawValue,
+                "space_before_id": String(readiness.before.current),
+                "space_target_id": String(readiness.expected),
+            ])
     }
     func startNativeSpaceVerification(
         _ direction: SpaceDirection, before: SpaceSnapshot, expected: Int, baseline: Int,

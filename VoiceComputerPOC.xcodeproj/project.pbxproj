@@ -14,6 +14,7 @@
 		11ABDA561800868B832427D3 /* router-cli-args.json in Resources */ = {isa = PBXBuildFile; fileRef = D478EB08637ACB3628315EC6 /* router-cli-args.json */; };
 		11B249B1108AD14B1E9D8685 /* SpaceToolBridgeSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77A1C0131F46AF8B11A108D1 /* SpaceToolBridgeSecurityTests.swift */; };
 		1903CCB753DCB55130698DD5 /* AppServerClient+SpaceVerification.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BBEAB99B854E808C3A2E50 /* AppServerClient+SpaceVerification.swift */; };
+		25389F8BE59799C7694C9D72 /* AppServerClient+SpaceAXExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658A3A41C80234ACA5A36A8D /* AppServerClient+SpaceAXExecution.swift */; };
 		2E46C2BD23DBA8D96B16443B /* router-output.schema.json in Resources */ = {isa = PBXBuildFile; fileRef = 6BE7479ACF49C5F779513C79 /* router-output.schema.json */; };
 		2FC0AEA630182A4F6C177E93 /* AppServerClient+Connection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1553759D35311E1698534226 /* AppServerClient+Connection.swift */; };
 		39ED284ACB1970972009A7AE /* CommandRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B74AD102A7A7BE23EB6619A /* CommandRoute.swift */; };
@@ -21,6 +22,7 @@
 		46A0B1E7E64FAA6B4DAF7B21 /* AppServerClientNotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D197EA13232A8EC0DF17BCA1 /* AppServerClientNotificationTests.swift */; };
 		46B4B0D406445B2F5DA025D6 /* AppServerClient+Spaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C996441AC1A3E32F91757B /* AppServerClient+Spaces.swift */; };
 		4B783A83A2C9EC4A3D90A251 /* SpaceNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4892574811141080E9E93FE /* SpaceNavigator.swift */; };
+		4C89AD07C7FD92FE012B26E3 /* NativeSpaceAXExecutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAF6FC2A95408A77DEB5287E /* NativeSpaceAXExecutionTests.swift */; };
 		51C8F021EEB3C28AF14AA781 /* RouterAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54D737F47D4FB6002490D93 /* RouterAgent.swift */; };
 		6E47380606EC3DFF30BF1E0E /* AppServerClientRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B71C5871C819570F0B56DC8 /* AppServerClientRoutingTests.swift */; };
 		815AE3BC1BD46EA6E2F4BF79 /* CommandRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D632B99140C3882305A8768D /* CommandRouteTests.swift */; };
@@ -58,6 +60,7 @@
 		3E5685373ED6C8075DD282EA /* AppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClient.swift; sourceTree = "<group>"; };
 		4DF54FE5EDD2D827D67E8AF4 /* ApprovalProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalProtocol.swift; sourceTree = "<group>"; };
 		5C9F9324497C1AD7B0B64440 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		658A3A41C80234ACA5A36A8D /* AppServerClient+SpaceAXExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+SpaceAXExecution.swift"; sourceTree = "<group>"; };
 		6B71C5871C819570F0B56DC8 /* AppServerClientRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClientRoutingTests.swift; sourceTree = "<group>"; };
 		6BE7479ACF49C5F779513C79 /* router-output.schema.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "router-output.schema.json"; sourceTree = "<group>"; };
 		77A1C0131F46AF8B11A108D1 /* SpaceToolBridgeSecurityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolBridgeSecurityTests.swift; sourceTree = "<group>"; };
@@ -80,6 +83,7 @@
 		EB2CE7E2613EEBFB29969E02 /* SpaceToolBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolBridge.swift; sourceTree = "<group>"; };
 		F54D737F47D4FB6002490D93 /* RouterAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouterAgent.swift; sourceTree = "<group>"; };
 		FA818DA41010F13056BC0096 /* AppServerClient+Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Notifications.swift"; sourceTree = "<group>"; };
+		FAF6FC2A95408A77DEB5287E /* NativeSpaceAXExecutionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSpaceAXExecutionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -100,6 +104,7 @@
 				6B71C5871C819570F0B56DC8 /* AppServerClientRoutingTests.swift */,
 				D632B99140C3882305A8768D /* CommandRouteTests.swift */,
 				7BDB7479844A824CE79FA957 /* DiagnosticLogTests.swift */,
+				FAF6FC2A95408A77DEB5287E /* NativeSpaceAXExecutionTests.swift */,
 				17DD4353727E45891FEF5DAB /* SpaceNavigatorTests.swift */,
 				77A1C0131F46AF8B11A108D1 /* SpaceToolBridgeSecurityTests.swift */,
 				E7EBF26FA90A2A71786A1435 /* SpaceToolContractTests.swift */,
@@ -137,6 +142,7 @@
 				FA818DA41010F13056BC0096 /* AppServerClient+Notifications.swift */,
 				DEF216825C70926B73579A26 /* AppServerClient+Responses.swift */,
 				AAEE0B9B8B1A5F7E5359DD50 /* AppServerClient+Routing.swift */,
+				658A3A41C80234ACA5A36A8D /* AppServerClient+SpaceAXExecution.swift */,
 				34C996441AC1A3E32F91757B /* AppServerClient+Spaces.swift */,
 				D3BBEAB99B854E808C3A2E50 /* AppServerClient+SpaceVerification.swift */,
 				8B74AD102A7A7BE23EB6619A /* CommandRoute.swift */,
@@ -268,6 +274,7 @@
 				8832F6771617F802E160B22F /* ApprovalProtocolTests.swift in Sources */,
 				815AE3BC1BD46EA6E2F4BF79 /* CommandRouteTests.swift in Sources */,
 				BC4753D6EC07F923ED6AE722 /* DiagnosticLogTests.swift in Sources */,
+				4C89AD07C7FD92FE012B26E3 /* NativeSpaceAXExecutionTests.swift in Sources */,
 				45B59E7EEC152F2A6831E556 /* SpaceNavigatorTests.swift in Sources */,
 				11B249B1108AD14B1E9D8685 /* SpaceToolBridgeSecurityTests.swift in Sources */,
 				956571D06FD82926DEBD3B4D /* SpaceToolContractTests.swift in Sources */,
@@ -283,6 +290,7 @@
 				F4C66D788160D488340A7AAF /* AppServerClient+Notifications.swift in Sources */,
 				E47F520E49C91E7C1477649E /* AppServerClient+Responses.swift in Sources */,
 				D8182DE6E3A2B8DD9BC19CD0 /* AppServerClient+Routing.swift in Sources */,
+				25389F8BE59799C7694C9D72 /* AppServerClient+SpaceAXExecution.swift in Sources */,
 				1903CCB753DCB55130698DD5 /* AppServerClient+SpaceVerification.swift in Sources */,
 				46B4B0D406445B2F5DA025D6 /* AppServerClient+Spaces.swift in Sources */,
 				8C8E6085BEBB050DAC7DE0EB /* AppServerClient.swift in Sources */,

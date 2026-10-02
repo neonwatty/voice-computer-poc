@@ -175,6 +175,15 @@ struct NativeSpaceReadiness {
     let roundTripOrigin: Int?
     let commandID: String?
     let deadline: TimeInterval
+    let pressGate = NativeSpacePressGate()
+}
+final class NativeSpacePressGate {
+    private(set) var attempted = false
+    func claim() -> Bool {
+        guard !attempted else { return false }
+        attempted = true
+        return true
+    }
 }
 enum MissionControlAXError: LocalizedError {
     case permissionRequired
@@ -196,62 +205,6 @@ enum MissionControlAXError: LocalizedError {
 }
 enum MissionControlAXProbe {
     static var isTrusted: Bool { AXIsProcessTrusted() }
-    static func pressDesktop(
-        number: Int, expectedCount: Int, deadline: TimeInterval, canPress: () -> Bool
-    ) throws {
-        guard isTrusted else { throw MissionControlAXError.permissionRequired }
-        guard
-            let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock")
-                .first
-        else { throw MissionControlAXError.dockUnavailable }
-        var queue = [AXUIElementCreateApplication(dock.processIdentifier)]
-        var visited = 0
-        var largestDesktopCount = 0
-        while !queue.isEmpty && visited < 120 {
-            guard ProcessInfo.processInfo.systemUptime < deadline else {
-                throw MissionControlAXError.scanUnavailable("readiness_timeout", largestDesktopCount, visited)
-            }
-            let element = queue.removeFirst()
-            visited += 1
-            AXUIElementSetMessagingTimeout(element, 0.1)
-            let childElements = children(of: element)
-            if string(element, attribute: kAXRoleAttribute) == kAXListRole as String {
-                let desktops = childElements.filter {
-                    AXUIElementSetMessagingTimeout($0, 0.1)
-                    return string($0, attribute: kAXRoleAttribute) == kAXButtonRole as String
-                        && string($0, attribute: kAXTitleAttribute).hasPrefix("Desktop ")
-                }
-                largestDesktopCount = max(largestDesktopCount, desktops.count)
-                let expectedTitles = Set((1...expectedCount).map { "Desktop \($0)" })
-                if desktops.count == expectedCount
-                    && Set(desktops.map { string($0, attribute: kAXTitleAttribute) }) == expectedTitles,
-                    let target = desktops.first(where: {
-                        string($0, attribute: kAXTitleAttribute) == "Desktop \(number)"
-                            && string($0, attribute: kAXDescriptionAttribute)
-                                == "exit to Desktop \(number)"
-                    })
-                {
-                    var actionValue: CFArray?
-                    guard AXUIElementCopyActionNames(target, &actionValue) == .success,
-                        (actionValue as? [String] ?? []).contains(kAXPressAction as String)
-                    else {
-                        throw MissionControlAXError.scanUnavailable(
-                            "mismatched_controls", largestDesktopCount, visited)
-                    }
-                    guard canPress() else { throw MissionControlAXError.desktopNotFound("stale_command") }
-                    let result = AXUIElementPerformAction(target, kAXPressAction as CFString)
-                    guard result == .success else { throw MissionControlAXError.pressFailed(result) }
-                    return
-                }
-            }
-            queue.append(contentsOf: childElements)
-        }
-        let reason =
-            largestDesktopCount == 0
-            ? "missing_controls"
-            : largestDesktopCount < expectedCount ? "incomplete_controls" : "mismatched_controls"
-        throw MissionControlAXError.scanUnavailable(reason, largestDesktopCount, visited)
-    }
     static func inspectDock(limit: Int = 120) -> (
         trusted: Bool, dockFound: Bool, nodes: [MissionControlAXNode]
     ) {
