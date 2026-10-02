@@ -43,6 +43,9 @@ compilation, copying, or byte comparison fails. At launch the app verifies that
 exact regular executable and its build-time SHA-256 manifest before offering
 the Space tool. It never builds a helper at command time or launches one from
 the source checkout.
+The helper uses the pinned official Swift MCP SDK. Its stdio adapter preserves
+supported initialize capabilities while omitting only non-string experimental
+entries that this SDK cannot decode; all tool requests pass through unchanged.
 
 Type a command or select a sample phrase, then click Run or press Return in the
 focused command field. For general commands, the app starts a local app-server

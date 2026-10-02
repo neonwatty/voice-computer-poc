@@ -25,7 +25,7 @@ struct DesktopToolMain {
         }
         do {
             ToolServer.stage("server_start")
-            try await server.start(transport: StdioTransport())
+            try await server.start(transport: InitializeCompatibilityTransport())
             ToolServer.stage("server_ready")
             await server.waitUntilCompleted()
             ToolServer.stage("server_end")
