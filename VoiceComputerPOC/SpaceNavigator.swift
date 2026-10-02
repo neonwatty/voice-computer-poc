@@ -7,7 +7,6 @@ import Foundation
 enum SpaceDirection: String {
     case left
     case right
-
     init?(phrase: String) {
         switch Self.normalizedPhrase(phrase) {
         case "switch to the previous desktop space", "switch one desktop space to the left":
@@ -18,7 +17,6 @@ enum SpaceDirection: String {
             return nil
         }
     }
-
     static func normalizedPhrase(_ phrase: String) -> String {
         phrase.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
@@ -26,11 +24,9 @@ enum SpaceDirection: String {
             .lowercased()
     }
 }
-
 enum SpaceCommand: Equatable {
     case one(SpaceDirection)
     case rightThenLeft
-
     init?(phrase: String) {
         let normalized = SpaceDirection.normalizedPhrase(phrase)
         if normalized == "switch one desktop space right and then back left" {
@@ -41,7 +37,6 @@ enum SpaceCommand: Equatable {
             return nil
         }
     }
-
     var directions: [SpaceDirection] {
         switch self {
         case .one(let direction): return [direction]
@@ -49,18 +44,15 @@ enum SpaceCommand: Equatable {
         }
     }
 }
-
 struct SpaceSnapshot: Equatable {
     let current: Int
     let ordered: [Int]
-
     func adjacent(_ direction: SpaceDirection) -> Int? {
         guard let index = ordered.firstIndex(of: current) else { return nil }
         let target = index + (direction == .right ? 1 : -1)
         return ordered.indices.contains(target) ? ordered[target] : nil
     }
 }
-
 enum SpaceNavigator {
     static func snapshot() -> SpaceSnapshot? {
         let task = Process()
@@ -86,7 +78,6 @@ enum SpaceNavigator {
             return nil
         }
     }
-
     static func parseMonitors(_ monitors: [[String: Any]], current: Int) -> SpaceSnapshot? {
         guard current > 0 else { return nil }
         var identifiers = Set<String>()
@@ -124,7 +115,6 @@ enum SpaceNavigator {
         guard let mainIDs, mainIDs.contains(current) else { return nil }
         return SpaceSnapshot(current: current, ordered: mainIDs)
     }
-
     private static func isCollapsedStaleMonitor(
         _ monitor: [String: Any], identifier: String
     ) -> Bool {
@@ -153,7 +143,6 @@ enum SpaceNavigator {
         }
         return true
     }
-
     // com.apple.spaces can retain a stale Current Space; this prototype reads the live ID.
     // SkyLight is private API, so distribution needs a supported verification strategy.
     static func liveSpaceID() -> Int? {
@@ -171,23 +160,28 @@ enum SpaceNavigator {
         let space = unsafeBitCast(spaceSymbol, to: ActiveSpace.self)(connection)
         return Int(exactly: space)
     }
-
 }
-
 struct MissionControlAXNode {
-    let path: String
-    let role: String
     let title: String
     let description: String
     let actions: String
 }
-
+struct NativeSpaceReadiness {
+    let direction: SpaceDirection
+    let before: SpaceSnapshot
+    let expected: Int
+    let baseline: Int
+    let targetNumber: Int
+    let remaining: [SpaceDirection]
+    let roundTripOrigin: Int?
+    let commandID: String?
+    let deadline: TimeInterval
+}
 enum MissionControlAXError: LocalizedError {
     case permissionRequired
     case dockUnavailable
-    case desktopNotFound
+    case desktopNotFound(String)
     case pressFailed(AXError)
-
     var errorDescription: String? {
         switch self {
         case .permissionRequired:
@@ -201,30 +195,34 @@ enum MissionControlAXError: LocalizedError {
         }
     }
 }
-
 enum MissionControlAXProbe {
     static var isTrusted: Bool { AXIsProcessTrusted() }
-
-    static func pressDesktop(number: Int, expectedCount: Int) throws {
+    static func pressDesktop(
+        number: Int, expectedCount: Int, deadline: TimeInterval, canPress: () -> Bool
+    ) throws {
         guard isTrusted else { throw MissionControlAXError.permissionRequired }
         guard
             let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock")
                 .first
         else { throw MissionControlAXError.dockUnavailable }
-
-        let root = AXUIElementCreateApplication(dock.processIdentifier)
-        var queue = [root]
+        var queue = [AXUIElementCreateApplication(dock.processIdentifier)]
         var visited = 0
+        var largestDesktopCount = 0
         while !queue.isEmpty && visited < 120 {
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw MissionControlAXError.desktopNotFound("readiness_timeout")
+            }
             let element = queue.removeFirst()
             visited += 1
-            AXUIElementSetMessagingTimeout(element, 0.5)
+            AXUIElementSetMessagingTimeout(element, 0.1)
             let childElements = children(of: element)
             if string(element, attribute: kAXRoleAttribute) == kAXListRole as String {
                 let desktops = childElements.filter {
-                    string($0, attribute: kAXRoleAttribute) == kAXButtonRole as String
+                    AXUIElementSetMessagingTimeout($0, 0.1)
+                    return string($0, attribute: kAXRoleAttribute) == kAXButtonRole as String
                         && string($0, attribute: kAXTitleAttribute).hasPrefix("Desktop ")
                 }
+                largestDesktopCount = max(largestDesktopCount, desktops.count)
                 let expectedTitles = Set((1...expectedCount).map { "Desktop \($0)" })
                 let actualTitles = Set(desktops.map { string($0, attribute: kAXTitleAttribute) })
                 if desktops.count == expectedCount && actualTitles == expectedTitles,
@@ -234,6 +232,13 @@ enum MissionControlAXProbe {
                                 == "exit to Desktop \(number)"
                     })
                 {
+                    var actionValue: CFArray?
+                    guard AXUIElementCopyActionNames(target, &actionValue) == .success,
+                        (actionValue as? [String] ?? []).contains(kAXPressAction as String)
+                    else { throw MissionControlAXError.desktopNotFound("mismatched_controls") }
+                    guard canPress() else {
+                        throw MissionControlAXError.desktopNotFound("stale_command")
+                    }
                     let result = AXUIElementPerformAction(target, kAXPressAction as CFString)
                     guard result == .success else { throw MissionControlAXError.pressFailed(result) }
                     return
@@ -241,9 +246,12 @@ enum MissionControlAXProbe {
             }
             queue.append(contentsOf: childElements)
         }
-        throw MissionControlAXError.desktopNotFound
+        let reason =
+            largestDesktopCount == 0
+            ? "missing_controls"
+            : largestDesktopCount < expectedCount ? "incomplete_controls" : "mismatched_controls"
+        throw MissionControlAXError.desktopNotFound(reason)
     }
-
     static func inspectDock(limit: Int = 120) -> (
         trusted: Bool, dockFound: Bool, nodes: [MissionControlAXNode]
     ) {
@@ -252,31 +260,28 @@ enum MissionControlAXProbe {
             let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock")
                 .first
         else { return (trusted, false, []) }
-
         let root = AXUIElementCreateApplication(dock.processIdentifier)
-        var queue: [(element: AXUIElement, path: String)] = [(root, "root")]
+        var queue = [root]
         var nodes: [MissionControlAXNode] = []
-        while !queue.isEmpty && nodes.count < limit {
-            let item = queue.removeFirst()
-            AXUIElementSetMessagingTimeout(item.element, 0.5)
-            var actionValue: CFArray?
-            let actionStatus = AXUIElementCopyActionNames(item.element, &actionValue)
-            let actions =
-                actionStatus == .success ? (actionValue as? [String] ?? []).joined(separator: ",") : ""
-            nodes.append(
-                MissionControlAXNode(
-                    path: item.path,
-                    role: string(item.element, attribute: kAXRoleAttribute),
-                    title: string(item.element, attribute: kAXTitleAttribute),
-                    description: string(item.element, attribute: kAXDescriptionAttribute),
-                    actions: actions))
-            for (index, child) in children(of: item.element).enumerated() {
-                queue.append((child, "\(item.path).\(index)"))
+        var visited = 0
+        while !queue.isEmpty && visited < limit {
+            let element = queue.removeFirst()
+            visited += 1
+            AXUIElementSetMessagingTimeout(element, 0.1)
+            let title = string(element, attribute: kAXTitleAttribute)
+            if title.hasPrefix("Desktop ") {
+                var actionValue: CFArray?
+                let status = AXUIElementCopyActionNames(element, &actionValue)
+                nodes.append(
+                    MissionControlAXNode(
+                        title: title, description: string(element, attribute: kAXDescriptionAttribute),
+                        actions: status == .success
+                            ? (actionValue as? [String] ?? []).joined(separator: ",") : ""))
             }
+            queue.append(contentsOf: children(of: element))
         }
         return (trusted, true, nodes)
     }
-
     private static func string(_ element: AXUIElement, attribute: String) -> String {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else {
@@ -284,7 +289,6 @@ enum MissionControlAXProbe {
         }
         return value as? String ?? ""
     }
-
     private static func children(of element: AXUIElement) -> [AXUIElement] {
         var value: CFTypeRef?
         guard

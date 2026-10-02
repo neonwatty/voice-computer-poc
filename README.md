@@ -151,8 +151,18 @@ check from unit tests or an agent message.
 
 This remains a prototype: it expects English **Desktop N** labels and a simple
 main-display desktop sequence. The current Space ID check uses a private
-SkyLight read because the `com.apple.spaces` preference can be stale. A
-monitor record for a disconnected display may contain only a well-formed
+SkyLight read because the `com.apple.spaces` preference can be stale.
+Space action now waits up to four seconds for the exact Mission Control
+Desktop count, titles, target description, and AXPress action. It permits at
+most one press, then allows up to three seconds for independent ID and
+notification verification within the ten-second tool callback limit. If controls do not
+appear, the typed result remains unverified; the normal log records only a
+reason code, attempt count, trust state, and deadline status. The read-only
+inspection command reports only Desktop controls, without the full Dock AX
+tree. The Air smoke verifier uses the exact typed `agent switch desktop space
+right/left` phrase, distinct from its outer CUA instruction.
+
+A monitor record for a disconnected display may contain only a well-formed
 `Collapsed Space` and no `Spaces` array; the parser ignores that stale record
 while rejecting populated secondary displays and ambiguous main records. A
 distribution-ready app needs a supported verification method and testing across
@@ -251,6 +261,10 @@ python3 scripts/smoke_app_server.py \
   --case 15 --case 16 --case 15 --case 16 --case 15 --case 16 \
   --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/mcp-pairs-$(date +%s).jsonl"
 ```
+
+For a reviewed single rightward hardware retest, add `--single-mcp-step` and
+select only `--case 15`. This mode stops after that one submission even if it
+passes; it never starts a leftward step.
 
 Before each step the driver independently reads the live Space ID and checks
 Main `[3,4]`, the expected starting ID, and the exact running executable. It

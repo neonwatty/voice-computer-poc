@@ -43,6 +43,10 @@ COMMANDS = [
 CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Mission Control", "Finder", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC"]
 MCP_CASES = {15: "right", 16: "left"}
 APP_LOG_DIRECTORY = Path.home() / "Library/Application Support/VoiceComputerPOC/Logs"
+
+
+def mcp_case_phrase(index):
+    return "agent switch desktop space " + MCP_CASES[index]
 EXPECTED_EVIDENCE = [
     re.compile(r"Window:.*Safari|standard window.*Safari", re.IGNORECASE),
     re.compile(r"(?<!\d)63(?!\d)"),
@@ -157,7 +161,11 @@ def running_app_pids(app_path):
             and match.group(2) == expected]
 
 
-def validate_mcp_cases(selected):
+def validate_mcp_cases(selected, single_step=False):
+    if single_step:
+        if selected != [15]:
+            raise ValueError("Single-step MCP mode permits only one rightward case")
+        return
     if len(selected) > 6 or selected != [15, 16] * (len(selected) // 2):
         raise ValueError("MCP cases require one to three complete right/left pairs")
 
@@ -493,9 +501,13 @@ def main():
                         help="Run one numbered command; repeat to select multiple")
     parser.add_argument("--app-path", type=Path,
                         help="Canonical absolute VoiceComputerPOC.app path, required for MCP cases")
+    parser.add_argument("--single-mcp-step", action="store_true",
+                        help="Run only one rightward MCP case and stop regardless of result")
     args = parser.parse_args()
     selected = args.case or list(range(1, 7))
     mcp_selected = any(index in MCP_CASES for index in selected)
+    if args.single_mcp_step and not mcp_selected:
+        parser.error("--single-mcp-step requires --case 15")
     app_path = None
     if mcp_selected:
         if not args.app_path:
@@ -505,7 +517,7 @@ def main():
         except (OSError, ValueError) as error:
             parser.error(str(error))
         try:
-            validate_mcp_cases(selected)
+            validate_mcp_cases(selected, single_step=args.single_mcp_step)
         except ValueError as error:
             parser.error(str(error))
     os.umask(0o077)
@@ -618,7 +630,7 @@ def main():
                         raise ValueError("Exact app process changed during CUA command")
                     after_id = space_after["current"] if space_after else None
                     mcp_receipt = verify_mcp_receipt(
-                        app_log_rows(APP_LOG_DIRECTORY, app_since), phrase,
+                        app_log_rows(APP_LOG_DIRECTORY, app_since), mcp_case_phrase(index),
                         MCP_CASES[index], space_before["current"], expected_space, after_id)
                     driver.record("mcp_receipt_verified", **mcp_receipt)
                 except (OSError, ValueError) as error:

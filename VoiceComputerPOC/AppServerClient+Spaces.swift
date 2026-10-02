@@ -38,13 +38,11 @@ extension AppServerClient {
         record("mcp_bridge_accepted", details: ["direction": request.direction])
         runNativeSpaceStep(expectedToolDirection, remaining: [], roundTripOrigin: nil)
     }
-
     func handleSpaceToolTimeout(commandID: String?) {
         guard isWorking, activeCommandID == commandID, toolReply != nil else { return }
         record("mcp_native_callback_timeout")
         fail("The native Space callback timed out.")
     }
-
     func runNativeSpaceStep(
         _ direction: SpaceDirection, remaining: [SpaceDirection], roundTripOrigin: Int?
     ) {
@@ -88,40 +86,73 @@ extension AppServerClient {
         let commandID = activeCommandID
         let targetNumber = (before.ordered.firstIndex(of: expected) ?? 0) + 1
         status = "Opening Mission Control…"
+        let deadline = ProcessInfo.processInfo.systemUptime + 4
+        let readiness = NativeSpaceReadiness(
+            direction: direction, before: before, expected: expected, baseline: baseline,
+            targetNumber: targetNumber, remaining: remaining,
+            roundTripOrigin: roundTripOrigin, commandID: commandID, deadline: deadline)
         let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
         NSWorkspace.shared.openApplication(at: url, configuration: .init()) { [weak self] _, error in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            DispatchQueue.main.async {
                 guard let self, self.isWorking, self.activeCommandID == commandID else { return }
-                self.pressNativeSpace(
-                    direction, before: before, expected: expected, baseline: baseline,
-                    targetNumber: targetNumber, remaining: remaining,
-                    roundTripOrigin: roundTripOrigin, launchError: error)
+                self.pressNativeSpace(readiness, launchError: error, attempts: 1) {
+                    try MissionControlAXProbe.pressDesktop(
+                        number: targetNumber, expectedCount: before.ordered.count,
+                        deadline: deadline,
+                        canPress: { [weak self] in
+                            self?.isWorking == true && self?.activeCommandID == commandID
+                        })
+                }
             }
         }
     }
-
     func pressNativeSpace(
-        _ direction: SpaceDirection, before: SpaceSnapshot, expected: Int, baseline: Int,
-        targetNumber: Int, remaining: [SpaceDirection], roundTripOrigin: Int?, launchError: Error?
+        _ readiness: NativeSpaceReadiness, launchError: Error?, attempts: Int,
+        press: @escaping () throws -> Void
     ) {
+        guard isWorking, activeCommandID == readiness.commandID else { return }
         do {
             if let launchError { throw launchError }
-            try MissionControlAXProbe.pressDesktop(
-                number: targetNumber, expectedCount: before.ordered.count)
+            guard ProcessInfo.processInfo.systemUptime < readiness.deadline else {
+                throw MissionControlAXError.desktopNotFound("readiness_timeout")
+            }
+            try press()
             record(
                 "native_space_ax_pressed",
-                details: ["direction": direction.rawValue, "desktop_number": String(targetNumber)])
-            append("Pressed Desktop \(targetNumber) in Mission Control")
+                details: [
+                    "direction": readiness.direction.rawValue,
+                    "desktop_number": String(readiness.targetNumber),
+                ])
+            append("Pressed Desktop \(readiness.targetNumber) in Mission Control")
             startNativeSpaceVerification(
-                direction, before: before, expected: expected, baseline: baseline,
-                remaining: remaining, roundTripOrigin: roundTripOrigin)
+                readiness.direction, before: readiness.before, expected: readiness.expected,
+                baseline: readiness.baseline, remaining: readiness.remaining,
+                roundTripOrigin: readiness.roundTripOrigin)
         } catch {
-            let visible = MissionControlAXProbe.inspectDock().nodes
-                .filter { $0.title.hasPrefix("Desktop ") }
-                .map { "\($0.path):\($0.title):\($0.description)" }
+            let reason: String
+            switch error {
+            case MissionControlAXError.permissionRequired: reason = "ax_trust_lost"
+            case MissionControlAXError.dockUnavailable: reason = "dock_unavailable"
+            case MissionControlAXError.desktopNotFound(let detail): reason = detail
+            case MissionControlAXError.pressFailed: reason = "ax_press_failed"
+            default: reason = "launch_error"
+            }
+            if ["dock_unavailable", "missing_controls", "incomplete_controls", "mismatched_controls"]
+                .contains(reason), ProcessInfo.processInfo.systemUptime < readiness.deadline
+            {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                    self?.pressNativeSpace(
+                        readiness, launchError: nil, attempts: attempts + 1, press: press)
+                }
+                return
+            }
             record(
-                "mission_control_ax_available", details: ["desktop_controls": visible.joined(separator: "; ")]
-            )
+                "mission_control_ax_readiness",
+                details: [
+                    "reason": reason, "attempts": String(attempts), "deadline_ms": "4000",
+                    "trusted": String(MissionControlAXProbe.isTrusted),
+                    "timed_out": String(ProcessInfo.processInfo.systemUptime >= readiness.deadline),
+                ])
             if case MissionControlAXError.permissionRequired = error {
                 record("native_space_permission_missing")
             }
@@ -129,13 +160,12 @@ extension AppServerClient {
                 status: "failed", verification: "unverified",
                 message: error.localizedDescription,
                 details: [
-                    "direction": direction.rawValue,
-                    "space_before_id": String(before.current),
-                    "space_target_id": String(expected),
+                    "direction": readiness.direction.rawValue,
+                    "space_before_id": String(readiness.before.current),
+                    "space_target_id": String(readiness.expected),
                 ])
         }
     }
-
     func startNativeSpaceVerification(
         _ direction: SpaceDirection, before: SpaceSnapshot, expected: Int, baseline: Int,
         remaining: [SpaceDirection], roundTripOrigin: Int?
@@ -183,7 +213,6 @@ extension AppServerClient {
             }
         }
     }
-
     func completeNativeSpace(
         status outcome: String, verification: String, message: String, details: [String: String]
     ) {
@@ -238,49 +267,31 @@ extension AppServerClient {
         isWorking = false
         finishCommand()
     }
-
     func runMissionControlProbe() {
         status = "Inspecting Mission Control…"
         record("mission_control_probe_started")
         let commandID = activeCommandID
         let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
         NSWorkspace.shared.openApplication(at: url, configuration: .init()) { [weak self] _, error in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                guard let self, self.isWorking, self.activeCommandID == commandID else { return }
-                if let error {
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.8) {
+                let probe = MissionControlAXProbe.inspectDock()
+                let controls = probe.nodes.map { "\($0.title):\($0.description):\($0.actions)" }
+                DispatchQueue.main.async {
+                    guard let self, self.isWorking, self.activeCommandID == commandID else { return }
+                    if error != nil { self.record("mission_control_launch_failed") }
                     self.record(
-                        "mission_control_launch_failed",
-                        details: ["error": error.localizedDescription])
-                }
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let probe = MissionControlAXProbe.inspectDock()
-                    DispatchQueue.main.async {
-                        guard self.isWorking, self.activeCommandID == commandID else { return }
-                        self.record(
-                            "mission_control_ax_summary",
-                            details: [
-                                "trusted": String(probe.trusted),
-                                "dock_found": String(probe.dockFound),
-                                "node_count": String(probe.nodes.count),
-                            ])
-                        for node in probe.nodes {
-                            self.record(
-                                "mission_control_ax_node",
-                                details: [
-                                    "path": node.path, "role": node.role, "title": node.title,
-                                    "description": node.description, "actions": node.actions,
-                                ])
-                        }
-                        self.status = "Ready"
-                        self.result =
-                            "Inspected \(probe.nodes.count) Dock accessibility elements. See Diagnostic Log."
-                        self.record(
-                            "command_finished", details: ["elapsed_ms": self.commandElapsedMilliseconds])
-                        self.queuedPhrase = nil
-                        self.isWorking = false
-                        self.finishCommand()
-                        NSApp.activate(ignoringOtherApps: true)
-                    }
+                        "mission_control_ax_summary",
+                        details: [
+                            "trusted": String(probe.trusted), "dock_found": String(probe.dockFound),
+                            "controls": controls.joined(separator: "; "),
+                        ])
+                    self.status = "Ready"
+                    self.result = "Inspected Dock desktop controls. See Diagnostic Log."
+                    self.record("command_finished", details: ["elapsed_ms": self.commandElapsedMilliseconds])
+                    self.queuedPhrase = nil
+                    self.isWorking = false
+                    self.finishCommand()
+                    NSApp.activate(ignoringOtherApps: true)
                 }
             }
         }

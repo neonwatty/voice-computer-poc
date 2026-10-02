@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from smoke_app_server import (canonical_app_path, validate_mcp_cases,
+from smoke_app_server import (COMMANDS, canonical_app_path, mcp_case_phrase, validate_mcp_cases,
                               verify_mcp_receipt)  # noqa: E402
 
 
@@ -59,6 +59,16 @@ class MCPReceiptTests(unittest.TestCase):
     def test_valid_right_and_left(self):
         self.assertEqual(self.check(valid_rows())["command_id"], COMMAND_ID)
         self.assertEqual(self.check(valid_rows("left", 4, 3), "left", 4, 3)["after"], 3)
+
+    def test_real_case_phrase_callsite_rejects_outer_and_legacy(self):
+        for case, direction, before, after in ((15, "right", 3, 4), (16, "left", 4, 3)):
+            with self.subTest(case=case):
+                rows = valid_rows(direction, before, after)
+                self.assertEqual(verify_mcp_receipt(
+                    rows, mcp_case_phrase(case), direction, before, after, after)["after"], after)
+                for wrong in (COMMANDS[case - 1], "Switch to the next desktop Space"):
+                    with self.assertRaisesRegex(ValueError, "phrase"):
+                        verify_mcp_receipt(rows, wrong, direction, before, after, after)
 
     def test_legacy_native_only_rejected(self):
         rows = valid_rows("left", 4, 3)
@@ -129,6 +139,10 @@ class MCPReceiptTests(unittest.TestCase):
     def test_case_sequence_is_bounded_and_alternating(self):
         for count in (1, 2, 3):
             validate_mcp_cases([15, 16] * count)
+        validate_mcp_cases([15], single_step=True)
+        for cases in ([15, 16], [16], [15, 15]):
+            with self.subTest(single_step=cases), self.assertRaises(ValueError):
+                validate_mcp_cases(cases, single_step=True)
         for cases in ([15], [16, 15], [15, 15], [15, 16] * 4, [15, 16, 9]):
             with self.subTest(cases=cases), self.assertRaises(ValueError):
                 validate_mcp_cases(cases)

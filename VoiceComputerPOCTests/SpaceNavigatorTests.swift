@@ -133,6 +133,88 @@ final class SpaceNavigatorTests: XCTestCase {
         }
     }
 
+    func testDelayedStrictControlsPermitOneSyntheticPress() {
+        let client = AppServerClient()
+        client.activeCommandID = "ready-command"
+        client.isWorking = true
+        let context = readiness(commandID: "ready-command", after: 4, seconds: 1.5)
+        var attempts = 0
+        client.pressNativeSpace(context, launchError: nil, attempts: 1) {
+            attempts += 1
+            if attempts < 3 { throw MissionControlAXError.desktopNotFound("missing_controls") }
+        }
+        let completed = expectation(description: "One synthetic press")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            XCTAssertEqual(attempts, 3)
+            XCTAssertEqual(
+                client.diagnosticEntries.filter { $0.event == "native_space_ax_pressed" }.count, 1)
+            client.stop()
+            completed.fulfill()
+        }
+        wait(for: [completed], timeout: 2)
+    }
+
+    func testMissingIncompleteAndMismatchedControlsNeverPress() {
+        for reason in ["missing_controls", "incomplete_controls", "mismatched_controls"] {
+            let client = AppServerClient()
+            client.activeCommandID = reason
+            client.isWorking = true
+            let context = readiness(commandID: reason, after: 4, seconds: 0.2)
+            client.pressNativeSpace(context, launchError: nil, attempts: 1) {
+                throw MissionControlAXError.desktopNotFound(reason)
+            }
+            let failed = expectation(description: "Readiness failure: \(reason)")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                XCTAssertEqual(client.status, "Space failed")
+                XCTAssertFalse(client.isWorking)
+                XCTAssertFalse(client.diagnosticEntries.contains { $0.event == "native_space_ax_pressed" })
+                XCTAssertTrue(
+                    client.diagnosticEntries.contains { $0.event == "mission_control_ax_readiness" })
+                failed.fulfill()
+            }
+            wait(for: [failed], timeout: 1)
+        }
+    }
+
+    func testCancelledOrStaleReadinessCannotPress() {
+        for active in [false, true] {
+            let client = AppServerClient()
+            client.activeCommandID = active ? "other" : "command"
+            client.isWorking = active
+            var presses = 0
+            client.pressNativeSpace(
+                readiness(commandID: "command", after: 4, seconds: 1),
+                launchError: nil, attempts: 1
+            ) { presses += 1 }
+            XCTAssertEqual(presses, 0)
+            XCTAssertFalse(client.diagnosticEntries.contains { $0.event == "native_space_ax_pressed" })
+        }
+    }
+
+    func testReadinessDeadlinePrecedesToolTimeout() {
+        XCTAssertLessThan(4.0 + 3.0, 10.0)
+        let client = AppServerClient()
+        client.activeCommandID = "expired"
+        client.isWorking = true
+        var presses = 0
+        client.pressNativeSpace(
+            readiness(commandID: "expired", after: 4, seconds: -1),
+            launchError: nil, attempts: 1
+        ) { presses += 1 }
+        XCTAssertEqual(presses, 0)
+        XCTAssertEqual(client.status, "Space failed")
+    }
+
+    private func readiness(
+        commandID: String, after: Int, seconds: TimeInterval
+    ) -> NativeSpaceReadiness {
+        .init(
+            direction: .right, before: SpaceSnapshot(current: 3, ordered: [3, 4]),
+            expected: after, baseline: 0, targetNumber: 2, remaining: [],
+            roundTripOrigin: nil, commandID: commandID,
+            deadline: ProcessInfo.processInfo.systemUptime + seconds)
+    }
+
     private func monitor(_ identifier: String, ids: [Int]) -> [String: Any] {
         ["Display Identifier": identifier, "Spaces": ids.map { ["id64": $0] }]
     }
