@@ -245,52 +245,12 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
     }
 
     private func queryFromPython(_ bridge: SpaceToolBridge) throws -> SpaceToolResult {
-        let script = """
-            import socket,sys
-            s=socket.socket(socket.AF_UNIX)
-            s.settimeout(3)
-            s.connect(sys.argv[1])
-            sys.stdin.readline()
-            print(s.recv(4096).decode())
-            """
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-        task.arguments = ["-c", script, bridge.socketPath]
-        let input = Pipe()
-        let output = Pipe()
-        let errors = Pipe()
-        task.standardInput = input
-        task.standardOutput = output
-        task.standardError = errors
-        try task.run()
-        defer { if task.isRunning { task.terminate() } }
-        var info = proc_bsdinfo()
-        let pid = task.processIdentifier
-        XCTAssertEqual(
-            proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(MemoryLayout.size(ofValue: info))),
-            Int32(MemoryLayout.size(ofValue: info)))
-        XCTAssertEqual(pid_t(info.pbi_ppid), getpid(), "pid=\(pid) parent=\(info.pbi_ppid)")
-        var path = [CChar](repeating: 0, count: 4_096)
-        XCTAssertGreaterThan(proc_pidpath(pid, &path, UInt32(path.count)), 0)
-        let executable = URL(fileURLWithPath: String(cString: path)).resolvingSymlinksInPath().path
-        XCTAssertNotEqual(executable, bridge.expectedExecutablePath, "pid=\(pid) executable=\(executable)")
-        try input.fileHandleForWriting.write(contentsOf: Data("\n".utf8))
-        try input.fileHandleForWriting.close()
-        let completed = DispatchSemaphore(value: 0)
-        DispatchQueue.global().async {
-            task.waitUntilExit()
-            completed.signal()
-        }
-        let finished = completed.wait(timeout: .now() + 5) == .success
-        let data = finished ? output.fileHandleForReading.readDataToEndOfFile() : Data()
-        let stderr = finished ? errors.fileHandleForReading.readDataToEndOfFile() : Data()
-        let details =
-            "pid=\(pid) parent=\(info.pbi_ppid) executable=\(executable) "
-            + "timeout=\(!finished) exit=\(finished ? task.terminationStatus : -1) "
-            + "stdout=\(String(decoding: data, as: UTF8.self).prefix(256)) "
-            + "stderr=\(String(decoding: stderr, as: UTF8.self).prefix(256))"
-        let response = try XCTUnwrap(
-            finished && task.terminationStatus == 0 && !data.isEmpty ? data : nil, details)
-        return try XCTUnwrap(try? JSONDecoder().decode(SpaceToolResult.self, from: response), details)
+        let child = try SpaceToolBridgePythonPeerSupport.query(socketPath: bridge.socketPath)
+        XCTAssertGreaterThan(child.pid, 0)
+        XCTAssertEqual(child.parentPID, getpid(), "pid=\(child.pid) parent=\(child.parentPID)")
+        XCTAssertNotEqual(
+            child.executablePath, bridge.expectedExecutablePath,
+            "pid=\(child.pid) executable=\(child.executablePath)")
+        return child.result
     }
 }

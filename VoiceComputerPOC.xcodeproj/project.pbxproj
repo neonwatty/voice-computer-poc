@@ -30,6 +30,7 @@
 		8C8E6085BEBB050DAC7DE0EB /* AppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5685373ED6C8075DD282EA /* AppServerClient.swift */; };
 		956571D06FD82926DEBD3B4D /* SpaceToolContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7EBF26FA90A2A71786A1435 /* SpaceToolContractTests.swift */; };
 		A8852D260D8504D5024ABB58 /* AppServerClient+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DA61CCE4D3F6CC8236658A /* AppServerClient+Lifecycle.swift */; };
+		AA621174BB334EDF6B44707F /* SpaceToolBridgePythonPeerSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17C96BB825E16BE3B775FD87 /* SpaceToolBridgePythonPeerSupport.swift */; };
 		B00819EC5F0AB40C9AEDB658 /* LocalVoiceInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */; };
 		BC4753D6EC07F923ED6AE722 /* DiagnosticLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BDB7479844A824CE79FA957 /* DiagnosticLogTests.swift */; };
 		CA907AAE2B1E537AD1A8EDF4 /* ApprovalProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF54FE5EDD2D827D67E8AF4 /* ApprovalProtocol.swift */; };
@@ -55,6 +56,7 @@
 		03E832F80A1C092C60825323 /* VoiceComputerPOCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceComputerPOCApp.swift; sourceTree = "<group>"; };
 		0F9746E05DAF2F18E2164AE0 /* DiagnosticLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLog.swift; sourceTree = "<group>"; };
 		1553759D35311E1698534226 /* AppServerClient+Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Connection.swift"; sourceTree = "<group>"; };
+		17C96BB825E16BE3B775FD87 /* SpaceToolBridgePythonPeerSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolBridgePythonPeerSupport.swift; sourceTree = "<group>"; };
 		17DD4353727E45891FEF5DAB /* SpaceNavigatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceNavigatorTests.swift; sourceTree = "<group>"; };
 		34C996441AC1A3E32F91757B /* AppServerClient+Spaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Spaces.swift"; sourceTree = "<group>"; };
 		3E5685373ED6C8075DD282EA /* AppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClient.swift; sourceTree = "<group>"; };
@@ -106,6 +108,7 @@
 				7BDB7479844A824CE79FA957 /* DiagnosticLogTests.swift */,
 				FAF6FC2A95408A77DEB5287E /* NativeSpaceAXExecutionTests.swift */,
 				17DD4353727E45891FEF5DAB /* SpaceNavigatorTests.swift */,
+				17C96BB825E16BE3B775FD87 /* SpaceToolBridgePythonPeerSupport.swift */,
 				77A1C0131F46AF8B11A108D1 /* SpaceToolBridgeSecurityTests.swift */,
 				E7EBF26FA90A2A71786A1435 /* SpaceToolContractTests.swift */,
 			);
@@ -276,6 +279,7 @@
 				BC4753D6EC07F923ED6AE722 /* DiagnosticLogTests.swift in Sources */,
 				4C89AD07C7FD92FE012B26E3 /* NativeSpaceAXExecutionTests.swift in Sources */,
 				45B59E7EEC152F2A6831E556 /* SpaceNavigatorTests.swift in Sources */,
+				AA621174BB334EDF6B44707F /* SpaceToolBridgePythonPeerSupport.swift in Sources */,
 				11B249B1108AD14B1E9D8685 /* SpaceToolBridgeSecurityTests.swift in Sources */,
 				956571D06FD82926DEBD3B4D /* SpaceToolContractTests.swift in Sources */,
 			);
