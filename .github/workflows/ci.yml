@@ -43,6 +43,7 @@ jobs:
       - name: Test Swift MCP tool
         run: swift test --package-path DesktopToolServer
       - name: Build and run unit tests
+        id: debug_tests
         run: |
           xcodebuild -quiet \
             -project VoiceComputerPOC.xcodeproj \
@@ -50,7 +51,15 @@ jobs:
             -configuration Debug \
             -destination 'platform=macOS' \
             -derivedDataPath DerivedData \
+            -resultBundlePath "$RUNNER_TEMP/VoiceComputerPOC-Debug.xcresult" \
             test CODE_SIGNING_ALLOWED=NO
+      - name: Save failed Debug XCTest results
+        if: ${{ failure() && steps.debug_tests.outcome == 'failure' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: debug-xcresult
+          path: ${{ runner.temp }}/VoiceComputerPOC-Debug.xcresult
+          if-no-files-found: error
       - name: Verify bundled Debug desktop helper
         run: |
           helper="DerivedData/Build/Products/Debug/VoiceComputerPOC.app/Contents/Helpers/DesktopToolServer"
@@ -59,6 +68,7 @@ jobs:
           cmp "$product" "$helper"
           test "$(shasum -a 256 "$helper" | awk '{print $1}')" = "$(cat "$helper.sha256")"
       - name: Run Release unit tests
+        id: release_tests
         run: |
           xcodebuild -quiet \
             -project VoiceComputerPOC.xcodeproj \
@@ -66,7 +76,15 @@ jobs:
             -configuration Release \
             -destination 'platform=macOS' \
             -derivedDataPath DerivedData \
+            -resultBundlePath "$RUNNER_TEMP/VoiceComputerPOC-Release.xcresult" \
             test CODE_SIGNING_ALLOWED=NO ENABLE_TESTABILITY=YES
+      - name: Save failed Release XCTest results
+        if: ${{ failure() && steps.release_tests.outcome == 'failure' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-xcresult
+          path: ${{ runner.temp }}/VoiceComputerPOC-Release.xcresult
+          if-no-files-found: error
       - name: Verify bundled Release desktop helper
         run: |
           helper="DerivedData/Build/Products/Release/VoiceComputerPOC.app/Contents/Helpers/DesktopToolServer"

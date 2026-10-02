@@ -232,43 +232,60 @@ final class SpaceToolContractTests: XCTestCase {
     func testBridgeAcceptsOnlyServerDescendant() throws {
         let bridge = try XCTUnwrap(SpaceToolBridge())
         defer { bridge.stop() }
+        var executable = [CChar](repeating: 0, count: 4_096)
+        XCTAssertGreaterThan(proc_pidpath(getpid(), &executable, UInt32(executable.count)), 0)
+        bridge.expectedExecutablePath =
+            URL(fileURLWithPath: String(cString: executable))
+            .resolvingSymlinksInPath().path
+        var callbacks = 0
         bridge.onRequest = { request, _, reply in
+            callbacks += 1
             reply(
                 .failure(
                     "rejected", commandID: "one", direction: request.direction,
                     message: "No action was taken."))
         }
         bridge.serverPID = 999_999
-        XCTAssertEqual(try queryBridge(bridge)["status"] as? String, "unauthorized")
+        XCTAssertEqual(try queryBridge(bridge).status, "unauthorized")
+        XCTAssertEqual(callbacks, 0)
         bridge.serverPID = getpid()
-        XCTAssertEqual(try queryBridge(bridge)["status"] as? String, "unauthorized")
+        XCTAssertEqual(try queryBridge(bridge).status, "unauthorized")
+        XCTAssertEqual(callbacks, 0)
     }
 
-    private func queryBridge(_ bridge: SpaceToolBridge) throws -> [String: Any] {
-        let script = """
-            import json,socket,sys
-            s=socket.socket(socket.AF_UNIX)
-            s.connect(sys.argv[1])
-            s.sendall((json.dumps({'sessionID':sys.argv[2],'direction':'right'})+'\\n').encode())
-            data=s.recv(4096)
-            print(data.decode())
-            """
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-        task.arguments = ["-c", script, bridge.socketPath, bridge.sessionID]
-        let output = Pipe()
-        task.standardOutput = output
-        let expectation = expectation(description: "Bridge answered")
-        var data = Data()
-        DispatchQueue.global().async {
-            do {
-                try task.run()
-                data = output.fileHandleForReading.readDataToEndOfFile()
-                task.waitUntilExit()
-            } catch { XCTFail(error.localizedDescription) }
-            expectation.fulfill()
+    private func queryBridge(_ bridge: SpaceToolBridge) throws -> SpaceToolResult {
+        let descriptor = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+        let client = try XCTUnwrap(descriptor >= 0 ? descriptor : nil)
+        defer { Darwin.close(client) }
+        var noSignal: Int32 = 1
+        XCTAssertEqual(
+            setsockopt(
+                client, SOL_SOCKET, SO_NOSIGPIPE, &noSignal,
+                socklen_t(MemoryLayout.size(ofValue: noSignal))),
+            0)
+        var address = try XCTUnwrap(SpaceToolBridge.address(for: bridge.socketPath))
+        let connected = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.connect(client, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+            }
         }
-        wait(for: [expectation], timeout: 5)
-        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(connected, 0)
+        var timeout = timeval(tv_sec: 2, tv_usec: 0)
+        XCTAssertEqual(
+            setsockopt(
+                client, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout))),
+            0)
+        var request = try JSONEncoder().encode(
+            SpaceToolRequest(sessionID: bridge.sessionID, direction: "right"))
+        request.append(0x0A)
+        let written = request.withUnsafeBytes { buffer in
+            Darwin.write(client, buffer.baseAddress, buffer.count)
+        }
+        XCTAssertTrue(written == request.count || (written == -1 && errno == EPIPE))
+        var bytes = [UInt8](repeating: 0, count: 4_096)
+        let count = Darwin.read(client, &bytes, bytes.count)
+        let received = try XCTUnwrap(
+            count > 0 ? count : nil, "Bridge response missing before two-second deadline")
+        return try JSONDecoder().decode(SpaceToolResult.self, from: Data(bytes.prefix(received)))
     }
 }
