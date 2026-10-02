@@ -8,11 +8,13 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent))
 from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path,
                               cua_exact_path_call, mcp_case_phrase, parse_open_session_log,
-                              validate_mcp_cases, verify_mcp_receipt,
+                              running_app_pids, validate_mcp_cases, verify_mcp_receipt,
                               verify_read_only_receipt)  # noqa: E402
 
 
@@ -69,6 +71,18 @@ def read_only_rows():
 
 
 class ExactAirBindingTests(unittest.TestCase):
+    def test_sole_pid_matches_exact_executable_path(self):
+        app = Path("/Users/jeremywatt/Desktop/VoiceComputerPOC-a8175c4.app")
+        executable = app / "Contents/MacOS/VoiceComputerPOC"
+        listing = (f"70331 {executable}\n" +
+                   "55110 /private/tmp/other.app/Contents/MacOS/VoiceComputerPOC\n")
+        with patch("smoke_app_server.subprocess.run",
+                   return_value=SimpleNamespace(stdout=listing)):
+            self.assertEqual(running_app_pids(app), [70331])
+        with patch("smoke_app_server.subprocess.run",
+                   return_value=SimpleNamespace(stdout=listing + f"70332 {executable}\n")):
+            self.assertEqual(len(running_app_pids(app)), 2)
+
     def test_cua_requires_exact_path_without_bundle_fallback(self):
         path = Path("/Users/jeremywatt/Desktop/VoiceComputerPOC-a8175c4.app")
         self.assertTrue(cua_exact_path_call({"arguments": {"code":
