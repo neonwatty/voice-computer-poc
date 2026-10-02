@@ -54,6 +54,9 @@ read-only shell/filesystem sandbox, and sends the phrase as a turn. Desktop oper
 in the prompt to the configured `cua_repl` Computer Use tool. When app-server
 requests Computer Use access to an app, the prototype displays the request and
 lets you allow or decline it.
+The main command window joins every desktop Space, so its attached approval
+sheet remains available when an action switches to another Space. This changes
+only that window's AppKit collection behavior, not the Mac's Space settings.
 
 For voice input, click **Record**, speak, then click **Stop Recording**. The app
 records a temporary mono WAV file, posts it to the local server with model
@@ -104,8 +107,10 @@ completed through the live MCP bridge on a stable Space ID 3. Its visible
 approval used **Allow once**; the authentic tool item reached
 `mcp_helper_bound` and `mcp_bridge_accepted`, then returned typed
 `probe_no_action`. No native Space request, Accessibility press, or Space-change
-event occurred. This proves the guarded bridge path without moving a Space;
-unlocked MacBook Air acceptance is still pending.
+event occurred. This proves the guarded bridge path without moving a Space.
+One later unlocked MacBook Air rightward request was independently verified
+from live Space ID 3 to 4 with the active-Space notification and typed MCP
+result. Repeated round trips remain to be tested.
 
 ### Routed commands
 

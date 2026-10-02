@@ -8,11 +8,25 @@ struct VoiceComputerPOCApp: App {
         WindowGroup(id: "main") {
             ContentView(client: client)
                 .frame(minWidth: 640, minHeight: 620)
+                .background(MainWindowSpaceBehavior())
         }
         .windowResizability(.contentMinSize)
 
         MenuBarExtra("Voice Computer", systemImage: "cursorarrow.rays") {
             MenuBarContent(client: client)
+        }
+    }
+}
+
+private struct MainWindowSpaceBehavior: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { JoiningWindowView() }
+
+    func updateNSView(_ view: NSView, context: Context) {}
+
+    private final class JoiningWindowView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            window?.collectionBehavior.insert(.canJoinAllSpaces)
         }
     }
 }
