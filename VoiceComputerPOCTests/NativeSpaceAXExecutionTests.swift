@@ -4,6 +4,116 @@ import XCTest
 @testable import VoiceComputerPOC
 
 final class NativeSpaceAXExecutionTests: XCTestCase {
+    func testMissingActivationOrWrongFrontmostAppNeverLaunches() {
+        for scenario in ["inactive", "frontmost_mismatch"] {
+            let client = activeClient(scenario)
+            let context = readiness(scenario)
+            let settled = expectation(description: scenario)
+            var activationRequests = 0
+            var launches = 0
+            client.requestVoiceForeground(
+                context, activate: { activationRequests += 1 },
+                isActive: { scenario != "inactive" },
+                frontmostBundleID: {
+                    scenario == "inactive" ? nil : "com.example.OtherApp"
+                }, launch: { launches += 1 })
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.95) {
+                XCTAssertEqual(activationRequests, 1)
+                XCTAssertEqual(launches, 0)
+                XCTAssertEqual(client.status, "Space failed")
+                XCTAssertTrue(client.result.contains("did not become the active app"))
+                XCTAssertFalse(context.pressGate.attempted)
+                XCTAssertTrue(
+                    client.diagnosticEntries.contains {
+                        $0.event == "voice_foreground_observed"
+                            && $0.details["frontmost_matches"] == "false"
+                    })
+                settled.fulfill()
+            }
+            wait(for: [settled], timeout: 1.5)
+        }
+    }
+
+    func testForegroundSuccessStillRequiresStrictDiscoveryAndMainChecks() {
+        for scenario in ["missing_controls", "changed_space"] {
+            let client = activeClient(scenario)
+            let context = readiness(scenario, seconds: 0.25)
+            let settled = expectation(description: scenario)
+            var launches = 0
+            var presses = 0
+            client.requestVoiceForeground(
+                context, activate: {}, isActive: { true },
+                frontmostBundleID: { "com.neonwatty.VoiceComputerPOC" },
+                launch: {
+                    launches += 1
+                    client.discoverAndPressNativeSpace(
+                        context, launchError: nil, attempts: 1,
+                        discover: {
+                            if scenario == "missing_controls" {
+                                throw MissionControlAXError.scanUnavailable("missing_controls", 0, 5)
+                            }
+                            return self.discovery()
+                        }, revalidate: { _ in }, press: { _ in presses += 1 },
+                        liveSpaceID: { scenario == "changed_space" ? 4 : 3 })
+                })
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                XCTAssertEqual(launches, 1)
+                XCTAssertEqual(presses, 0)
+                XCTAssertFalse(context.pressGate.attempted)
+                XCTAssertEqual(client.status, "Space failed")
+                settled.fulfill()
+            }
+            wait(for: [settled], timeout: 1)
+        }
+    }
+
+    func testLaunchErrorAndNilApplicationFailBeforeDiscovery() {
+        for scenario in ["error", "nil_application"] {
+            let client = activeClient(scenario)
+            var readyCalls = 0
+            client.handleMissionControlLaunchResult(
+                readiness(scenario), applicationPresent: scenario == "error",
+                error: scenario == "error" ? NSError(domain: "synthetic", code: 1) : nil,
+                onReady: { readyCalls += 1 })
+            XCTAssertEqual(readyCalls, 0)
+            XCTAssertEqual(client.status, "Space failed")
+            XCTAssertTrue(
+                client.diagnosticEntries.contains {
+                    $0.event == "mission_control_launch_failed"
+                })
+        }
+        let client = activeClient("success")
+        var readyCalls = 0
+        client.handleMissionControlLaunchResult(
+            readiness("success"), applicationPresent: true, error: nil,
+            onReady: { readyCalls += 1 })
+        XCTAssertEqual(readyCalls, 1)
+        XCTAssertFalse(client.diagnosticEntries.contains { $0.event == "native_space_ax_pressed" })
+        client.stop()
+    }
+
+    func testStopChangedCommandAndExpiredDeadlinePreventHandoffLaunch() {
+        for scenario in ["stop", "command", "expired"] {
+            let client = activeClient(scenario)
+            let context = readiness(scenario, seconds: scenario == "expired" ? -1 : 1)
+            var activations = 0
+            var launches = 0
+            let settled = expectation(description: scenario)
+            client.requestVoiceForeground(
+                context, activate: { activations += 1 }, isActive: { false },
+                frontmostBundleID: { nil }, launch: { launches += 1 })
+            if scenario == "stop" { client.stop() }
+            if scenario == "command" { client.activeCommandID = "different" }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                XCTAssertEqual(launches, 0)
+                XCTAssertFalse(context.pressGate.attempted)
+                XCTAssertEqual(activations, scenario == "expired" ? 0 : 1)
+                settled.fulfill()
+            }
+            wait(for: [settled], timeout: 1)
+        }
+    }
+
     func testDelayedDiscoveryRevalidatesOnMainAndPressesOnce() {
         let client = activeClient("delayed")
         let context = readiness("delayed")

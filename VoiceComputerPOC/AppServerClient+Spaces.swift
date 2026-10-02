@@ -87,8 +87,31 @@ extension AppServerClient {
             targetNumber: (before.ordered.firstIndex(of: expected) ?? 0) + 1,
             remaining: remaining, roundTripOrigin: roundTripOrigin,
             commandID: commandID, deadline: ProcessInfo.processInfo.systemUptime + 4)
-        launchNativeSpaceDiscovery(readiness)
+        requestVoiceForeground(readiness) { [weak self] in
+            self?.launchNativeSpaceDiscovery(readiness)
+        }
     }
+    func handleMissionControlLaunchResult(
+        _ readiness: NativeSpaceReadiness, applicationPresent: Bool, error: Error?,
+        onReady: () -> Void
+    ) {
+        guard isWorking, activeCommandID == readiness.commandID else { return }
+        let elapsed = Int((ProcessInfo.processInfo.systemUptime - readiness.deadline + 4) * 1000)
+        record(
+            error == nil && applicationPresent
+                ? "mission_control_launch_completed" : "mission_control_launch_failed",
+            details: ["elapsed_ms": String(elapsed), "application_returned": String(applicationPresent)])
+        if let error {
+            handleNativeSpaceReadinessError(error, readiness: readiness, attempts: 0)
+        } else if !applicationPresent {
+            handleNativeSpaceReadinessError(
+                MissionControlAXError.desktopNotFound("launch_no_application"),
+                readiness: readiness, attempts: 0)
+        } else {
+            onReady()
+        }
+    }
+
     func handleNativeSpaceReadinessError(
         _ error: Error, readiness: NativeSpaceReadiness, attempts: Int,
         retry: (() -> Void)? = nil
@@ -127,9 +150,13 @@ extension AppServerClient {
         if case MissionControlAXError.permissionRequired = error {
             record("native_space_permission_missing")
         }
+        let message =
+            ["voice_inactive", "frontmost_mismatch"].contains(reason)
+            ? "Voice Computer POC did not become the active app before opening Mission Control."
+            : error.localizedDescription
         completeNativeSpace(
             status: "failed", verification: "unverified",
-            message: error.localizedDescription,
+            message: message,
             details: [
                 "direction": readiness.direction.rawValue,
                 "space_before_id": String(readiness.before.current),

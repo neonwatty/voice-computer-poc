@@ -105,33 +105,97 @@ enum NativeSpaceAXExecution {
 }
 
 extension AppServerClient {
+    func requestVoiceForeground(
+        _ readiness: NativeSpaceReadiness,
+        activate: () -> Void = { NSApp.activate() },
+        isActive: @escaping () -> Bool = { NSApp.isActive },
+        frontmostBundleID: @escaping () -> String? = {
+            NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        },
+        launch: @escaping () -> Void
+    ) {
+        guard isWorking, activeCommandID == readiness.commandID else { return }
+        let started = ProcessInfo.processInfo.systemUptime
+        guard started < readiness.deadline else {
+            handleNativeSpaceReadinessError(
+                MissionControlAXError.desktopNotFound("readiness_timeout"),
+                readiness: readiness, attempts: 0)
+            return
+        }
+        record("voice_foreground_requested")
+        activate()
+        pollVoiceForeground(
+            readiness, started: started, cutoff: min(readiness.deadline, started + 0.8),
+            isActive: isActive, frontmostBundleID: frontmostBundleID,
+            launch: launch)
+    }
+
+    private func pollVoiceForeground(
+        _ readiness: NativeSpaceReadiness, started: TimeInterval, cutoff: TimeInterval,
+        isActive: @escaping () -> Bool, frontmostBundleID: @escaping () -> String?,
+        launch: @escaping () -> Void
+    ) {
+        guard isWorking, activeCommandID == readiness.commandID else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        let active = isActive()
+        let matches = frontmostBundleID() == "com.neonwatty.VoiceComputerPOC"
+        if active && matches && now < readiness.deadline {
+            record(
+                "voice_foreground_observed",
+                details: [
+                    "active": "true", "frontmost_matches": "true",
+                    "elapsed_ms": String(Int((now - started) * 1000)),
+                ])
+            launch()
+            return
+        }
+        if now >= cutoff {
+            record(
+                "voice_foreground_observed",
+                details: [
+                    "active": String(active), "frontmost_matches": String(matches),
+                    "elapsed_ms": String(Int((now - started) * 1000)),
+                ])
+            handleNativeSpaceReadinessError(
+                MissionControlAXError.desktopNotFound(
+                    active ? "frontmost_mismatch" : "voice_inactive"),
+                readiness: readiness, attempts: 0)
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.pollVoiceForeground(
+                readiness, started: started, cutoff: cutoff, isActive: isActive,
+                frontmostBundleID: frontmostBundleID, launch: launch)
+        }
+    }
+
     func launchNativeSpaceDiscovery(_ readiness: NativeSpaceReadiness) {
         let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
-        NSWorkspace.shared.openApplication(at: url, configuration: .init()) { [weak self] _, error in
+        var configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) {
+            [weak self] application, error in
             DispatchQueue.main.async {
-                guard let self, self.isWorking,
-                    self.activeCommandID == readiness.commandID
-                else { return }
-                let elapsed = Int((ProcessInfo.processInfo.systemUptime - readiness.deadline + 4) * 1000)
-                self.record(
-                    error == nil ? "mission_control_launch_completed" : "mission_control_launch_failed",
-                    details: ["elapsed_ms": String(elapsed)])
-                self.discoverAndPressNativeSpace(
-                    readiness, launchError: error, attempts: 1,
-                    discover: {
-                        try NativeSpaceAXExecution.discover(
-                            number: readiness.targetNumber,
-                            expectedCount: readiness.before.ordered.count,
-                            deadline: readiness.deadline)
-                    },
-                    revalidate: { discovery in
-                        try NativeSpaceAXExecution.revalidate(
-                            discovery, number: readiness.targetNumber,
-                            expectedCount: readiness.before.ordered.count)
-                    },
-                    press: { discovery in
-                        try NativeSpaceAXExecution.press(discovery)
-                    })
+                self?.handleMissionControlLaunchResult(
+                    readiness, applicationPresent: application != nil, error: error
+                ) { [weak self] in
+                    self?.discoverAndPressNativeSpace(
+                        readiness, launchError: nil, attempts: 1,
+                        discover: {
+                            try NativeSpaceAXExecution.discover(
+                                number: readiness.targetNumber,
+                                expectedCount: readiness.before.ordered.count,
+                                deadline: readiness.deadline)
+                        },
+                        revalidate: { discovery in
+                            try NativeSpaceAXExecution.revalidate(
+                                discovery, number: readiness.targetNumber,
+                                expectedCount: readiness.before.ordered.count)
+                        },
+                        press: { discovery in
+                            try NativeSpaceAXExecution.press(discovery)
+                        })
+                }
             }
         }
     }
