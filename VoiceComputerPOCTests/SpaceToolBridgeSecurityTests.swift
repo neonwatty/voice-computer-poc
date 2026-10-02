@@ -9,13 +9,16 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         let bridge = try XCTUnwrap(SpaceToolBridge())
         defer { bridge.stop() }
         bridge.serverPID = getpid()
+        let helper = Bundle.main.bundleURL.appendingPathComponent(DesktopToolPreflight.helperRelativePath)
+        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: helper.path))
+        bridge.expectedExecutablePath = helper.resolvingSymlinksInPath().path
         var callbacks = 0
         bridge.onRequest = { request, _, reply in
             callbacks += 1
             reply(
                 .failure("unexpected", commandID: "one", direction: request.direction, message: "No action"))
         }
-        XCTAssertEqual(try queryFromPython(bridge)["status"] as? String, "unauthorized")
+        XCTAssertEqual(try queryFromPython(bridge).status, "unauthorized")
         XCTAssertEqual(callbacks, 0)
     }
     func testExactBinaryWithWrongParentCannotReachBridgeCallback() throws {
@@ -86,7 +89,7 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         let (task, input, output) = try launchHelper(bridge)
         defer { if task.isRunning { task.terminate() } }
         XCTAssertNotNil(bridge.eligiblePeer(task.processIdentifier))
-        XCTAssertEqual(try queryFromPython(bridge)["status"] as? String, "unauthorized")
+        XCTAssertEqual(try queryFromPython(bridge).status, "unauthorized")
 
         let callResponse = try callTool(input: input, output: output)
         let result = try XCTUnwrap(callResponse["result"] as? [String: Any])
@@ -241,30 +244,53 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         return callResponse
     }
 
-    private func queryFromPython(_ bridge: SpaceToolBridge) throws -> [String: Any] {
+    private func queryFromPython(_ bridge: SpaceToolBridge) throws -> SpaceToolResult {
         let script = """
-            import json,socket,sys
+            import socket,sys
             s=socket.socket(socket.AF_UNIX)
+            s.settimeout(3)
             s.connect(sys.argv[1])
-            s.sendall((json.dumps({'sessionID':sys.argv[2],'direction':'right'})+'\\n').encode())
+            sys.stdin.readline()
             print(s.recv(4096).decode())
             """
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-        task.arguments = ["-c", script, bridge.socketPath, bridge.sessionID]
+        task.arguments = ["-c", script, bridge.socketPath]
+        let input = Pipe()
         let output = Pipe()
+        let errors = Pipe()
+        task.standardInput = input
         task.standardOutput = output
-        let completion = expectation(description: "Non-helper descendant answered")
-        var data = Data()
+        task.standardError = errors
+        try task.run()
+        defer { if task.isRunning { task.terminate() } }
+        var info = proc_bsdinfo()
+        let pid = task.processIdentifier
+        XCTAssertEqual(
+            proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(MemoryLayout.size(ofValue: info))),
+            Int32(MemoryLayout.size(ofValue: info)))
+        XCTAssertEqual(pid_t(info.pbi_ppid), getpid(), "pid=\(pid) parent=\(info.pbi_ppid)")
+        var path = [CChar](repeating: 0, count: 4_096)
+        XCTAssertGreaterThan(proc_pidpath(pid, &path, UInt32(path.count)), 0)
+        let executable = URL(fileURLWithPath: String(cString: path)).resolvingSymlinksInPath().path
+        XCTAssertNotEqual(executable, bridge.expectedExecutablePath, "pid=\(pid) executable=\(executable)")
+        try input.fileHandleForWriting.write(contentsOf: Data("\n".utf8))
+        try input.fileHandleForWriting.close()
+        let completed = DispatchSemaphore(value: 0)
         DispatchQueue.global().async {
-            do {
-                try task.run()
-                data = output.fileHandleForReading.readDataToEndOfFile()
-                task.waitUntilExit()
-            } catch { XCTFail(error.localizedDescription) }
-            completion.fulfill()
+            task.waitUntilExit()
+            completed.signal()
         }
-        wait(for: [completion], timeout: 5)
-        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let finished = completed.wait(timeout: .now() + 5) == .success
+        let data = finished ? output.fileHandleForReading.readDataToEndOfFile() : Data()
+        let stderr = finished ? errors.fileHandleForReading.readDataToEndOfFile() : Data()
+        let details =
+            "pid=\(pid) parent=\(info.pbi_ppid) executable=\(executable) "
+            + "timeout=\(!finished) exit=\(finished ? task.terminationStatus : -1) "
+            + "stdout=\(String(decoding: data, as: UTF8.self).prefix(256)) "
+            + "stderr=\(String(decoding: stderr, as: UTF8.self).prefix(256))"
+        let response = try XCTUnwrap(
+            finished && task.terminationStatus == 0 && !data.isEmpty ? data : nil, details)
+        return try XCTUnwrap(try? JSONDecoder().decode(SpaceToolResult.self, from: response), details)
     }
 }
