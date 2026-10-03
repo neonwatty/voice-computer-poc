@@ -39,6 +39,7 @@ jobs:
           queries: security-extended
       - name: Build for analysis
         run: |
+          swift test --package-path DesktopToolServer
           xcodebuild -quiet \
             -project VoiceComputerPOC.xcodeproj \
             -scheme VoiceComputerPOC \

@@ -73,13 +73,9 @@ final class LocalVoiceInput: ObservableObject {
         let duration = ProcessInfo.processInfo.systemUptime - (recordingStartedAt ?? 0)
         recordingStartedAt = nil
         onEvent?("voice_recording_stopped", ["duration_ms": String(Int(duration * 1_000))])
-
-        let audio: Data
-        do {
-            audio = try Data(contentsOf: recordingURL)
-            removeRecordingFile(at: recordingURL)
-        } catch {
-            removeRecordingFile(at: recordingURL)
+        let audio = try? Data(contentsOf: recordingURL)
+        removeRecordingFile(at: recordingURL)
+        guard let audio else {
             fail("Could not read the recorded audio.", event: "voice_recording_read_failed")
             return
         }
@@ -88,7 +84,17 @@ final class LocalVoiceInput: ObservableObject {
             return
         }
         onEvent?("voice_transcription_started", ["audio_bytes": String(audio.count)])
+        let urlRequest = makeTranscriptionRequest(audio: audio)
+        request = URLSession.shared.dataTask(with: urlRequest) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                self?.handleTranscriptionResponse(
+                    data, response: response, error: error, completion: completion)
+            }
+        }
+        request?.resume()
+    }
 
+    private func makeTranscriptionRequest(audio: Data) -> URLRequest {
         let boundary = "VoiceComputerPOC-\(UUID().uuidString)"
         var body = Data()
         body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\nwhisper-1\r\n")
@@ -103,46 +109,45 @@ final class LocalVoiceInput: ObservableObject {
         urlRequest.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = body
         urlRequest.timeoutInterval = 60
-        request = URLSession.shared.dataTask(with: urlRequest) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                guard let self, self.state == .transcribing else { return }
-                self.request = nil
-                if let error {
-                    self.fail(
-                        "Could not reach the local transcription server at 127.0.0.1:8080.",
-                        event: "voice_transcription_network_failed",
-                        details: ["error": error.localizedDescription])
-                    return
-                }
-                guard let status = (response as? HTTPURLResponse)?.statusCode else {
-                    self.fail(
-                        "The local transcription server gave no HTTP response.",
-                        event: "voice_transcription_invalid_response")
-                    return
-                }
-                guard status == 200 else {
-                    self.fail(
-                        "The local transcription server returned HTTP \(status).",
-                        event: "voice_transcription_http_failed",
-                        details: ["http_status": String(status)])
-                    return
-                }
-                guard let data,
-                    let result = try? JSONDecoder().decode(TranscriptionResponse.self, from: data),
-                    !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                else {
-                    self.fail(
-                        "The local transcription server returned no transcript.",
-                        event: "voice_transcription_empty")
-                    return
-                }
-                let transcript = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                self.state = .idle
-                self.onEvent?("voice_transcription_completed", ["character_count": String(transcript.count)])
-                completion(transcript)
-            }
+        return urlRequest
+    }
+
+    private func handleTranscriptionResponse(
+        _ data: Data?, response: URLResponse?, error: Error?, completion: (String) -> Void
+    ) {
+        guard state == .transcribing else { return }
+        request = nil
+        if let error {
+            fail(
+                "Could not reach the local transcription server at 127.0.0.1:8080.",
+                event: "voice_transcription_network_failed",
+                details: ["error": error.localizedDescription])
+            return
         }
-        request?.resume()
+        guard let status = (response as? HTTPURLResponse)?.statusCode else {
+            fail(
+                "The local transcription server gave no HTTP response.",
+                event: "voice_transcription_invalid_response")
+            return
+        }
+        guard status == 200 else {
+            fail(
+                "The local transcription server returned HTTP \(status).",
+                event: "voice_transcription_http_failed",
+                details: ["http_status": String(status)])
+            return
+        }
+        guard let data,
+            let result = try? JSONDecoder().decode(TranscriptionResponse.self, from: data),
+            !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            fail("The local transcription server returned no transcript.", event: "voice_transcription_empty")
+            return
+        }
+        let transcript = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        state = .idle
+        onEvent?("voice_transcription_completed", ["character_count": String(transcript.count)])
+        completion(transcript)
     }
 
     func cancel() {

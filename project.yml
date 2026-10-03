@@ -8,6 +8,16 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - VoiceComputerPOC
+      - path: evals/router-instruction.txt
+        buildPhase: resources
+      - path: evals/router-cli-args.json
+        buildPhase: resources
+      - path: evals/router-output.schema.json
+        buildPhase: resources
+    postBuildScripts:
+      - name: Package pinned DesktopToolServer
+        script: '"$SRCROOT/scripts/package-desktop-tool.sh"'
+        basedOnDependencyAnalysis: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.neonwatty.VoiceComputerPOC
