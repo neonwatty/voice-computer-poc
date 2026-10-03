@@ -33,8 +33,10 @@ Run `xcodebuild -project VoiceComputerPOC.xcodeproj -scheme VoiceComputerPOC
 test CODE_SIGNING_ALLOWED=NO` for the unit tests. GitHub Actions runs the tests
 in Debug and Release, checks formatting, source and function size, unused Swift declarations,
 smoke-driver syntax, and generated-project consistency, and scans Swift with
-CodeQL. Interactive desktop behavior is
-verified manually and documented in [PLAN.md](PLAN.md).
+CodeQL. Interactive desktop behavior is verified with manual and bounded
+unattended checks documented in [PLAN.md](PLAN.md). The current
+[tool capability inventory](docs/tool-capability-inventory.md) separates
+Computer Use, the native path, and MCP and sets the next test order.
 
 Each app build compiles the pinned Swift MCP package into Xcode's derived-data
 scratch directory and installs the current configuration's executable at
@@ -260,7 +262,8 @@ complete right/left pairs; the driver rejects other MCP sequences and stops
 on the first failed step. The app must already be running from that exact path
 with one matching process and an unlocked, observable UI. The local app-server
 Computer Use turn requests that full path through CUA. Its inner Space-tool
-approval must be visibly reviewed and set to **Allow once** for each step.
+approval must be visibly reviewed and set to **Allow once** for each step; the
+outer Computer Use agent can do this in an unattended run.
 Each MCP case has a finite 24-call Computer Use budget; the driver still stops
 after the first failed step.
 
@@ -276,8 +279,8 @@ select only `--case 15`. This mode stops after that one submission even if it
 passes; it never starts a leftward step.
 
 Before each step the driver independently reads the live Space ID and checks
-Main `[3,4]`, the expected starting ID, and the exact running executable. It
-then checks the command-correlated app JSONL for one authentic
+the two ordered Main desktop Spaces, the expected starting ID, and the exact
+running executable. It then checks the command-correlated app JSONL for one authentic
 `desktop_tool.switch_space` item and turn, Allow once, helper identity, bridge
 acceptance, AX press, notification, typed verified result, and after-ID. A
 native-only trace is rejected. Run this only on an exact-head build after CI

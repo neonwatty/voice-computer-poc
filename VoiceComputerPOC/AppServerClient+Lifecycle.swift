@@ -80,6 +80,13 @@ extension AppServerClient {
         errorLinesLogged = 0
     }
 
+    func rotateServerAfterSpaceTool() {
+        guard let process else { return }
+        record("mcp_server_rotating", details: ["pid": String(process.processIdentifier)])
+        if process.isRunning { process.terminate() }
+        cleanupProcess()
+    }
+
     func fail(_ message: String) {
         spaceToolApproval = nil
         spaceToolBridge?.revoke()

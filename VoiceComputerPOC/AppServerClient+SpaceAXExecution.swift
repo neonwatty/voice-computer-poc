@@ -1,8 +1,9 @@
 import AppKit
+
 extension AppServerClient {
     func requestVoiceForeground(
         _ readiness: NativeSpaceReadiness,
-        activate: () -> Void = { NSApp.activate() },
+        activate: (() -> Void)? = nil,
         isActive: @escaping () -> Bool = { NSApp.isActive },
         frontmostBundleID: @escaping () -> String? = {
             NSWorkspace.shared.frontmostApplication?.bundleIdentifier
@@ -18,7 +19,7 @@ extension AppServerClient {
             return
         }
         record("voice_foreground_requested")
-        activate()
+        if let activate { activate() } else { requestVoiceActivation() }
         pollVoiceForeground(
             readiness, started: started, cutoff: min(readiness.deadline, started + 0.8),
             isActive: isActive, frontmostBundleID: frontmostBundleID,

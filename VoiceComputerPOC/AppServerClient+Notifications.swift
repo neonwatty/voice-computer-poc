@@ -161,6 +161,7 @@ extension AppServerClient {
             record("router_step_finished", details: ["verification": verification])
             record("router_next_step", details: ["direction": next.rawValue])
             prepareNextSpaceStep(next, phrase: phrase)
+            rotateServerAfterSpaceTool()
             beginActingTurn()
             return
         }
@@ -173,6 +174,7 @@ extension AppServerClient {
         remainingRoutedDirections = []
         routedOriginalPhrase = nil
         focusTargetBundleID = nil
+        let finishedSpaceTool = requestedToolDirection != nil
         requestedToolDirection = nil
         activatedBundleIDsThisTurn.removeAll()
         isWorking = false
@@ -180,6 +182,7 @@ extension AppServerClient {
         approval = nil
         queuedApprovals.removeAll()
         finishCommand()
+        if finishedSpaceTool { rotateServerAfterSpaceTool() }
     }
 
     private func prepareNextSpaceStep(_ direction: SpaceDirection, phrase: String) {

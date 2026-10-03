@@ -747,11 +747,15 @@ def main():
             elif index in MCP_CASES:
                 instruction = (
                     "Use only mcp__cua_repl.js for UI. Bind with cua.getApp to this exact full app path: "
-                    + str(app_path) + ". Verify the observed app executable/path and visible command field "
-                    "match; if not, stop. Type the exact quoted command and submit once using Return. "
+                    + str(app_path) + ". The driver has already checked the running executable; "
+                    "do not inspect app metadata, object properties, or processes. If the first "
+                    "tool response shows only Computer Use documentation, call app.getAXState(). "
+                    "Find the visible command field in its Accessibility state, enter the exact "
+                    "quoted command, and submit once using Return. "
                     "Only if a desktop_tool.switch_space approval is visibly shown with the requested "
                     "direction, click Allow once. Do not choose session access or approve through protocol. "
-                    "Wait for the visible app result. Do not switch Spaces yourself. User request: "
+                    "Wait for the visible app result. Do not switch Spaces yourself. If Computer Use "
+                    "fails, report the error and stop; do not use a shell fallback. User request: "
                 )
             response = driver.wait_rpc(driver.rpc("turn/start", {
                 "threadId": thread, "input": [{"type": "text", "text": instruction + phrase}],

@@ -76,7 +76,7 @@ extension AppServerClient {
         record("mission_control_probe_started")
         guard let commandID = activeCommandID else { return }
         let started = ProcessInfo.processInfo.systemUptime
-        NSApp.activate()
+        requestVoiceActivation()
         pollMissionControlProbeForeground(commandID: commandID, started: started)
     }
 

@@ -1,6 +1,29 @@
 import AppKit
 
 extension AppServerClient {
+    func requestVoiceActivation() {
+        NSApp.activate()
+        guard Bundle.main.bundleIdentifier == "com.neonwatty.VoiceComputerPOC",
+            NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+                != "com.neonwatty.VoiceComputerPOC"
+        else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        configuration.promptsUserIfNeeded = false
+        configuration.addsToRecentItems = false
+        let commandID = activeCommandID
+        record("voice_activation_handoff_requested")
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) {
+            [weak self] application, error in
+            DispatchQueue.main.async {
+                guard let self, self.activeCommandID == commandID else { return }
+                self.record(
+                    "voice_activation_handoff_result",
+                    details: ["accepted": String(application != nil && error == nil)])
+            }
+        }
+    }
+
     /// Complete an explicit Open Calculator request only after macOS reports focus.
     func requestCalculatorFocusAfterTool(
         _ turn: [String: Any],

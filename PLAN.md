@@ -1,5 +1,9 @@
 # Text-to-computer-use plan
 
+This is the historical test log. See the [current desktop tool inventory](docs/tool-capability-inventory.md)
+for the October 3 Mac Mini capability split, unattended MCP right-left pair,
+and next commands. Speech and Foil integration are deferred.
+
 ## Working prototype
 
 1. A macOS window accepts a typed command or one of four sample phrases.
