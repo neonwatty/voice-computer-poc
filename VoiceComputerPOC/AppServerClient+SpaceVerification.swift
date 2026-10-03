@@ -110,35 +110,68 @@ extension AppServerClient {
 
     private func launchMissionControlProbe(commandID: String) {
         let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
-        NSWorkspace.shared.openApplication(at: url, configuration: .init()) {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) {
             [weak self] application, error in
-            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.8) {
-                let probe = MissionControlAXProbe.inspectDock()
-                DispatchQueue.main.async {
-                    guard let self, self.isWorking, self.activeCommandID == commandID else { return }
-                    if error != nil { self.record("mission_control_launch_failed") }
-                    let summary = [
-                        "trusted": String(probe.trusted), "dock_found": String(probe.dockFound),
-                        "visited": String(probe.visited),
-                        "limit_reached": String(probe.limitReached),
-                        "mission_present": String(application != nil),
-                        "mission_active": String(application?.isActive ?? false),
-                        "frontmost_bundle_id": NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-                            ?? "unknown",
-                        "controls": probe.nodes.map { "\($0.title):\($0.description):\($0.actions)" }
-                            .joined(separator: "; "),
-                    ]
-                    self.record("mission_control_ax_summary", details: summary)
-                    self.status = "Ready"
-                    self.result = "Inspected Dock desktop controls. See Diagnostic Log."
-                    self.record(
-                        "command_finished",
-                        details: ["status": "completed", "elapsed_ms": self.commandElapsedMilliseconds])
-                    self.queuedPhrase = nil
-                    self.isWorking = false
-                    self.finishCommand()
-                    NSApp.activate(ignoringOtherApps: true)
+            DispatchQueue.main.async {
+                guard let self, self.isWorking, self.activeCommandID == commandID else { return }
+                let launched = application != nil && error == nil
+                if !launched { self.record("mission_control_launch_failed") }
+                self.pollMissionControlProbe(
+                    commandID: commandID, launched: launched,
+                    activeAtLaunch: application?.isActive ?? false,
+                    deadline: ProcessInfo.processInfo.systemUptime + 3, attempts: 1)
+            }
+        }
+    }
+
+    private func pollMissionControlProbe(
+        commandID: String, launched: Bool, activeAtLaunch: Bool,
+        deadline: TimeInterval, attempts: Int
+    ) {
+        guard isWorking, activeCommandID == commandID else { return }
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            let probe = MissionControlAXProbe.inspectDock()
+            DispatchQueue.main.async {
+                guard let self, self.isWorking, self.activeCommandID == commandID else { return }
+                if probe.nodes.count < 2 && !probe.limitReached
+                    && ProcessInfo.processInfo.systemUptime < deadline
+                {
+                    self.pollMissionControlProbe(
+                        commandID: commandID, launched: launched,
+                        activeAtLaunch: activeAtLaunch, deadline: deadline, attempts: attempts + 1)
+                    return
                 }
+                let summary = [
+                    "trusted": String(probe.trusted), "dock_found": String(probe.dockFound),
+                    "visited": String(probe.visited), "limit_reached": String(probe.limitReached),
+                    "attempts": String(attempts), "mission_present": String(launched),
+                    "mission_active": String(activeAtLaunch),
+                    "frontmost_bundle_id": NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+                        ?? "unknown",
+                    "controls": probe.nodes.map { "\($0.title):\($0.description):\($0.actions)" }
+                        .joined(separator: "; "),
+                ]
+                self.record("mission_control_ax_summary", details: summary)
+                let found =
+                    launched && probe.trusted && probe.dockFound
+                    && !probe.limitReached && probe.nodes.count == 2
+                self.status = "Ready"
+                self.result =
+                    found
+                    ? "Inspected Dock desktop controls. See Diagnostic Log."
+                    : "Mission Control did not expose two desktop controls. See Diagnostic Log."
+                self.record(
+                    "command_finished",
+                    details: [
+                        "status": found ? "completed" : "failed",
+                        "elapsed_ms": self.commandElapsedMilliseconds,
+                    ])
+                self.queuedPhrase = nil
+                self.isWorking = false
+                self.finishCommand()
+                NSApp.activate(ignoringOtherApps: true)
             }
         }
     }

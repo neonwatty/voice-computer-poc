@@ -51,6 +51,7 @@ jobs:
             -configuration Debug \
             -destination 'platform=macOS' \
             -derivedDataPath DerivedData \
+            -parallel-testing-enabled NO \
             -resultBundlePath "$RUNNER_TEMP/VoiceComputerPOC-Debug.xcresult" \
             test CODE_SIGNING_ALLOWED=NO
       - name: Save failed Debug XCTest results
@@ -76,6 +77,7 @@ jobs:
             -configuration Release \
             -destination 'platform=macOS' \
             -derivedDataPath DerivedData \
+            -parallel-testing-enabled NO \
             -resultBundlePath "$RUNNER_TEMP/VoiceComputerPOC-Release.xcresult" \
             test CODE_SIGNING_ALLOWED=NO ENABLE_TESTABILITY=YES
       - name: Save failed Release XCTest results

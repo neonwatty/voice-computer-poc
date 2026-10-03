@@ -187,7 +187,7 @@ class ExactAppBindingTests(unittest.TestCase):
                          COMMAND_ID)
         cases = [
             (0, "command_id", "old"), (3, "trusted", "false"),
-            (3, "dock_found", "false"), (3, "mission_active", "false"),
+            (3, "dock_found", "false"), (3, "mission_present", "false"),
             (3, "limit_reached", "true"), (3, "controls", "Desktop 1:wrong:AXPress"),
             (5, "live_space_id", "4"),
         ]

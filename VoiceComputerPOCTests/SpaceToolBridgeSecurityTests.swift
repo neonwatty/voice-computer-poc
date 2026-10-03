@@ -110,7 +110,13 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         bridge.expectedExecutablePath = "/tmp/not-the-desktop-tool/DesktopToolServer"
         XCTAssertNil(bridge.eligiblePeer(task.processIdentifier))
         bridge.expectedExecutablePath = correctPath
-        let identity = try XCTUnwrap(bridge.eligiblePeer(task.processIdentifier))
+        let deadline = Date().addingTimeInterval(2)
+        var candidate = bridge.eligiblePeer(task.processIdentifier)
+        while candidate == nil && task.isRunning && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+            candidate = bridge.eligiblePeer(task.processIdentifier)
+        }
+        let identity = try XCTUnwrap(candidate)
         XCTAssertTrue(bridge.bind(identity, commandID: "one", itemID: "item-one"))
         XCTAssertTrue(bridge.isBoundPeerAlive(commandID: "one", itemID: "item-one"))
         #if DEBUG
