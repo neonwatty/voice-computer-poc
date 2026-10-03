@@ -3,7 +3,7 @@
 Status: October 3, 2026. The narrow Safari and Finder slices are implemented;
 three isolated Safari runs and multiple Safari→Finder sequences passed, as did
 repeated Finder runs. The default suite passed on the final app build, and all
-three focused Browser negatives passed with independent UI evidence. The
+three focused Browser negatives and three Finder rejection cases passed. The
 optional Mission Control gate is intermittent. The Codex host task
 status route is deferred because a separate app-server process cannot read the
 host's live state. Speech transcription and Foil integration remain deferred.
@@ -41,8 +41,9 @@ opening Calculator; its schema, validator, corpus, and handoff change together.
 
 - Keep the existing exact-bundle preflight, one-process check, unlocked-console
   check, helper hash check, owner-only JSONL receipts, and command ID linkage.
-- Run the read-only Mission Control case before new acting tests. Record the
-  starting Space and frontmost bundle ID. New tests must not change Space.
+- Run the read-only Mission Control case as a separate diagnostic or an explicit
+  Space-control gate. Record the starting Space and frontmost bundle ID. New
+  Browser and Finder tests must not change Space.
 - Keep Computer Use app approvals scoped to the named target. If the inner
   Voice Computer run asks for another app, a shell command, or an unexpected
   MCP tool, stop and record the request.
@@ -139,6 +140,11 @@ AppleScript tool.
 
 Test the report, decoy ambiguity, missing file, symlink escape, and an already
 open Finder window. Preserve user files and windows outside the test fixture.
+
+**Measured negatives:** Focused exact-app runs with a missing report, a report
+symlink to an outside temporary file, and the similarly named decoy each
+finished with `no_action`. The runner required a fresh app command, no acting
+turn or tool, the same live Space ID, and fixture cleanup.
 
 **Gate:** Three unattended reveals select the exact report, including one run
 with Finder initially in the background. Every negative case returns no action

@@ -339,6 +339,10 @@ task status route remains disabled pending a host-aware read-only interface.
 Focused Browser negatives use `--case 17 --browser-mode missing-link`,
 `home-404`, or `redirect`. The runner requires the exact local request sequence
 and rendered final page for each scenario; an observed wrong origin fails.
+Focused Finder negatives use `--case 18 --finder-mode missing-file`,
+`symlink-escape`, or `decoy-target`. Each requires a fresh app command that
+finishes with `no_action`, without starting a Finder acting turn or changing
+the desktop Space. Fixture files are removed after the receipt is written.
 
 ## Scope
 

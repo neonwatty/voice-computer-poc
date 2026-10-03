@@ -18,7 +18,8 @@ from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path
                               validate_exact_space_state,
                               validate_mcp_cases, verify_mcp_receipt,
                               verify_read_only_receipt, verify_browser_receipt,
-                              verify_finder_receipt)  # noqa: E402
+                              verify_finder_receipt,
+                              verify_finder_rejection_receipt)  # noqa: E402
 
 
 COMMAND_ID = "A1B2C3D4"
@@ -311,6 +312,44 @@ class BrowserReceiptTests(unittest.TestCase):
 
 
 class FinderReceiptTests(unittest.TestCase):
+    def test_missing_and_symlinked_reports_start_no_actor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "report.txt"
+            rows = [
+                row("command_started", user_action="run"),
+                row("router_requested", mode="isolated_codex_exec"),
+                row("router_decided", route="clarification"),
+                row("command_finished", status="clarification", verification="no_action"),
+            ]
+            self.assertEqual(verify_finder_rejection_receipt(
+                rows, report, 5, 5)["scenario"], "missing-file")
+            with self.assertRaisesRegex(ValueError, "started an action"):
+                verify_finder_rejection_receipt(
+                    rows[:3] + [row("turn_requested", route="finder")] + rows[3:],
+                    report, 5, 5)
+            with self.assertRaisesRegex(ValueError, "acting route"):
+                verify_finder_rejection_receipt(
+                    rows[:2] + [row("router_decided", route="finder")] + rows[3:],
+                    report, 5, 5)
+            with self.assertRaisesRegex(ValueError, "changed desktop"):
+                verify_finder_rejection_receipt(rows, report, 5, 6)
+            with self.assertRaisesRegex(ValueError, "stale"):
+                verify_finder_rejection_receipt(rows, report, 5, 5, {COMMAND_ID})
+            outside = root / "outside.txt"
+            outside.write_text("outside")
+            report.symlink_to(outside)
+            self.assertEqual(verify_finder_rejection_receipt(
+                rows, report, 5, 5, mode="symlink-escape")["scenario"],
+                "symlink-escape")
+            with self.assertRaisesRegex(ValueError, "unexpectedly exists"):
+                verify_finder_rejection_receipt(rows, report, 5, 5)
+            decoy = root / "report-copy.txt"
+            decoy.write_text("decoy")
+            self.assertEqual(verify_finder_rejection_receipt(
+                rows, decoy, 5, 5, mode="decoy-target")["scenario"],
+                "decoy-target")
+
     def test_exact_selected_report_and_decoy(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
