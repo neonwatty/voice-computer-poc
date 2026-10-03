@@ -5,7 +5,7 @@ struct VoiceComputerPOCApp: App {
     @StateObject private var client = AppServerClient()
 
     var body: some Scene {
-        WindowGroup(id: "main") {
+        Window("Voice Computer", id: "main") {
             ContentView(client: client)
                 .frame(minWidth: 640, minHeight: 620)
                 .background(MainWindowSpaceBehavior())
