@@ -134,6 +134,9 @@ final class NativeSpaceAXExecutionTests: XCTestCase {
         XCTAssertEqual(calls, 1)
         XCTAssertEqual(context.pressGate.attempted, true)
         XCTAssertEqual(client.diagnosticEntries.filter { $0.event == "native_space_ax_pressed" }.count, 1)
+        XCTAssertEqual(
+            client.diagnosticEntries.first { $0.event == "native_space_ax_pressed" }?
+                .details["control_source"], "dock")
         client.stop()
     }
 

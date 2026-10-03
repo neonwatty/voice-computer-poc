@@ -86,13 +86,11 @@ extension AppServerClient {
             targetNumber: (before.ordered.firstIndex(of: expected) ?? 0) + 1,
             remaining: remaining, roundTripOrigin: roundTripOrigin,
             commandID: commandID, deadline: ProcessInfo.processInfo.systemUptime + 4)
-        discoverAndPressNativeSpace(
-            readiness, launchError: nil, attempts: 0,
-            openOnAbsent: { [weak self] in
-                self?.requestVoiceForeground(readiness) { [weak self] in
-                    self?.launchNativeSpaceDiscovery(readiness)
-                }
-            })
+        requestVoiceForeground(readiness) { [weak self] in
+            self?.discoverAndPressNativeSpace(
+                readiness, launchError: nil, attempts: 0,
+                openOnAbsent: { [weak self] in self?.launchNativeSpaceDiscovery(readiness) })
+        }
     }
     func handleMissionControlLaunchResult(
         _ readiness: NativeSpaceReadiness, applicationPresent: Bool, error: Error?,
@@ -137,7 +135,9 @@ extension AppServerClient {
             details: [
                 "attempts": String(attempts), "reason": reason,
                 "desktops": String(min(120, desktopCount)), "nodes": String(min(120, visited)),
-                "dock_count": reason == "dock_unavailable" ? "0" : (visited > 0 ? "1" : "unknown"),
+                "control_source": NativeSpaceAXExecution.source(
+                    forMajorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+                ).rawValue,
             ])
         if let retry,
             ["dock_unavailable", "missing_controls", "incomplete_controls", "mismatched_controls"]

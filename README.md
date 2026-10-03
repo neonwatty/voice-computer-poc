@@ -77,7 +77,7 @@ path. The endpoint is fixed for this first experiment.
 The phrases **Switch to the next desktop Space**, **Switch to the previous
 desktop Space**, and **Switch one desktop Space right and then back left** use a
 narrow native macOS Accessibility path. The app opens Mission Control and
-presses only the verified adjacent **Desktop N** control in Dock's Accessibility
+presses only the verified adjacent **Desktop N** control in the system's Accessibility
 tree. It requires both an active-Space notification and the expected live Space
 ID after each move. It logs each step and reports a failure if verification
 does not arrive. Sentence-ending punctuation from transcription is accepted.
@@ -153,14 +153,16 @@ This remains a prototype: it expects English **Desktop N** labels and a simple
 main-display desktop sequence. The current Space ID check uses a private
 SkyLight read because the `com.apple.spaces` preference can be stale.
 Space action now waits up to four seconds for the exact Mission Control
-Desktop count, titles, target description, and AXPress action. It permits at
+Desktop count, titles, target description, and AXPress action. On macOS 27 it
+reads the `mc.spaces.list` controls from `WindowManager`; older versions use
+the Dock tree. It permits at
 most one press, then allows up to three seconds for independent ID and
 notification verification within the ten-second tool callback limit. If controls do not
 appear, the typed result remains unverified; the normal log records only a
-reason code, attempt count, Dock presence, and bounded Desktop-control and AX-node counts for
+reason code, attempt count, control source, and bounded Desktop-control and AX-node counts for
 each strict scan. It also records Mission Control launch completion or failure
 and elapsed time. These diagnostics omit unrelated AX nodes and UI content. The read-only
-inspection command reports only Desktop controls, without the full Dock AX
+inspection command reports only Desktop controls, without the full AX
 tree. The Air smoke verifier uses the exact typed `agent switch desktop space
 right/left` phrase, distinct from its outer CUA instruction.
 
@@ -245,7 +247,7 @@ python3 scripts/smoke_app_server.py --case 10 --case 9 \
 ```
 
 Cases 11 and 12 probe Mission Control through Computer Use; both failed on the
-Air. Case 13 inspects Dock's Mission Control Accessibility tree. The app's
+Air. Case 13 inspects Mission Control's Accessibility tree. The app's
 native case 10 passed on the Air; see [PLAN.md](PLAN.md).
 
 Cases 15 and 16 run the **acting MCP** right and left commands through the
