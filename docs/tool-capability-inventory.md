@@ -2,6 +2,8 @@
 
 Status: October 3, 2026. Speech input and Foil integration are deferred while
 desktop actions and unattended testing are validated.
+The [next-capabilities plan](next-capabilities-plan.md) covers Browser, Finder,
+and Codex desktop status work.
 
 ## Current paths
 
