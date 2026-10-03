@@ -129,6 +129,11 @@ extension AppServerClient {
                 details: ["turn_id": turn["id"] as? String ?? "unknown"])
             return
         }
+        if requestCalculatorFocusAfterTool(turn) { return }
+        finishTurnCompleted(turn)
+    }
+
+    func finishTurnCompleted(_ turn: [String: Any]) {
         let outcome = turn["status"] as? String ?? "completed"
         let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         status = outcome == "completed" ? "Ready" : "Turn \(outcome)"

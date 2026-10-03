@@ -205,9 +205,12 @@ Computer Use could inspect its window, while targeting the other copy returned
 
 For commands that explicitly ask to foreground Chrome or Calculator, the app
 observes macOS app-activation notifications and checks the final frontmost app.
-If the requested app is not frontmost when the turn ends, the result says focus
-is unverified. The earlier Computer Use test could inspect those windows but
-did not produce an observed activation on this Mac.
+After a completed Computer Use call for **Open Calculator**, it asks Launch
+Services to bring the one running Calculator instance forward and waits briefly
+for macOS to confirm focus. If the requested app is still not frontmost, the
+result says focus is unverified. Earlier Computer Use tests could inspect the
+Calculator window without bringing it forward; the Mac Mini acceptance run
+verified the Launch Services handoff and independent frontmost observation.
 
 The app observes macOS's active-Space-change notification and displays a count.
 The native route also checks the Space ID. The earlier Computer Use-only Space

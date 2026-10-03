@@ -154,6 +154,32 @@ final class AppServerClientNotificationTests: XCTestCase {
             "verified")
     }
 
+    func testCalculatorFocusHandoffRequiresCompletedComputerUseTool() {
+        let client = makeClient()
+        client.isWorking = true
+        client.activeCommandID = "one"
+        client.turnID = "turn-one"
+        client.focusTargetBundleID = "com.apple.calculator"
+
+        let turn = ["id": "turn-one", "status": "completed"]
+        XCTAssertFalse(
+            client.requestCalculatorFocusAfterTool(
+                turn, frontmostBundleID: "com.openai.codex"))
+        client.record(
+            "tool_completed",
+            details: [
+                "server": "cua_repl", "status": "completed", "result_is_error": "false",
+            ])
+        client.generalTurnFailure = .accessDeclined
+        XCTAssertFalse(
+            client.requestCalculatorFocusAfterTool(
+                turn, frontmostBundleID: "com.openai.codex"))
+        XCTAssertFalse(
+            client.diagnosticEntries.contains {
+                $0.event == "focus_activation_requested"
+            })
+    }
+
     private func makeClient() -> AppServerClient {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         addTeardownBlock { try FileManager.default.removeItem(at: directory) }

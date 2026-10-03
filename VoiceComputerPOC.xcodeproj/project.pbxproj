@@ -45,6 +45,7 @@
 		F4C66D788160D488340A7AAF /* AppServerClient+Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA818DA41010F13056BC0096 /* AppServerClient+Notifications.swift */; };
 		F8ED3CAF55A6B34F67BE9856 /* NativeSpaceCancellationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9EB4AB5FB13BC8D4FE6427F /* NativeSpaceCancellationTests.swift */; };
 		FABA6BB3D1B74125E9834BB6 /* router-instruction.txt in Resources */ = {isa = PBXBuildFile; fileRef = BED1EF7D88AEDFF253DD76FC /* router-instruction.txt */; };
+		FB9DF7EBC9313DD2DDF7F5A5 /* AppServerClient+FocusActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0462EAA1EC591D98B59A5113 /* AppServerClient+FocusActivation.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +61,7 @@
 /* Begin PBXFileReference section */
 		0021295ABADC32033A3EDE68 /* ApprovalProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalProtocolTests.swift; sourceTree = "<group>"; };
 		03E832F80A1C092C60825323 /* VoiceComputerPOCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceComputerPOCApp.swift; sourceTree = "<group>"; };
+		0462EAA1EC591D98B59A5113 /* AppServerClient+FocusActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+FocusActivation.swift"; sourceTree = "<group>"; };
 		0F9746E05DAF2F18E2164AE0 /* DiagnosticLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLog.swift; sourceTree = "<group>"; };
 		1553759D35311E1698534226 /* AppServerClient+Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Connection.swift"; sourceTree = "<group>"; };
 		17C96BB825E16BE3B775FD87 /* SpaceToolBridgePythonPeerSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolBridgePythonPeerSupport.swift; sourceTree = "<group>"; };
@@ -155,6 +157,7 @@
 				4DF54FE5EDD2D827D67E8AF4 /* ApprovalProtocol.swift */,
 				3E5685373ED6C8075DD282EA /* AppServerClient.swift */,
 				1553759D35311E1698534226 /* AppServerClient+Connection.swift */,
+				0462EAA1EC591D98B59A5113 /* AppServerClient+FocusActivation.swift */,
 				E1DA61CCE4D3F6CC8236658A /* AppServerClient+Lifecycle.swift */,
 				FA818DA41010F13056BC0096 /* AppServerClient+Notifications.swift */,
 				DEF216825C70926B73579A26 /* AppServerClient+Responses.swift */,
@@ -310,6 +313,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2FC0AEA630182A4F6C177E93 /* AppServerClient+Connection.swift in Sources */,
+				FB9DF7EBC9313DD2DDF7F5A5 /* AppServerClient+FocusActivation.swift in Sources */,
 				A8852D260D8504D5024ABB58 /* AppServerClient+Lifecycle.swift in Sources */,
 				F4C66D788160D488340A7AAF /* AppServerClient+Notifications.swift in Sources */,
 				E47F520E49C91E7C1477649E /* AppServerClient+Responses.swift in Sources */,
