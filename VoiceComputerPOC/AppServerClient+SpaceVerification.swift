@@ -1,6 +1,20 @@
 import Foundation
 
 extension AppServerClient {
+    func nativeSpaceActionActive(commandID: String?) -> Bool {
+        guard let commandID else { return false }
+        return isWorking && activeCommandID == commandID
+            && cancelledNativeSpaceCommandID != commandID
+    }
+
+    static func controlsAbsent(_ error: Error) -> Bool {
+        if case MissionControlAXError.dockUnavailable = error { return true }
+        if case MissionControlAXError.scanUnavailable("missing_controls", 0, _) = error {
+            return true
+        }
+        return false
+    }
+
     @discardableResult
     func recordLiveSpaceObservation(_ phase: String) -> Int? {
         let liveID = SpaceNavigator.liveSpaceID()
@@ -39,7 +53,7 @@ extension AppServerClient {
             nativeSpacePollTimer = Timer.scheduledTimer(
                 withTimeInterval: 0.5, repeats: false
             ) { [weak self] _ in
-                guard let self, self.isWorking, self.activeCommandID == commandID else { return }
+                guard let self, self.nativeSpaceActionActive(commandID: commandID) else { return }
                 self.nativeSpacePollTimer = nil
                 self.runNativeSpaceStep(
                     next, remaining: Array(remaining.dropFirst()),

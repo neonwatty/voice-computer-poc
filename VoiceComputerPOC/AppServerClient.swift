@@ -53,6 +53,7 @@ final class AppServerClient: ObservableObject {
     var focusTargetBundleID: String?
     var activatedBundleIDsThisTurn: Set<String> = []
     var activeCommandID: String?
+    var cancelledNativeSpaceCommandID: String?
     var voiceCaptureCommandID: String?
     var commandStartedUptime: TimeInterval?
     var lastServerEventUptime: TimeInterval?
@@ -159,6 +160,7 @@ final class AppServerClient: ObservableObject {
         isWorking = true
         activeCommandID =
             source == .reviewedVoice ? (voiceCaptureCommandID ?? UUID().uuidString) : UUID().uuidString
+        cancelledNativeSpaceCommandID = nil
         voiceCaptureCommandID = nil
         commandStartedUptime = ProcessInfo.processInfo.systemUptime
         lastServerEventUptime = commandStartedUptime
@@ -241,6 +243,7 @@ final class AppServerClient: ObservableObject {
 
     func stop() {
         guard isWorking else { return }
+        cancelledNativeSpaceCommandID = activeCommandID
         spaceToolApproval = nil
         spaceToolBridge?.revoke()
         record("stop_requested")

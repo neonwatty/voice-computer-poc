@@ -93,10 +93,17 @@ def screen_is_locked():
             ["ioreg", "-r", "-c", "IOResources", "-l", "-w0"],
             capture_output=True, text=True, timeout=5, check=True,
         ).stdout
-    except (OSError, subprocess.SubprocessError):
+        match = re.search(r'"CGSSessionScreenIsLocked"=(Yes|No)', output)
+        if match:
+            return match.group(1) == "Yes"
+        root = subprocess.run(
+            ["ioreg", "-n", "Root", "-d1", "-a"],
+            capture_output=True, timeout=5, check=True,
+        ).stdout
+        locked = plistlib.loads(root).get("IOConsoleLocked")
+        return locked if type(locked) is bool else None
+    except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
         return None
-    match = re.search(r'"CGSSessionScreenIsLocked"=(Yes|No)', output)
-    return match.group(1) == "Yes" if match else None
 
 
 def space_state():
@@ -122,6 +129,24 @@ def space_state():
         }
     except (OSError, subprocess.SubprocessError, KeyError, StopIteration, ValueError, AttributeError):
         return None
+
+
+def validate_exact_space_state(state, case):
+    """Require two distinct live Main desktops and the case's starting edge."""
+    if not isinstance(state, dict):
+        raise RuntimeError("Cannot read the host's live desktop Space state")
+    ordered = state.get("ordered")
+    current = state.get("current")
+    if (not isinstance(ordered, list) or len(ordered) != 2
+            or any(type(value) is not int or value <= 0 for value in ordered)
+            or ordered[0] == ordered[1] or type(current) is not int
+            or current not in ordered):
+        raise RuntimeError("Exact app case requires two distinct Main desktop Spaces")
+    if case == 15 and current != ordered[0]:
+        raise RuntimeError("Rightward MCP case requires the first Main desktop Space")
+    if case == 16 and current != ordered[1]:
+        raise RuntimeError("Leftward MCP case requires the second Main desktop Space")
+    return state
 
 
 def default_codex():
@@ -632,8 +657,8 @@ def main():
     try:
         locked = screen_is_locked()
         driver.record("environment_check", screen_locked=locked)
-        if locked:
-            print("SMOKE BLOCKED: the macOS desktop session is locked", file=sys.stderr)
+        if locked is True or (exact_selected and locked is not False):
+            print("SMOKE BLOCKED: macOS desktop unlock state is not verified", file=sys.stderr)
             return 2
         driver.wait_rpc(driver.rpc("initialize", {"clientInfo": {
             "name": "voice_computer_smoke", "title": "Voice Computer Smoke Test", "version": "0.1.0",
@@ -652,14 +677,12 @@ def main():
             phrase = COMMANDS[index - 1]
             space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 13, 14, 15, 16) else None
             expected_space = None
-            if index == 13 and space_before != {"current": 3, "ordered": [3, 4]}:
-                raise RuntimeError("Read-only case requires Main [3,4] at ID3")
+            if index in EXACT_APP_CASES:
+                validate_exact_space_state(space_before, index)
             if index in (7, 8, 9, 10, 11, 12, 14, 15, 16):
                 if space_before is None:
                     raise RuntimeError("Cannot read current desktop Space before case %s" % index)
                 ordered = space_before["ordered"]
-                if index in MCP_CASES and (ordered != [3, 4] or space_before["current"] != (3 if index == 15 else 4)):
-                    raise RuntimeError("MCP case requires exact Main [3,4] and expected starting ID")
                 position = ordered.index(space_before["current"])
                 destination = position + (1 if index in (7, 9, 10, 11, 12, 15) else -1)
                 if not 0 <= destination < len(ordered):

@@ -1,12 +1,5 @@
 import AppKit
 extension AppServerClient {
-    static func controlsAbsent(_ error: Error) -> Bool {
-        if case MissionControlAXError.dockUnavailable = error { return true }
-        if case MissionControlAXError.scanUnavailable("missing_controls", 0, _) = error {
-            return true
-        }
-        return false
-    }
     func handleSpaceToolRequest(
         _ request: SpaceToolRequest, peer: SpaceToolBridge.PeerIdentity,
         reply: @escaping (SpaceToolResult) -> Void
@@ -44,14 +37,14 @@ extension AppServerClient {
         runNativeSpaceStep(expectedToolDirection, remaining: [], roundTripOrigin: nil)
     }
     func handleSpaceToolTimeout(commandID: String?) {
-        guard isWorking, activeCommandID == commandID, toolReply != nil else { return }
+        guard nativeSpaceActionActive(commandID: commandID), toolReply != nil else { return }
         record("mcp_native_callback_timeout")
         fail("The native Space callback timed out.")
     }
     func runNativeSpaceStep(
         _ direction: SpaceDirection, remaining: [SpaceDirection], roundTripOrigin: Int?
     ) {
-        guard isWorking else { return }
+        guard nativeSpaceActionActive(commandID: activeCommandID) else { return }
         let trusted = MissionControlAXProbe.isTrusted
         let before = trusted ? SpaceNavigator.snapshot() : nil
         let preflight = SpaceToolSafety.preflight(
@@ -105,7 +98,7 @@ extension AppServerClient {
         _ readiness: NativeSpaceReadiness, applicationPresent: Bool, error: Error?,
         onReady: () -> Void
     ) {
-        guard isWorking, activeCommandID == readiness.commandID else { return }
+        guard nativeSpaceActionActive(commandID: readiness.commandID) else { return }
         let elapsed = Int((ProcessInfo.processInfo.systemUptime - readiness.deadline + 4) * 1000)
         record(
             error == nil && applicationPresent
@@ -121,12 +114,11 @@ extension AppServerClient {
             onReady()
         }
     }
-
     func handleNativeSpaceReadinessError(
         _ error: Error, readiness: NativeSpaceReadiness, attempts: Int,
         retry: (() -> Void)? = nil
     ) {
-        guard isWorking, activeCommandID == readiness.commandID else { return }
+        guard nativeSpaceActionActive(commandID: readiness.commandID) else { return }
         let reason: String
         var desktopCount = 0
         var visited = 0
@@ -152,7 +144,9 @@ extension AppServerClient {
                 .contains(reason), ProcessInfo.processInfo.systemUptime < readiness.deadline
         {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                guard self?.isWorking == true else { return }
+                guard self?.nativeSpaceActionActive(commandID: readiness.commandID) == true else {
+                    return
+                }
                 retry()
             }
             return
@@ -182,7 +176,7 @@ extension AppServerClient {
         let commandID = activeCommandID
         nativeSpacePollTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) {
             [weak self] timer in
-            guard let self, self.isWorking, self.activeCommandID == commandID else {
+            guard let self, self.nativeSpaceActionActive(commandID: commandID) else {
                 timer.invalidate()
                 self?.nativeSpacePollTimer = nil
                 return
@@ -219,6 +213,12 @@ extension AppServerClient {
     func completeNativeSpace(
         status outcome: String, verification: String, message: String, details: [String: String]
     ) {
+        if outcome != "stopped", let activeCommandID,
+            activeCommandID == cancelledNativeSpaceCommandID
+        {
+            record("late_native_result_ignored", details: ["status": outcome])
+            return
+        }
         guard isWorking else {
             record("late_native_result_ignored", details: ["status": outcome])
             return

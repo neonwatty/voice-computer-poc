@@ -1,9 +1,5 @@
 import AppKit
 import ApplicationServices
-struct MissionControlAXDiscovery {
-    let list: AXUIElement
-    let target: AXUIElement
-}
 enum NativeSpaceAXExecution {
     static func discover(number: Int, expectedCount: Int, deadline: TimeInterval) throws
         -> MissionControlAXDiscovery
@@ -122,7 +118,7 @@ extension AppServerClient {
         },
         launch: @escaping () -> Void
     ) {
-        guard isWorking, activeCommandID == readiness.commandID else { return }
+        guard nativeSpaceActionActive(commandID: readiness.commandID) else { return }
         let started = ProcessInfo.processInfo.systemUptime
         guard started < readiness.deadline else {
             handleNativeSpaceReadinessError(
@@ -142,7 +138,7 @@ extension AppServerClient {
         isActive: @escaping () -> Bool, frontmostBundleID: @escaping () -> String?,
         launch: @escaping () -> Void
     ) {
-        guard isWorking, activeCommandID == readiness.commandID else { return }
+        guard nativeSpaceActionActive(commandID: readiness.commandID) else { return }
         let now = ProcessInfo.processInfo.systemUptime
         let active = isActive()
         let matches = frontmostBundleID() == "com.neonwatty.VoiceComputerPOC"
@@ -197,7 +193,7 @@ extension AppServerClient {
         press: (MissionControlAXDiscovery) throws -> Void,
         liveSpaceID: () -> Int?
     ) {
-        guard isWorking, activeCommandID == readiness.commandID else { return }
+        guard nativeSpaceActionActive(commandID: readiness.commandID) else { return }
         do {
             guard ProcessInfo.processInfo.systemUptime < readiness.deadline else {
                 throw MissionControlAXError.desktopNotFound("readiness_timeout")
@@ -212,6 +208,7 @@ extension AppServerClient {
             guard liveSpaceID() == readiness.before.current else {
                 throw MissionControlAXError.desktopNotFound("start_space_changed")
             }
+            guard nativeSpaceActionActive(commandID: readiness.commandID) else { return }
             guard readiness.pressGate.claim() else {
                 throw MissionControlAXError.desktopNotFound("duplicate_press")
             }
@@ -252,7 +249,7 @@ extension AppServerClient {
                     expectedCount: readiness.before.ordered.count)
             }
         let press = press ?? { try NativeSpaceAXExecution.press($0) }
-        guard isWorking, activeCommandID == readiness.commandID else { return }
+        guard nativeSpaceActionActive(commandID: readiness.commandID) else { return }
         if let launchError {
             handleNativeSpaceReadinessError(launchError, readiness: readiness, attempts: attempts)
             return
@@ -266,7 +263,7 @@ extension AppServerClient {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let outcome = Result { try discover() }
             DispatchQueue.main.async {
-                guard let self, self.isWorking, self.activeCommandID == readiness.commandID else {
+                guard let self, self.nativeSpaceActionActive(commandID: readiness.commandID) else {
                     return
                 }
                 switch outcome {

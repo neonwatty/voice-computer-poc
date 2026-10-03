@@ -14,7 +14,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).parent))
 from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path,
                               cua_exact_path_call, mcp_case_phrase, parse_open_session_log,
-                              running_app_pids, validate_mcp_cases, verify_mcp_receipt,
+                              running_app_pids, screen_is_locked, validate_exact_space_state,
+                              validate_mcp_cases, verify_mcp_receipt,
                               verify_read_only_receipt)  # noqa: E402
 
 
@@ -70,7 +71,33 @@ def read_only_rows():
     ]
 
 
-class ExactAirBindingTests(unittest.TestCase):
+class ExactAppBindingTests(unittest.TestCase):
+    def test_unlock_probe_accepts_current_root_flag(self):
+        responses = [SimpleNamespace(stdout="IOResources without legacy lock flag"),
+                     SimpleNamespace(stdout=plistlib.dumps({"IOConsoleLocked": False}))]
+        with patch("smoke_app_server.sys.platform", "darwin"), patch(
+                "smoke_app_server.subprocess.run", side_effect=responses):
+            self.assertFalse(screen_is_locked())
+        responses[1] = SimpleNamespace(stdout=plistlib.dumps({"IOConsoleLocked": True}))
+        with patch("smoke_app_server.sys.platform", "darwin"), patch(
+                "smoke_app_server.subprocess.run", side_effect=responses):
+            self.assertTrue(screen_is_locked())
+
+    def test_exact_cases_accept_host_ids_and_reject_wrong_start_or_topology(self):
+        first = {"current": 5, "ordered": [5, 6]}
+        second = {"current": 6, "ordered": [5, 6]}
+        self.assertEqual(validate_exact_space_state(first, 13), first)
+        self.assertEqual(validate_exact_space_state(second, 13), second)
+        self.assertEqual(validate_exact_space_state(first, 15), first)
+        self.assertEqual(validate_exact_space_state(second, 16), second)
+        for state, case in ((first, 16), (second, 15),
+                            ({"current": 5, "ordered": [5, 5]}, 13),
+                            ({"current": 7, "ordered": [5, 6]}, 13),
+                            ({"current": 5, "ordered": [5, 6, 7]}, 15),
+                            (None, 13)):
+            with self.subTest(state=state, case=case), self.assertRaises(RuntimeError):
+                validate_exact_space_state(state, case)
+
     def test_sole_pid_matches_exact_executable_path(self):
         app = Path("/Users/jeremywatt/Desktop/VoiceComputerPOC-a8175c4.app")
         executable = app / "Contents/MacOS/VoiceComputerPOC"
