@@ -29,6 +29,9 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         bridge.onRequest = { _, _, _ in callbacks += 1 }
         let (task, input, output) = try launchHelper(bridge)
         defer { if task.isRunning { task.terminate() } }
+        bridge.serverPID = getpid()
+        XCTAssertNotNil(awaitEligiblePeer(bridge, task))
+        bridge.serverPID = getppid()
         XCTAssertNil(bridge.eligiblePeer(task.processIdentifier))
         let call = try callTool(input: input, output: output)
         let result = try XCTUnwrap(call["result"] as? [String: Any])
@@ -88,7 +91,7 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         }
         let (task, input, output) = try launchHelper(bridge)
         defer { if task.isRunning { task.terminate() } }
-        XCTAssertNotNil(bridge.eligiblePeer(task.processIdentifier))
+        XCTAssertNotNil(awaitEligiblePeer(bridge, task))
         XCTAssertEqual(try queryFromPython(bridge).status, "unauthorized")
 
         let callResponse = try callTool(input: input, output: output)
@@ -107,16 +110,11 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         let (task, _, _) = try launchHelper(bridge)
         defer { if task.isRunning { task.terminate() } }
         let correctPath = try XCTUnwrap(bridge.expectedExecutablePath)
+        XCTAssertNotNil(awaitEligiblePeer(bridge, task))
         bridge.expectedExecutablePath = "/tmp/not-the-desktop-tool/DesktopToolServer"
         XCTAssertNil(bridge.eligiblePeer(task.processIdentifier))
         bridge.expectedExecutablePath = correctPath
-        let deadline = Date().addingTimeInterval(2)
-        var candidate = bridge.eligiblePeer(task.processIdentifier)
-        while candidate == nil && task.isRunning && Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.05)
-            candidate = bridge.eligiblePeer(task.processIdentifier)
-        }
-        let identity = try XCTUnwrap(candidate)
+        let identity = try XCTUnwrap(awaitEligiblePeer(bridge, task))
         XCTAssertTrue(bridge.bind(identity, commandID: "one", itemID: "item-one"))
         XCTAssertTrue(bridge.isBoundPeerAlive(commandID: "one", itemID: "item-one"))
         #if DEBUG
@@ -130,8 +128,16 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         bridge.serverPID = getpid()
         let (first, _, _) = try launchHelper(bridge)
         defer { if first.isRunning { first.terminate() } }
+        XCTAssertNotNil(awaitEligiblePeer(bridge, first))
         let (second, _, _) = try launchHelper(bridge)
         defer { if second.isRunning { second.terminate() } }
+        let deadline = Date().addingTimeInterval(2)
+        while first.isRunning && second.isRunning && Date() < deadline
+            && bridge.eligiblePeer(first.processIdentifier) != nil
+        {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        XCTAssertTrue(first.isRunning && second.isRunning)
         XCTAssertNil(bridge.eligiblePeer(first.processIdentifier))
         XCTAssertNil(bridge.eligiblePeer(second.processIdentifier))
     }
@@ -140,13 +146,13 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         defer { bridge.stop() }
         bridge.serverPID = getpid()
         let (statusHelper, _, _) = try launchHelper(bridge)
-        XCTAssertNotNil(bridge.eligiblePeer(statusHelper.processIdentifier))
+        XCTAssertNotNil(awaitEligiblePeer(bridge, statusHelper))
         statusHelper.terminate()
         statusHelper.waitUntilExit()
         XCTAssertNil(bridge.eligiblePeer(statusHelper.processIdentifier))
         let (actingHelper, _, _) = try launchHelper(bridge)
         defer { if actingHelper.isRunning { actingHelper.terminate() } }
-        let identity = try XCTUnwrap(bridge.eligiblePeer(actingHelper.processIdentifier))
+        let identity = try XCTUnwrap(awaitEligiblePeer(bridge, actingHelper))
         XCTAssertTrue(bridge.bind(identity, commandID: "one", itemID: "item-one"))
         XCTAssertFalse(bridge.bind(identity, commandID: "one", itemID: "item-one"))
         XCTAssertTrue(bridge.isBoundPeerAlive(commandID: "one", itemID: "item-one"))
@@ -159,7 +165,7 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         bridge.serverPID = getpid()
         let (task, _, _) = try launchHelper(bridge)
         defer { if task.isRunning { task.terminate() } }
-        let peer = try XCTUnwrap(bridge.eligiblePeer(task.processIdentifier))
+        let peer = try XCTUnwrap(awaitEligiblePeer(bridge, task))
         let client = AppServerClient()
         client.spaceToolBridge = bridge
         client.isWorking = true
@@ -205,6 +211,17 @@ final class SpaceToolBridgeSecurityTests: XCTestCase {
         try task.run()
         bridge.expectedExecutablePath = binary.resolvingSymlinksInPath().path
         return (task, input, output)
+    }
+
+    private func awaitEligiblePeer(_ bridge: SpaceToolBridge, _ task: Process) -> SpaceToolBridge
+        .PeerIdentity?
+    {
+        let deadline = Date().addingTimeInterval(2)
+        repeat {
+            if let identity = bridge.eligiblePeer(task.processIdentifier) { return identity }
+            guard task.isRunning, Date() < deadline else { return nil }
+            Thread.sleep(forTimeInterval: 0.05)
+        } while true
     }
 
     private func callTool(input: Pipe, output: Pipe) throws -> [String: Any] {
