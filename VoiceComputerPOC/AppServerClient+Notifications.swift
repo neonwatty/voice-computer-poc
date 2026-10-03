@@ -14,7 +14,13 @@ extension AppServerClient {
             handleTurnCompleted(params["turn"] as? [String: Any] ?? [:])
         case "error":
             let error = params["error"] as? [String: Any] ?? [:]
-            fail(error["message"] as? String ?? "Codex reported an error")
+            let message = error["message"] as? String ?? "Codex reported an error"
+            if message.hasPrefix("Reconnecting...") {
+                status = "Codex is reconnecting…"
+                record("server_reconnecting")
+            } else {
+                fail(message)
+            }
         default:
             break
         }
@@ -174,6 +180,8 @@ extension AppServerClient {
         remainingRoutedDirections = []
         routedOriginalPhrase = nil
         focusTargetBundleID = nil
+        browserDocsURL = nil
+        finderReportURL = nil
         let finishedSpaceTool = requestedToolDirection != nil
         requestedToolDirection = nil
         activatedBundleIDsThisTurn.removeAll()

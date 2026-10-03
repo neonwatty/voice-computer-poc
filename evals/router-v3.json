@@ -1,0 +1,430 @@
+[
+  {
+    "phrase": "Switch one desktop Space to the left",
+    "route": "space",
+    "directions": [
+      "left"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Switch one desktop Space to the right",
+    "route": "space",
+    "directions": [
+      "right"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Go to the previous desktop Space",
+    "route": "space",
+    "directions": [
+      "left"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Go to the next desktop Space",
+    "route": "space",
+    "directions": [
+      "right"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Move one desktop to the left",
+    "route": "space",
+    "directions": [
+      "left"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Move one desktop to the right",
+    "route": "space",
+    "directions": [
+      "right"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Please switch Spaces left",
+    "route": "space",
+    "directions": [
+      "left"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Please switch Spaces right",
+    "route": "space",
+    "directions": [
+      "right"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Can you move to the left desktop?",
+    "route": "space",
+    "directions": [
+      "left"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Can you move to the right desktop?",
+    "route": "space",
+    "directions": [
+      "right"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Desktop Space left, please!",
+    "route": "space",
+    "directions": [
+      "left"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Desktop Space right, please!",
+    "route": "space",
+    "directions": [
+      "right"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Switch to the prior desktop",
+    "route": "space",
+    "directions": [
+      "left"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Switch to the next desktop",
+    "route": "space",
+    "directions": [
+      "right"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "One Space left.",
+    "route": "space",
+    "directions": [
+      "left"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "One Space right.",
+    "route": "space",
+    "directions": [
+      "right"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Go right one desktop space, then back left",
+    "route": "space",
+    "directions": [
+      "right",
+      "left"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Switch one desktop Space right and then back left",
+    "route": "space",
+    "directions": [
+      "right",
+      "left"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Move right a Space, then left to return",
+    "route": "space",
+    "directions": [
+      "right",
+      "left"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Go to the next desktop then back to the previous one",
+    "route": "space",
+    "directions": [
+      "right",
+      "left"
+    ],
+    "target": ""
+  },
+  {
+    "phrase": "Open Calculator",
+    "route": "computer_use",
+    "directions": [],
+    "target": "calculator"
+  },
+  {
+    "phrase": "Please open Calculator.",
+    "route": "computer_use",
+    "directions": [],
+    "target": "calculator"
+  },
+  {
+    "phrase": "Launch Calculator",
+    "route": "computer_use",
+    "directions": [],
+    "target": "calculator"
+  },
+  {
+    "phrase": "Bring Calculator to the foreground",
+    "route": "computer_use",
+    "directions": [],
+    "target": "calculator"
+  },
+  {
+    "phrase": "Show me Calculator",
+    "route": "computer_use",
+    "directions": [],
+    "target": "calculator"
+  },
+  {
+    "phrase": "Can you start Calculator?",
+    "route": "computer_use",
+    "directions": [],
+    "target": "calculator"
+  },
+  {
+    "phrase": "Open the Calculator app",
+    "route": "computer_use",
+    "directions": [],
+    "target": "calculator"
+  },
+  {
+    "phrase": "I need the calculator app",
+    "route": "computer_use",
+    "directions": [],
+    "target": "calculator"
+  },
+  {
+    "phrase": "Open Calculater",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Go to the write desktop",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Go to the rite space",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Switch to the lift desktop",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Move to a different desktop",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Switch spaces",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Go left or right, whichever",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Switch to the right or left desktop",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Switch two desktops left",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Go three Spaces right",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Move left then right",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Open Safari",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Delete all desktop files",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "What time is it?",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Calculator or the next desktop",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Go back",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Open a space",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Go left one desktop space, then back right",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Do not move right one desktop Space",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Never switch to the next desktop",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Maybe move right one Space",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Do not open Calculator",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Close Calculator",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+    "route": "browser",
+    "directions": [],
+    "target": "local_docs"
+  },
+  {
+    "phrase": "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link",
+    "route": "browser",
+    "directions": [],
+    "target": "local_docs"
+  },
+  {
+    "phrase": "Please open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Open https://example.com/home?run_id=fixture-1234 and follow the Docs link.",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Open http://127.0.0.1:49328/home and follow the Docs link.",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Open http://127.0.0.1:49328/error?run_id=fixture-1234 and follow the Docs link.",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Do not open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link, then delete the page.",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Reveal the test report at @FINDER_REPORT@ in Finder.",
+    "route": "finder",
+    "directions": [],
+    "target": "fixture_report"
+  },
+  {
+    "phrase": "Please reveal the test report at @FINDER_REPORT@ in Finder.",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Reveal the test report at @FINDER_REPORT@ in Finder, then open it.",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Delete the test report at @FINDER_REPORT@ in Finder.",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  },
+  {
+    "phrase": "Show the test report in Finder.",
+    "route": "clarification",
+    "directions": [],
+    "target": ""
+  }
+]

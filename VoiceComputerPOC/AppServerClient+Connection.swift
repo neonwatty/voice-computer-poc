@@ -196,7 +196,11 @@ extension AppServerClient {
             "turn_requested",
             details: [
                 "thread_id": threadID, "model": selectedModel ?? "unknown",
-                "route": requestedToolDirection == nil ? "computer_use" : "space",
+                "route": requestedToolDirection != nil
+                    ? "space"
+                    : browserDocsURL != nil
+                        ? "browser"
+                        : finderReportURL != nil ? "finder" : "computer_use",
             ])
         _ = send(
             "turn/start",
@@ -204,16 +208,6 @@ extension AppServerClient {
                 "threadId": threadID,
                 "input": [["type": "text", "text": instruction]],
             ], pendingKind: .turn)
-    }
-
-    func turnInstruction(for phrase: String) -> String {
-        if let direction = requestedToolDirection ?? SpaceToolRequest.direction(for: phrase) {
-            return
-                "Call the MCP tool mcp__desktop_tool__switch_space from desktop_tool exactly once with JSON arguments {\"direction\":\"\(direction.rawValue)\"}. This is one adjacent desktop Space move. Do not use Computer Use or another tool. Report the typed tool result; do not claim success without verified status. User request: \(phrase)"
-        }
-        return
-            "This prototype is for reversible, low-impact desktop tests. For other requests, explain that the prototype does not support them. Use only mcp__cua_repl.js for desktop UI interaction. Do not use shell commands, AppleScript, or file operations. If Computer Use access is needed, request it. Check the visible result before reporting success. Distinguish a declined access request from a tool failure; do not call a tool failure an access denial."
-            + " User request: \(phrase)"
     }
 
     @discardableResult

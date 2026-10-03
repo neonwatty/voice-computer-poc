@@ -124,6 +124,21 @@ final class AppServerClientNotificationTests: XCTestCase {
         XCTAssertEqual(entry?.details["error"], "Window not found")
     }
 
+    func testTransientReconnectDoesNotCancelCommand() {
+        let client = makeClient()
+        client.isWorking = true
+        client.activeCommandID = "one"
+        client.handleNotification(
+            method: "error",
+            params: [
+                "error": ["message": "Reconnecting... 2/5"]
+            ])
+        XCTAssertTrue(client.isWorking)
+        XCTAssertEqual(client.status, "Codex is reconnecting…")
+        XCTAssertNotNil(client.diagnosticEntries.last { $0.event == "server_reconnecting" })
+        XCTAssertNil(client.diagnosticEntries.last { $0.event == "command_failed" })
+    }
+
     func testCompletedTurnWithoutSpaceChangeRemainsUnverified() {
         let client = makeClient()
         client.isWorking = true

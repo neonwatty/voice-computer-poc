@@ -16,7 +16,8 @@ from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path
                               cua_exact_path_call, mcp_case_phrase, parse_open_session_log,
                               running_app_pids, screen_is_locked, validate_exact_space_state,
                               validate_mcp_cases, verify_mcp_receipt,
-                              verify_read_only_receipt)  # noqa: E402
+                              verify_read_only_receipt, verify_browser_receipt,
+                              verify_finder_receipt)  # noqa: E402
 
 
 COMMAND_ID = "A1B2C3D4"
@@ -219,6 +220,85 @@ class ExactAppBindingTests(unittest.TestCase):
         changed[3]["details"]["raw_audio"] = "private"
         with self.assertRaisesRegex(ValueError, "Private"):
             verify_read_only_receipt(changed, 3, 3)
+
+
+class BrowserReceiptTests(unittest.TestCase):
+    def test_browser_receipt_requires_correlated_render_and_requests(self):
+        run_id = "fixture-1234"
+        port = 49328
+        url = f"http://127.0.0.1:{port}/docs?run_id={run_id}"
+        rows = [
+            row("command_started", user_action="run"),
+            row("router_decided", route="browser", action="follow_docs", target="loopback_fixture"),
+            row("turn_requested", route="browser"),
+            row("tool_started", server="cua_repl", tool="js"),
+            row("approval_decided", server_name="cua_repl", decision="Allowed once"),
+            row("tool_completed", server="cua_repl", tool="js", status="completed"),
+            row("command_finished", status="completed", verification="model_report_only"),
+        ]
+        requests = [
+            {"method": "GET", "path": "/home", "run_id": [run_id]},
+            {"method": "GET", "path": "/docs", "run_id": [run_id]},
+        ]
+        observations = [f"Window: Voice Computer Fixture, App: Safari\n"
+                        f"HTML content URL: {url.removeprefix('http://')}\n"
+                        f"2 heading Voice Computer Docs {run_id}"]
+        self.assertEqual(verify_browser_receipt(
+            rows, run_id, port, requests, observations, 5, 5)["command_id"], COMMAND_ID)
+        session_rows = copy.deepcopy(rows)
+        session_rows[4]["details"]["decision"] = "Allowed for session"
+        self.assertEqual(verify_browser_receipt(
+            session_rows, run_id, port, requests, observations, 5, 5)["command_id"], COMMAND_ID)
+        with self.assertRaisesRegex(ValueError, "stale"):
+            verify_browser_receipt(rows, run_id, port, requests, observations, 5, 5, {COMMAND_ID})
+        with self.assertRaisesRegex(ValueError, "rendered"):
+            verify_browser_receipt(rows, run_id, port, requests, ["Docs loaded"], 5, 5)
+        with self.assertRaisesRegex(ValueError, "Home then Docs"):
+            verify_browser_receipt(rows, run_id, port, requests[:1], observations, 5, 5)
+        with self.assertRaisesRegex(ValueError, "changed desktop"):
+            verify_browser_receipt(rows, run_id, port, requests, observations, 5, 6)
+        unsafe = copy.deepcopy(rows)
+        unsafe[3]["details"]["server"] = "desktop_tool"
+        with self.assertRaisesRegex(ValueError, "only Computer Use"):
+            verify_browser_receipt(unsafe, run_id, port, requests, observations, 5, 5)
+
+
+class FinderReceiptTests(unittest.TestCase):
+    def test_exact_selected_report_and_decoy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "report.txt"
+            report.write_text("test")
+            decoy = root / "report-copy.txt"
+            decoy.write_text("decoy")
+            rows = [
+                row("command_started", user_action="run"),
+                row("router_decided", route="finder", action="reveal_file", target="fixture_report"),
+                row("turn_requested", route="finder"),
+                row("tool_started", server="cua_repl", tool="js"),
+                row("approval_decided", server_name="cua_repl", decision="Allowed once"),
+                row("tool_completed", server="cua_repl", tool="js", status="completed"),
+                row("command_finished", status="completed", verification="model_report_only"),
+            ]
+            selected = ("Window: fixture, App: Finder\n"
+                        f"10 row\n11 text field URL: {decoy.as_uri()}\n"
+                        f"12 row (selected)\n13 cell (selected)\n"
+                        f"14 text field URL: {report.as_uri()}\n")
+            self.assertEqual(verify_finder_receipt(
+                rows, report, [selected], 5, 5)["command_id"], COMMAND_ID)
+            session_rows = copy.deepcopy(rows)
+            session_rows[4]["details"]["decision"] = "Allowed for session"
+            self.assertEqual(verify_finder_receipt(
+                session_rows, report, [selected], 5, 5)["command_id"], COMMAND_ID)
+            self.assertEqual(verify_finder_receipt(
+                rows, report, [selected + selected], 5, 5)["command_id"], COMMAND_ID)
+            with self.assertRaisesRegex(ValueError, "selection"):
+                verify_finder_receipt(rows, report, [selected.replace(
+                    "12 row (selected)", "12 row")], 5, 5)
+            with self.assertRaisesRegex(ValueError, "stale"):
+                verify_finder_receipt(rows, report, [selected], 5, 5, {COMMAND_ID})
+            with self.assertRaisesRegex(ValueError, "changed desktop"):
+                verify_finder_receipt(rows, report, [selected], 5, 6)
 
 
 class MCPReceiptTests(unittest.TestCase):
