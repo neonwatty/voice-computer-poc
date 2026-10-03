@@ -51,6 +51,8 @@ final class AppServerClient: ObservableObject {
     var activationObserver: NSObjectProtocol?
     var spaceCountAtTurnStart: Int?
     var focusTargetBundleID: String?
+    var browserDocsURL: URL?
+    var finderReportURL: URL?
     var activatedBundleIDsThisTurn: Set<String> = []
     var activeCommandID: String?
     var cancelledNativeSpaceCommandID: String?
@@ -205,6 +207,8 @@ final class AppServerClient: ObservableObject {
     }
 
     private func configureCommandRouting(_ phrase: String) {
+        browserDocsURL = nil
+        finderReportURL = nil
         expectedToolDirection = SpaceToolRequest.direction(for: phrase)
         requestedToolDirection = expectedToolDirection
         activeToolDirection = nil

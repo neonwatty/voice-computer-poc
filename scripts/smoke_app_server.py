@@ -17,10 +17,14 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import threading
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+
+from browser_fixture import make_server
 
 
 COMMANDS = [
@@ -40,10 +44,12 @@ COMMANDS = [
     'In Voice Computer POC, enter "Switch to the previous desktop Space" in the command field and click Run. Wait for its result, then inspect Diagnostic Log for native_space_step_verified and native_space_finished. Report the app result. Do not control other apps.',
     'In the exact Voice Computer POC app, enter "agent switch desktop space right" in the command field and press Return once. Inspect the visible desktop_tool.switch_space approval and choose Allow once only. Wait for the app result. Report the command ID and visible result; do not submit another command.',
     'In the exact Voice Computer POC app, enter "agent switch desktop space left" in the command field and press Return once. Inspect the visible desktop_tool.switch_space approval and choose Allow once only. Wait for the app result. Report the command ID and visible result; do not submit another command.',
+    None,  # Case 17 receives its unique Browser fixture URL at runtime.
+    None,  # Case 18 receives its unique Finder fixture path at runtime.
 ]
-CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Mission Control", "Finder", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC"]
+CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Mission Control", "Finder", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC"]
 MCP_CASES = {15: "right", 16: "left"}
-EXACT_APP_CASES = {13, *MCP_CASES}
+EXACT_APP_CASES = {13, 17, 18, *MCP_CASES}
 APP_LOG_DIRECTORY = Path.home() / "Library/Application Support/VoiceComputerPOC/Logs"
 
 
@@ -64,6 +70,8 @@ EXPECTED_EVIDENCE = [
     None,
     re.compile(r"mission_control_ax_summary"),
     re.compile(r"native_space_step_verified"),
+    None,
+    None,
     None,
     None,
 ]
@@ -331,6 +339,158 @@ def assert_log_privacy(rows):
         raise ValueError("Private command or screen content in normal JSONL")
 
 
+def verify_browser_receipt(rows, run_id, port, fixture_rows, observations,
+                           before, after, prior_command_ids=(), mode="normal"):
+    """Correlate the exact app command with a rendered Safari page and server requests."""
+    starts = [row for row in rows if row.get("event") == "command_started"
+              and row.get("details", {}).get("user_action") == "run"]
+    if len(starts) != 1:
+        raise ValueError("Missing or ambiguous Browser command start")
+    command_id = starts[0].get("details", {}).get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("Browser command ID missing or stale")
+    command_rows = [row for row in rows
+                    if row.get("details", {}).get("command_id") == command_id]
+    def events(name):
+        return [row.get("details", {}) for row in command_rows if row.get("event") == name]
+    routes = events("router_decided")
+    turns = events("turn_requested")
+    tools = events("tool_started")
+    finishes = events("command_finished")
+    if len(routes) != 1 or routes[0].get("route") != "browser" \
+            or routes[0].get("action") != "follow_docs" \
+            or routes[0].get("target") != "loopback_fixture":
+        raise ValueError("Expected Browser route was not selected")
+    if len(turns) != 1 or turns[0].get("route") != "browser":
+        raise ValueError("Browser acting turn missing")
+    if not tools or any(tool.get("server") != "cua_repl" for tool in tools):
+        raise ValueError("Browser action did not use only Computer Use")
+    approvals = events("approval_decided")
+    if any(approval.get("server_name") != "cua_repl"
+           or approval.get("decision") not in ("Allowed once", "Allowed for session")
+           for approval in approvals):
+        raise ValueError("Browser Computer Use approval was unexpected or declined")
+    if len(finishes) != 1 or finishes[0].get("status") != "completed":
+        raise ValueError("Browser app command did not complete")
+    if any(row.get("event") in ("native_space_requested", "mcp_action_requested",
+                                    "space_changed") for row in command_rows):
+        raise ValueError("Browser command invoked an unexpected desktop action")
+    if before is None or after != before:
+        raise ValueError("Browser command changed desktop Space")
+    expected_paths = {
+        "normal": ["/home", "/docs"],
+        "missing-link": ["/home"],
+        "home-404": ["/home"],
+        "redirect": ["/home", "/docs", "/error"],
+    }.get(mode)
+    if expected_paths is None:
+        raise ValueError("Unsupported Browser fixture mode")
+    if [(row.get("method"), row.get("path"), row.get("run_id"))
+            for row in fixture_rows] != [
+                ("GET", path, [run_id]) for path in expected_paths]:
+        raise ValueError("Fixture request sequence did not match Browser scenario")
+    final_path = expected_paths[-1]
+    expected_url = f"http://127.0.0.1:{port}{final_path}?run_id={run_id}"
+    heading = (f"Voice Computer Docs {run_id}" if mode == "normal" else
+               f"Voice Computer Home {run_id}" if mode == "missing-link" else
+               "Fixture page not found")
+    if not any(expected_url.removeprefix("http://") in observation and heading in observation
+               and "heading" in observation for observation in observations):
+        raise ValueError("Independent rendered Safari URL and heading missing")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "scenario": mode, "url": expected_url,
+            "heading": heading, "approval_state": "prompted" if approvals else "no_new_prompt",
+            "before": before, "after": after}
+
+
+def verify_finder_receipt(rows, report, observations, before, after,
+                          prior_command_ids=()):
+    """Require one exact selected fixture file in Finder and no desktop move."""
+    starts = [row for row in rows if row.get("event") == "command_started"
+              and row.get("details", {}).get("user_action") == "run"]
+    if len(starts) != 1:
+        raise ValueError("Missing or ambiguous Finder command start")
+    command_id = starts[0].get("details", {}).get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("Finder command ID missing or stale")
+    command_rows = [row for row in rows if row.get("details", {}).get("command_id") == command_id]
+    def events(name):
+        return [row.get("details", {}) for row in command_rows if row.get("event") == name]
+    routes, turns, tools = events("router_decided"), events("turn_requested"), events("tool_started")
+    approvals, finishes = events("approval_decided"), events("command_finished")
+    if len(routes) != 1 or routes[0].get("route") != "finder" \
+            or routes[0].get("action") != "reveal_file" \
+            or routes[0].get("target") != "fixture_report":
+        raise ValueError("Expected Finder route was not selected")
+    if len(turns) != 1 or turns[0].get("route") != "finder":
+        raise ValueError("Finder acting turn missing")
+    if not tools or any(tool.get("server") != "cua_repl" for tool in tools):
+        raise ValueError("Finder action did not use only Computer Use")
+    if any(approval.get("server_name") != "cua_repl"
+           or approval.get("decision") not in ("Allowed once", "Allowed for session")
+           for approval in approvals):
+        raise ValueError("Finder Computer Use approval was unexpected or declined")
+    if len(finishes) != 1 or finishes[0].get("status") != "completed":
+        raise ValueError("Finder app command did not complete")
+    if any(row.get("event") in ("native_space_requested", "mcp_action_requested",
+                                    "space_changed") for row in command_rows):
+        raise ValueError("Finder command invoked an unexpected desktop action")
+    if before is None or after != before:
+        raise ValueError("Finder command changed desktop Space")
+    if not report.is_file() or report.is_symlink():
+        raise ValueError("Fixture report missing or not regular")
+    selected = re.compile(r"^\s*\d+ row \(selected\)(?:(?!^\s*\d+ row ).)*?URL: (file://\S+)",
+                          re.MULTILINE | re.DOTALL)
+    decoy_uri = report.with_name("report-copy.txt").as_uri()
+    if not any(set(selected.findall(observation)) == {report.as_uri()}
+               and decoy_uri in observation
+               for observation in observations):
+        raise ValueError("Independent Finder selection of exact report missing")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "path": str(report),
+            "approval_state": "prompted" if approvals else "no_new_prompt",
+            "before": before, "after": after}
+
+
+def verify_finder_rejection_receipt(rows, report, before, after,
+                                    prior_command_ids=(), mode="missing-file"):
+    """Require the unsafe Finder target to finish without starting an actor."""
+    if mode not in ("missing-file", "symlink-escape", "decoy-target"):
+        raise ValueError("Unsupported Finder rejection scenario")
+    if mode == "missing-file" and report.exists():
+        raise ValueError("Missing-file fixture unexpectedly exists")
+    if mode == "symlink-escape" and not report.is_symlink():
+        raise ValueError("Symlink-escape fixture is not a symlink")
+    if mode == "decoy-target" and (report.name != "report-copy.txt" or not report.is_file()):
+        raise ValueError("Decoy-target fixture is missing")
+    starts = [row for row in rows if row.get("event") == "command_started"
+              and row.get("details", {}).get("user_action") == "run"]
+    if len(starts) != 1:
+        raise ValueError("Missing or ambiguous Finder command start")
+    command_id = starts[0].get("details", {}).get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("Finder command ID missing or stale")
+    command_rows = [row for row in rows
+                    if row.get("details", {}).get("command_id") == command_id]
+    if any(row.get("event") in (
+            "turn_requested", "tool_started", "approval_decided", "native_space_requested",
+            "mcp_action_requested", "space_changed") for row in command_rows):
+        raise ValueError("Rejected Finder target started an action")
+    routes = [row for row in command_rows if row.get("event") == "router_decided"]
+    if any(row.get("details", {}).get("route") != "clarification" for row in routes):
+        raise ValueError("Rejected Finder target received an acting route")
+    finishes = [row.get("details", {}) for row in command_rows
+                if row.get("event") == "command_finished"]
+    if len(finishes) != 1 or finishes[0].get("status") != "clarification" \
+            or finishes[0].get("verification") != "no_action":
+        raise ValueError("Rejected Finder target did not finish with no action")
+    if before is None or after != before:
+        raise ValueError("Rejected Finder command changed desktop Space")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "scenario": mode, "path": str(report),
+            "before": before, "after": after}
+
+
 def verify_mcp_receipt(rows, phrase, direction, before, expected, after,
                        prior_command_ids=()):
     """Fail closed on any missing or ambiguous app-owned MCP/native proof."""
@@ -433,7 +593,8 @@ def verify_mcp_receipt(rows, phrase, direction, before, expected, after,
 
 
 class Driver:
-    def __init__(self, executable, log_path, trace_tool_output=False, app_path=None):
+    def __init__(self, executable, log_path, trace_tool_output=False, app_path=None,
+                 finder_mode="normal"):
         self.log = log_path.open("x", encoding="utf-8")
         self.events = queue.Queue()
         self.next_id = 0
@@ -447,7 +608,11 @@ class Driver:
         self.stderr_lines = 0
         self.trace_tool_output = trace_tool_output
         self.app_path = app_path
+        self.finder_mode = finder_mode
         self.cua_binding_observed = False
+        self.browser_observations = []
+        self.browser_run_id = None
+        self.finder_observations = []
         self.process = subprocess.Popen(
             [executable, "app-server"],
             stdin=subprocess.PIPE,
@@ -529,7 +694,13 @@ class Driver:
             and meta.get("connector_id") == "computer-use"
             and not ((params.get("requestedSchema") or {}).get("properties") or {})
             and self.command_index is not None
-            and app in ({CASE_APP[self.command_index - 1], str(self.app_path)}
+            and app in ({CASE_APP[self.command_index - 1], str(self.app_path),
+                         "Safari", "com.apple.Safari"}
+                        if self.command_index == 17 else
+                        {CASE_APP[self.command_index - 1], str(self.app_path),
+                         "Finder", "com.apple.finder"}
+                        if self.command_index == 18 and self.finder_mode == "normal" else
+                        {CASE_APP[self.command_index - 1], str(self.app_path)}
                         if self.command_index in EXACT_APP_CASES else
                         {CASE_APP[self.command_index - 1]})
         )
@@ -560,7 +731,7 @@ class Driver:
                     self.cua_binding_observed = True
                     self.record("cua_exact_path_requested")
             self.tool_calls += 1
-            limit = 24 if self.command_index in (6, 9, 10, 14, 15, 16) else 12
+            limit = 24 if self.command_index in (6, 9, 10, 14, 15, 16, 17, 18) else 12
             if self.tool_calls > limit:
                 raise RuntimeError("Command exceeded %s Computer Use calls" % limit)
             self.record("tool_started", item_id=item.get("id"), tool=item.get("tool"))
@@ -574,12 +745,25 @@ class Driver:
                 result = item.get("result") or {}
                 error = (item.get("error") or {}).get("message")
                 content = result.get("content") or []
+                if self.command_index == 17 and item.get("server") == "cua_repl":
+                    self.browser_observations.extend(
+                        part.get("text") or "" for part in content
+                        if part.get("type") == "text" and "Window:" in (part.get("text") or "")
+                        and "Safari" in (part.get("text") or ""))
+                if self.command_index == 18 and item.get("server") == "cua_repl":
+                    self.finder_observations.extend(
+                        part.get("text") or "" for part in content
+                        if part.get("type") == "text" and "Window:" in (part.get("text") or "")
+                        and "Finder" in (part.get("text") or ""))
                 if self.trace_tool_output:
                     self.record("tool_output_trace", item_id=item.get("id"),
                                 excerpt="\n".join(str(part.get("text") or "") for part in content)[:3000])
                 if item.get("status") == "failed" or result.get("isError"):
                     error = error or next((part.get("text") for part in content if part.get("text")), None)
-                    self.tool_failures.append("tool_failed")
+                    self.tool_failures.append(
+                        "stale_ui_state" if error and
+                        "Re-query the latest state with `get_app_state`" in error
+                        else "tool_failed")
                 elif self.command_index is not None:
                     pattern = EXPECTED_EVIDENCE[self.command_index - 1]
                     for part in content:
@@ -629,6 +813,16 @@ class Driver:
         self.log.close()
 
 
+def selected_cases(suite, cases, mission_control_gate):
+    if mission_control_gate and not suite:
+        raise ValueError("--mission-control-gate requires --suite")
+    if suite and cases:
+        raise ValueError("--suite cannot be combined with --case")
+    if suite:
+        return ([13] if mission_control_gate else []) + [17, 18]
+    return cases or list(range(1, 7))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--codex", default=default_codex())
@@ -637,12 +831,37 @@ def main():
                         help="Record bounded tool input/output excerpts; may contain private UI text")
     parser.add_argument("--case", type=int, action="append", choices=range(1, len(COMMANDS) + 1),
                         help="Run one numbered command; repeat to select multiple")
+    parser.add_argument("--suite", action="store_true",
+                        help="Run Browser, Finder, and Codex status feasibility probe")
+    parser.add_argument("--mission-control-gate", action="store_true",
+                        help="Require read-only Mission Control case 13 before --suite acts")
+    parser.add_argument("--browser-mode", default="normal",
+                        choices=("normal", "missing-link", "home-404", "redirect"),
+                        help="Fixture scenario for a focused --case 17 run")
+    parser.add_argument("--finder-mode", default="normal",
+                        choices=("normal", "missing-file", "symlink-escape", "decoy-target"),
+                        help="Fixture scenario for a focused --case 18 run")
+    parser.add_argument("--codex-thread-id",
+                        help="Optional exact existing Codex task UUID for --suite's read-only status probe")
     parser.add_argument("--app-path", type=Path,
-                        help="Canonical absolute VoiceComputerPOC.app path, required for cases 13, 15, and 16")
+                        help="Canonical absolute VoiceComputerPOC.app path, required for cases 13, 15, 16, 17, and 18")
     parser.add_argument("--single-mcp-step", action="store_true",
                         help="Run only one rightward MCP case and stop regardless of result")
     args = parser.parse_args()
-    selected = args.case or list(range(1, 7))
+    try:
+        selected = selected_cases(args.suite, args.case, args.mission_control_gate)
+    except ValueError as error:
+        parser.error(str(error))
+    if args.browser_mode != "normal" and selected != [17]:
+        parser.error("--browser-mode requires a focused --case 17 run")
+    if args.finder_mode != "normal" and selected != [18]:
+        parser.error("--finder-mode requires a focused --case 18 run")
+    if args.codex_thread_id and not args.suite:
+        parser.error("--codex-thread-id requires --suite")
+    if args.codex_thread_id and not re.fullmatch(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            args.codex_thread_id):
+        parser.error("--codex-thread-id requires an exact Codex task UUID")
     mcp_selected = any(index in MCP_CASES for index in selected)
     exact_selected = any(index in EXACT_APP_CASES for index in selected)
     if args.single_mcp_step and not mcp_selected:
@@ -650,7 +869,7 @@ def main():
     app_path = None
     if exact_selected:
         if not args.app_path:
-            parser.error("Cases 13, 15, and 16 require --app-path")
+            parser.error("Cases 13, 15, 16, 17, and 18 require --app-path")
         try:
             app_path = canonical_app_path(args.app_path)
         except (OSError, ValueError) as error:
@@ -663,8 +882,11 @@ def main():
     os.umask(0o077)
     args.log.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     driver = Driver(args.codex, args.log, trace_tool_output=args.trace_tool_output,
-                    app_path=app_path)
+                    app_path=app_path, finder_mode=args.finder_mode)
     failed = False
+    fixtures = []
+    finder_fixtures = []
+    finder_outside_fixtures = []
     try:
         locked = screen_is_locked()
         driver.record("environment_check", screen_locked=locked)
@@ -686,7 +908,50 @@ def main():
         }))["thread"]["id"]
         for index in selected:
             phrase = COMMANDS[index - 1]
-            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 13, 14, 15, 16) else None
+            fixture = None
+            if index == 17:
+                run_id = uuid.uuid4().hex
+                temporary = tempfile.TemporaryDirectory(prefix="voice-browser-smoke-")
+                fixture_log = Path(temporary.name) / "requests.jsonl"
+                server = make_server(run_id, fixture_log, args.browser_mode)
+                fixture_thread = threading.Thread(target=server.serve_forever, daemon=True)
+                fixture_thread.start()
+                fixtures.append((server, fixture_thread, temporary))
+                fixture = (run_id, server.server_port, fixture_log)
+                url = f"http://127.0.0.1:{server.server_port}/home?run_id={run_id}"
+                phrase = (f'In the exact Voice Computer POC app, enter "Open {url} '
+                          'and follow the Docs link." in the command field and press Return once. '
+                          'Approve only Safari if the app shows a Computer Use approval. '
+                          'Wait for the app result, then independently inspect the Safari '
+                          'window and report its exact URL and visible heading. Do not navigate Safari '
+                          'yourself or submit a second app command.')
+            if index == 18:
+                fixture_root = support / "TestFixtures" / uuid.uuid4().hex
+                fixture_root.mkdir(parents=True, mode=0o700)
+                finder_fixtures.append(fixture_root)
+                report = fixture_root / "report.txt"
+                if args.finder_mode in ("normal", "decoy-target"):
+                    report.write_text("Voice Computer Finder fixture\n")
+                elif args.finder_mode == "symlink-escape":
+                    outside = tempfile.TemporaryDirectory(prefix="voice-finder-outside-")
+                    finder_outside_fixtures.append(outside)
+                    outside_report = Path(outside.name) / "report.txt"
+                    outside_report.write_text("Outside Finder fixture\n")
+                    report.symlink_to(outside_report)
+                (fixture_root / "report-copy.txt").write_text("Decoy\n")
+                if args.finder_mode == "decoy-target":
+                    report = fixture_root / "report-copy.txt"
+                finder_instruction = (
+                    'Approve only Finder if the app shows a Computer Use approval. Wait for '
+                    'the app result, then independently inspect Finder and report the exact '
+                    'selected file URL. Do not open or edit the file or submit a second app command.'
+                    if args.finder_mode == "normal" else
+                    'Wait for the app result. Report whether it rejected the unsafe target '
+                    'without opening Finder or starting an acting turn. Do not submit a second app command.')
+                phrase = (f'In the exact Voice Computer POC app, enter "Reveal the test report '
+                          f'at {report} in Finder." in the command field and press Return once. '
+                          + finder_instruction)
+            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18) else None
             expected_space = None
             if index in EXACT_APP_CASES:
                 validate_exact_space_state(space_before, index)
@@ -731,6 +996,9 @@ def main():
             driver.tool_calls = 0
             driver.approvals = []
             driver.cua_binding_observed = False
+            driver.browser_observations = []
+            driver.browser_run_id = fixture[0] if fixture else None
+            driver.finder_observations = []
             driver.record("command_started",
                           space_before=space_before, expected_space=expected_space)
             started = time.monotonic()
@@ -740,7 +1008,10 @@ def main():
                     "Use only mcp__cua_repl.js for UI. Bind with cua.getApp to this exact full "
                     "app path: " + str(app_path) + ". Verify its visible Command and Run controls. "
                     "Enter the quoted read-only inspection phrase and submit once using Return. "
-                    "Read the app Diagnostic Log and report its new command ID, Accessibility "
+                    "Make the Return call by itself, without getAXState in the same call. "
+                    "Wait five seconds without UI calls so Mission Control can appear and the "
+                    "app can finish its scan. Then read the app Diagnostic Log and report its "
+                    "new command ID, Accessibility "
                     "trusted state, Dock found state, and Desktop controls. Do not use a bundle-ID "
                     "fallback, press a Desktop, change Spaces, or approve an acting tool. User request: "
                 )
@@ -757,6 +1028,47 @@ def main():
                     "Wait for the visible app result. Do not switch Spaces yourself. If Computer Use "
                     "fails, report the error and stop; do not use a shell fallback. User request: "
                 )
+            elif index == 17:
+                instruction = (
+                    "Use only mcp__cua_repl.js for UI. Bind with cua.getApp to this exact full "
+                    "app path: " + str(app_path) + ". Enter the exact quoted command and submit "
+                    "once with Return. Approve only Computer Use for Safari using "
+                    "the visible Allow for session button; never approve a shell or other app. Wait "
+                    "for the app command to finish. Only after it finishes, use cua.getApp "
+                    "for com.apple.Safari and getAXState({disableDiffing:true}) to inspect "
+                    "the Safari window. Do not create or navigate a tab yourself. After recording "
+                    "the URL and heading, close only the new fixture tab and verify the previous "
+                    "tab remains. Report the observed Safari URL and heading, plus the app result. "
+                    "Never inspect or control the "
+                    "Codex or ChatGPT host app; any approval is inside Voice Computer POC. "
+                    "User request: "
+                )
+            elif index == 18:
+                instruction = (
+                    "Use only mcp__cua_repl.js for UI. Start with this sole Computer Use call: "
+                    "var vcFinderApp = await cua.getApp('" + str(app_path) + "'); Use this "
+                    "fresh variable rather than an app variable from a prior case. First click "
+                    "Diagnostic Log then Show File "
+                    "to open a Finder window; do not inspect the log contents. Return to Voice "
+                    "Computer POC. Enter the exact quoted command and submit "
+                    "once with Return. Approve only Computer Use for Finder via the visible "
+                    "Allow for session button; never approve a shell or another app. Wait for the app "
+                    "command to finish. Then use cua.getApp('com.apple.finder') and a full "
+                    "getAXState to inspect the selected row and its exact file URL. Do not "
+                    "select the item yourself. After recording evidence, click the fixture "
+                    "Finder window's close button, then stop; never call getAXState on that "
+                    "closed Finder binding. Never inspect or control the Codex or ChatGPT "
+                    "host app; any approval is inside Voice Computer POC. User request: "
+                )
+                if args.finder_mode != "normal":
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. Bind with cua.getApp to this exact "
+                        "full app path: " + str(app_path) + ". Enter the quoted command and "
+                        "submit once with Return. Wait for Voice Computer POC to finish routing, "
+                        "then inspect its visible result. Do not bind, inspect, or control Finder; "
+                        "the target is intentionally unsafe and must start no acting turn. "
+                        "Never inspect or control the Codex or ChatGPT host app. User request: "
+                    )
             response = driver.wait_rpc(driver.rpc("turn/start", {
                 "threadId": thread, "input": [{"type": "text", "text": instruction + phrase}],
             }))
@@ -768,7 +1080,7 @@ def main():
                     if space_after and space_after["current"] == expected_space:
                         break
                     time.sleep(0.5)
-            elif index == 13:
+            elif index in (13, 17, 18):
                 space_after = space_state()
             negative_result = re.search(
                 r"couldn.t|cannot|can.t|declined|unverified|failed|unable to",
@@ -803,6 +1115,25 @@ def main():
                         exact_receipt = verify_read_only_receipt(
                             rows, space_before["current"], after_id, prior_ids)
                         driver.record("read_only_receipt_verified", **exact_receipt)
+                    elif index == 17:
+                        run_id, port, fixture_log = fixture
+                        fixture_rows = [json.loads(line) for line in fixture_log.read_text().splitlines()]
+                        exact_receipt = verify_browser_receipt(
+                            rows, run_id, port, fixture_rows, driver.browser_observations,
+                            space_before["current"], after_id, prior_ids,
+                            mode=args.browser_mode)
+                        driver.record("browser_receipt_verified", **exact_receipt)
+                    elif index == 18:
+                        if args.finder_mode == "normal":
+                            exact_receipt = verify_finder_receipt(
+                                rows, report, driver.finder_observations,
+                                space_before["current"], after_id, prior_ids)
+                            driver.record("finder_receipt_verified", **exact_receipt)
+                        else:
+                            exact_receipt = verify_finder_rejection_receipt(
+                                rows, report, space_before["current"], after_id, prior_ids,
+                                mode=args.finder_mode)
+                            driver.record("finder_rejection_receipt_verified", **exact_receipt)
                     else:
                         exact_receipt = verify_mcp_receipt(
                             rows, mcp_case_phrase(index), MCP_CASES[index],
@@ -812,11 +1143,16 @@ def main():
                     driver.record("exact_app_receipt_rejected", reason=str(error))
                     verified = False
                 else:
-                    verified = exact_receipt is not None and (verified or index == 13)
+                    verified = exact_receipt is not None and (verified or index in (13, 17, 18))
+            recovered_stale_ui = (
+                index == 13 and exact_receipt is not None
+                and driver.tool_failures == ["stale_ui_state"])
+            if recovered_stale_ui:
+                driver.record("stale_ui_state_recovered")
             success = (turn.get("status") == "completed" and verified
-                       and not driver.tool_failures
+                       and (not driver.tool_failures or recovered_stale_ui)
                        and all(a["allowed"] for a in driver.approvals)
-                       and (expected_space is not None or not negative_result))
+                       and (expected_space is not None or index in (17, 18) or not negative_result))
             driver.record("command_finished", success=success,
                           elapsed_ms=round((time.monotonic() - started) * 1000),
                           tool_failures=driver.tool_failures, approvals=driver.approvals,
@@ -827,8 +1163,23 @@ def main():
             print("%s. %s: %s" % (index, "PASS" if success else "FAIL", phrase), flush=True)
             print("   result present: %s" % bool(driver.last_result), flush=True)
             failed = failed or not success
-            if index in MCP_CASES and not success:
+            if not success and (args.suite or index in MCP_CASES or index == 13):
                 break
+        if args.suite and not failed and args.codex_thread_id:
+            response = driver.wait_rpc(driver.rpc("thread/read", {
+                "threadId": args.codex_thread_id, "includeTurns": False,
+            }))
+            task = response.get("thread") or {}
+            if task.get("id") != args.codex_thread_id:
+                raise RuntimeError("Codex status probe returned a different task ID")
+            protocol_status = (task.get("status") or {}).get("type")
+            interpretation = ("unavailable_cross_process" if protocol_status == "notLoaded"
+                              else "observed_in_driver_process")
+            driver.record("codex_status_feasibility", thread_id=args.codex_thread_id,
+                          protocol_status=protocol_status, interpretation=interpretation)
+            print("Codex status: %s (%s)" % (interpretation, protocol_status), flush=True)
+        elif args.suite and not failed:
+            driver.record("codex_status_skipped", reason="no_exact_task_id")
     except Exception as error:
         failed = True
         driver.record("driver_error", error_type=type(error).__name__)
@@ -838,6 +1189,19 @@ def main():
         driver.record("driver_interrupted")
         print("Smoke test interrupted", file=sys.stderr)
     finally:
+        for server, thread, temporary in fixtures:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=3)
+            temporary.cleanup()
+        if fixtures:
+            driver.record("fixtures_cleaned", count=len(fixtures))
+        for directory in finder_fixtures:
+            shutil.rmtree(directory)
+        for directory in finder_outside_fixtures:
+            directory.cleanup()
+        if finder_fixtures:
+            driver.record("finder_fixtures_cleaned", count=len(finder_fixtures))
         driver.close()
         print("Log: %s" % args.log, flush=True)
     return 1 if failed else 0

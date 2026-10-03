@@ -124,6 +124,21 @@ final class AppServerClientNotificationTests: XCTestCase {
         XCTAssertEqual(entry?.details["error"], "Window not found")
     }
 
+    func testTransientReconnectDoesNotCancelCommand() {
+        let client = makeClient()
+        client.isWorking = true
+        client.activeCommandID = "one"
+        client.handleNotification(
+            method: "error",
+            params: [
+                "error": ["message": "Reconnecting... 2/5"]
+            ])
+        XCTAssertTrue(client.isWorking)
+        XCTAssertEqual(client.status, "Codex is reconnecting…")
+        XCTAssertNotNil(client.diagnosticEntries.last { $0.event == "server_reconnecting" })
+        XCTAssertNil(client.diagnosticEntries.last { $0.event == "command_failed" })
+    }
+
     func testCompletedTurnWithoutSpaceChangeRemainsUnverified() {
         let client = makeClient()
         client.isWorking = true
@@ -178,6 +193,17 @@ final class AppServerClientNotificationTests: XCTestCase {
             client.diagnosticEntries.contains {
                 $0.event == "focus_activation_requested"
             })
+    }
+
+    func testBrowserInstructionTargetsNativeSafariAndExactDocsURL() throws {
+        let client = makeClient()
+        client.browserDocsURL = try XCTUnwrap(
+            URL(string: "http://127.0.0.1:49328/home?run_id=fixture-1234"))
+        let instruction = client.turnInstruction(for: "Open the fixture")
+        XCTAssertTrue(instruction.contains("cua.getApp('com.apple.Safari')"))
+        XCTAssertTrue(instruction.contains("never use cua.getBrowser"))
+        XCTAssertTrue(
+            instruction.contains("http://127.0.0.1:49328/docs?run_id=fixture-1234"))
     }
 
     private func makeClient() -> AppServerClient {

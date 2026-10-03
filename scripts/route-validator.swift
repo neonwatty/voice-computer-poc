@@ -25,6 +25,10 @@ struct RouteValidator {
             case .invalid: result = ["route": "invalid"]
             case .clarification: result = ["route": "clarification"]
             case .calculator: result = ["route": "calculator"]
+            case .browserDocs(let url):
+                result = ["route": "browser", "url": url.absoluteString]
+            case .finderReveal(let url):
+                result = ["route": "finder", "path": url.path]
             case .space(let first, let remaining):
                 result = [
                     "route": "space", "first": first.rawValue,

@@ -4,13 +4,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 EVALS = ROOT / "evals"
-FIXTURES = json.loads((EVALS / "router-v1.json").read_text())
+FIXTURES = json.loads((EVALS / "router-v3.json").read_text())
 INSTRUCTION = (EVALS / "router-instruction.txt").read_text()
 CLI_ARGS = json.loads((EVALS / "router-cli-args.json").read_text())
 SCHEMA = EVALS / "router-output.schema.json"
@@ -66,7 +68,7 @@ def handoffs(validator, results):
     return rows
 
 
-def main():
+def evaluate():
     if len(FIXTURES) < 40:
         raise RuntimeError("Router corpus has fewer than 40 phrases")
     with tempfile.TemporaryDirectory(prefix="voice-router-validator-") as temp:
@@ -85,7 +87,7 @@ def main():
         results.sort(key=lambda row: (row[0], row[1]))
         decisions = handoffs(validator, results)
 
-    report = {"corpus": "router-v1", "fixture_count": len(FIXTURES),
+    report = {"corpus": "router-v3", "fixture_count": len(FIXTURES),
               "independent_model_turns": len(results), "trials": [], "misses": []}
     for (index, trial, output), handoff in zip(results, decisions):
         expected = FIXTURES[index]
@@ -97,6 +99,12 @@ def main():
                        and [handoff.get("first"), *handoff.get("remaining", [])] == expected["directions"])
         elif expected["route"] == "computer_use":
             correct = correct and handoff.get("route") == "calculator"
+        elif expected["route"] == "browser":
+            correct = correct and handoff.get("route") == "browser" \
+                and handoff.get("url") in expected["phrase"]
+        elif expected["route"] == "finder":
+            correct = correct and handoff.get("route") == "finder" \
+                and handoff.get("path") in expected["phrase"]
         else:
             correct = correct and handoff.get("route") == "clarification"
         row = {"id": index, "trial": trial, "phrase": expected["phrase"],
@@ -112,15 +120,32 @@ def main():
         for row in report["trials"])
     report["clarification_actions"] = sum(
         row["expected"]["route"] == "clarification"
-        and row["handoff"]["route"] in ("space", "calculator")
+        and row["handoff"]["route"] in ("space", "calculator", "browser", "finder")
         for row in report["trials"])
-    (EVALS / "router-v1-report.json").write_text(json.dumps(report, indent=2) + "\n")
+    (EVALS / "router-v3-report.json").write_text(
+        json.dumps(report, indent=2).replace(FINDER_PATH, "@FINDER_REPORT@") + "\n")
     summary = {key: report[key] for key in ("fixture_count", "independent_model_turns", "accuracy",
                                           "wrong_direction_actions", "clarification_actions")}
     summary["miss_count"] = len(report["misses"])
     print(json.dumps(summary))
     return 0 if report["accuracy"] >= .95 and report["wrong_direction_actions"] == 0 \
         and report["clarification_actions"] == 0 else 1
+
+
+def main():
+    global FIXTURES, FINDER_PATH
+    root = (Path.home() / "Library/Application Support/VoiceComputerPOC/TestFixtures"
+            / uuid.uuid4().hex)
+    root.mkdir(parents=True, mode=0o700)
+    report = root / "report.txt"
+    report.write_text("Router Finder fixture\n")
+    FINDER_PATH = str(report)
+    FIXTURES = [{**row, "phrase": row["phrase"].replace("@FINDER_REPORT@", FINDER_PATH)}
+                for row in FIXTURES]
+    try:
+        return evaluate()
+    finally:
+        shutil.rmtree(root)
 
 
 if __name__ == "__main__":
