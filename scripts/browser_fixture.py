@@ -17,7 +17,7 @@ RUN_ID = re.compile(r"[A-Za-z0-9-]{8,64}\Z")
 def make_server(run_id, log_path, mode="normal"):
     if not RUN_ID.fullmatch(run_id):
         raise ValueError("run ID must be 8–64 letters, digits, or hyphens")
-    if mode not in {"normal", "missing-link", "redirect"}:
+    if mode not in {"normal", "missing-link", "redirect", "home-404"}:
         raise ValueError("unsupported fixture mode")
     log_path.touch(mode=0o600, exist_ok=True)
 
@@ -31,6 +31,8 @@ def make_server(run_id, log_path, mode="normal"):
                                           "run_id": supplied_id}, sort_keys=True) + "\n")
             if supplied_id != [run_id]:
                 self.respond(404, "Unknown test run")
+            elif path == "/home" and mode == "home-404":
+                self.respond(404, "<h1>Fixture page not found</h1>")
             elif path == "/home":
                 link = ("" if mode == "missing-link" else
                         f'<a href="/docs?run_id={run_id}">Docs</a>')
@@ -45,7 +47,7 @@ def make_server(run_id, log_path, mode="normal"):
                          f'<input name="run_id" value="{run_id}" type="hidden">'
                          '<input name="query" aria-label="Query"><button>Submit</button></form>')
             else:
-                self.respond(404, "Fixture page not found")
+                self.respond(404, "<h1>Fixture page not found</h1>")
 
         def respond(self, status, body):
             page = f"<!doctype html><html><head><title>Voice Computer Fixture</title></head>"
@@ -69,7 +71,7 @@ def main():
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--log", type=Path, required=True)
     parser.add_argument("--mode", default="normal",
-                        choices=("normal", "missing-link", "redirect"))
+                        choices=("normal", "missing-link", "redirect", "home-404"))
     args = parser.parse_args()
     os.umask(0o077)
     args.log.parent.mkdir(parents=True, exist_ok=True, mode=0o700)

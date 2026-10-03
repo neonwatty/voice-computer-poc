@@ -1,9 +1,10 @@
 # Next desktop capabilities: Browser, Finder, and Codex
 
 Status: October 3, 2026. The narrow Safari and Finder slices are implemented;
-three isolated Safari runs and one Safari→Finder sequence passed, as did four
-earlier Finder runs. All used independent UI evidence. The gated full suite
-still has an intermittent Mission Control preflight. The Codex host task
+three isolated Safari runs and multiple Safari→Finder sequences passed, as did
+repeated Finder runs. The default suite passed on the final app build, and all
+three focused Browser negatives passed with independent UI evidence. The
+optional Mission Control gate is intermittent. The Codex host task
 status route is deferred because a separate app-server process cannot read the
 host's live state. Speech transcription and Foil integration remain deferred.
 The [capability inventory](tool-capability-inventory.md) records the measured
@@ -32,9 +33,9 @@ new Codex tasks, messages to other chats, uploads, or speech input.
 | “What is the status of Codex task `<ID>`?” | Read-only structured Codex interface, if available | Exact task ID, state, and observation time from the supported interface | `unsupported` or `ambiguous_target`; never guess from a title |
 
 These are separate route types. Do not pass the raw phrase directly to an
-unrestricted acting agent and call a plausible answer success. The existing
-router currently accepts only Space moves and opening Calculator; its schema,
-validator, corpus, and handoff must be expanded together.
+unrestricted acting agent and call a plausible answer success. The router now
+accepts the narrow Browser and Finder fixtures alongside Space moves and
+opening Calculator; its schema, validator, corpus, and handoff change together.
 
 ## Work package 0: preserve the test baseline
 
@@ -114,6 +115,12 @@ fixture; regular browser profile expansion needs a separate decision.
 negative cases that return non-success without visiting an unapproved origin.
 The starting desktop Space remains unchanged.
 
+**Measured negatives:** The missing-link, Home 404, and local redirect-to-error
+fixtures each passed a focused exact-app run. The runner verified the local
+request sequence and rendered Safari URL and heading. The app still reports
+these acting turns as `model_report_only`, so app-owned typed outcomes remain
+open work.
+
 ## Work package 3: Finder vertical slice
 
 Create a unique directory under Voice Computer POC's Application Support test
@@ -178,7 +185,9 @@ is available to Voice Computer.
 ## Work package 5: unattended runner and release gate
 
 Extend `scripts/smoke_app_server.py` with one case per slice and a suite mode
-that runs preflight → read-only gate → Browser → Finder → Codex status. Each
+that runs preflight → Browser → Finder. An exact `--codex-thread-id` adds the
+read-only Codex feasibility probe. The optional `--mission-control-gate`
+inserts read-only case 13 before Browser. Each
 case gets a finite tool-call and time budget, one target allowlist, a unique
 fixture run ID, a private receipt, and a command-correlated app log check.
 Fail closed on missing evidence, a wrong app, an unexpected approval, changed
@@ -191,13 +200,16 @@ session. The unlocked Mac runs the UI suite against one exact Debug app build.
 The review receipt should state build SHA, app path and PID, OS version, case
 IDs, observed URL/path/task ID, approvals, verification status, and cleanup
 status. Keep any screenshot or detailed CUA trace local unless needed to debug
-a failure.
+a failure. Browser and Finder only need an unlocked desktop, the exact app,
+their target app's Accessibility state, and stable live Space IDs. Keep Mission
+Control's read-only control scan as a separate diagnostic and an opt-in
+`--mission-control-gate` for Space control testing.
 
-**Current suite limit:** Case 13 has both passed with two WindowManager
+**Current Mission Control limit:** Case 13 has both passed with two WindowManager
 Desktop controls and failed when another app became frontmost while Mission
-Control opened. The runner keeps this read-only gate fail-closed. A separate
-Browser→Finder run checks the acting sequence without treating a failed
-Mission Control probe as permission to act in the gated suite. One recoverable
+Control opened. The optional gate remains fail-closed. The default Browser →
+Finder suite checks its own prerequisites and does not depend on Mission Control
+controls. One recoverable
 stale UI binding before the read-only command can be accepted only after the
 exact app log proves a fresh command completed with both controls and the
 Space ID unchanged. Other Computer Use errors still fail the case.

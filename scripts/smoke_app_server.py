@@ -340,7 +340,7 @@ def assert_log_privacy(rows):
 
 
 def verify_browser_receipt(rows, run_id, port, fixture_rows, observations,
-                           before, after, prior_command_ids=()):
+                           before, after, prior_command_ids=(), mode="normal"):
     """Correlate the exact app command with a rendered Safari page and server requests."""
     starts = [row for row in rows if row.get("event") == "command_started"
               and row.get("details", {}).get("user_action") == "run"]
@@ -366,10 +366,10 @@ def verify_browser_receipt(rows, run_id, port, fixture_rows, observations,
     if not tools or any(tool.get("server") != "cua_repl" for tool in tools):
         raise ValueError("Browser action did not use only Computer Use")
     approvals = events("approval_decided")
-    if not approvals or any(approval.get("server_name") != "cua_repl"
-                            or approval.get("decision") not in ("Allowed once", "Allowed for session")
-                            for approval in approvals):
-        raise ValueError("Browser Computer Use approvals were not allowed once")
+    if any(approval.get("server_name") != "cua_repl"
+           or approval.get("decision") not in ("Allowed once", "Allowed for session")
+           for approval in approvals):
+        raise ValueError("Browser Computer Use approval was unexpected or declined")
     if len(finishes) != 1 or finishes[0].get("status") != "completed":
         raise ValueError("Browser app command did not complete")
     if any(row.get("event") in ("native_space_requested", "mcp_action_requested",
@@ -377,18 +377,30 @@ def verify_browser_receipt(rows, run_id, port, fixture_rows, observations,
         raise ValueError("Browser command invoked an unexpected desktop action")
     if before is None or after != before:
         raise ValueError("Browser command changed desktop Space")
+    expected_paths = {
+        "normal": ["/home", "/docs"],
+        "missing-link": ["/home"],
+        "home-404": ["/home"],
+        "redirect": ["/home", "/docs", "/error"],
+    }.get(mode)
+    if expected_paths is None:
+        raise ValueError("Unsupported Browser fixture mode")
     if [(row.get("method"), row.get("path"), row.get("run_id"))
             for row in fixture_rows] != [
-                ("GET", "/home", [run_id]), ("GET", "/docs", [run_id])]:
-        raise ValueError("Fixture did not receive exactly Home then Docs for this run")
-    expected_url = f"http://127.0.0.1:{port}/docs?run_id={run_id}"
-    heading = f"Voice Computer Docs {run_id}"
+                ("GET", path, [run_id]) for path in expected_paths]:
+        raise ValueError("Fixture request sequence did not match Browser scenario")
+    final_path = expected_paths[-1]
+    expected_url = f"http://127.0.0.1:{port}{final_path}?run_id={run_id}"
+    heading = (f"Voice Computer Docs {run_id}" if mode == "normal" else
+               f"Voice Computer Home {run_id}" if mode == "missing-link" else
+               "Fixture page not found")
     if not any(expected_url.removeprefix("http://") in observation and heading in observation
                and "heading" in observation for observation in observations):
         raise ValueError("Independent rendered Safari URL and heading missing")
     assert_log_privacy(rows)
-    return {"command_id": command_id, "url": expected_url,
-            "heading": heading, "before": before, "after": after}
+    return {"command_id": command_id, "scenario": mode, "url": expected_url,
+            "heading": heading, "approval_state": "prompted" if approvals else "no_new_prompt",
+            "before": before, "after": after}
 
 
 def verify_finder_receipt(rows, report, observations, before, after,
@@ -414,10 +426,10 @@ def verify_finder_receipt(rows, report, observations, before, after,
         raise ValueError("Finder acting turn missing")
     if not tools or any(tool.get("server") != "cua_repl" for tool in tools):
         raise ValueError("Finder action did not use only Computer Use")
-    if not approvals or any(approval.get("server_name") != "cua_repl"
-                            or approval.get("decision") not in ("Allowed once", "Allowed for session")
-                            for approval in approvals):
-        raise ValueError("Finder Computer Use approvals were not allowed once")
+    if any(approval.get("server_name") != "cua_repl"
+           or approval.get("decision") not in ("Allowed once", "Allowed for session")
+           for approval in approvals):
+        raise ValueError("Finder Computer Use approval was unexpected or declined")
     if len(finishes) != 1 or finishes[0].get("status") != "completed":
         raise ValueError("Finder app command did not complete")
     if any(row.get("event") in ("native_space_requested", "mcp_action_requested",
@@ -435,7 +447,9 @@ def verify_finder_receipt(rows, report, observations, before, after,
                for observation in observations):
         raise ValueError("Independent Finder selection of exact report missing")
     assert_log_privacy(rows)
-    return {"command_id": command_id, "path": str(report), "before": before, "after": after}
+    return {"command_id": command_id, "path": str(report),
+            "approval_state": "prompted" if approvals else "no_new_prompt",
+            "before": before, "after": after}
 
 
 def verify_mcp_receipt(rows, phrase, direction, before, expected, after,
@@ -758,6 +772,16 @@ class Driver:
         self.log.close()
 
 
+def selected_cases(suite, cases, mission_control_gate):
+    if mission_control_gate and not suite:
+        raise ValueError("--mission-control-gate requires --suite")
+    if suite and cases:
+        raise ValueError("--suite cannot be combined with --case")
+    if suite:
+        return ([13] if mission_control_gate else []) + [17, 18]
+    return cases or list(range(1, 7))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--codex", default=default_codex())
@@ -767,21 +791,31 @@ def main():
     parser.add_argument("--case", type=int, action="append", choices=range(1, len(COMMANDS) + 1),
                         help="Run one numbered command; repeat to select multiple")
     parser.add_argument("--suite", action="store_true",
-                        help="Run the read-only gate, Browser, Finder, and Codex status feasibility probe")
+                        help="Run Browser, Finder, and Codex status feasibility probe")
+    parser.add_argument("--mission-control-gate", action="store_true",
+                        help="Require read-only Mission Control case 13 before --suite acts")
+    parser.add_argument("--browser-mode", default="normal",
+                        choices=("normal", "missing-link", "home-404", "redirect"),
+                        help="Fixture scenario for a focused --case 17 run")
     parser.add_argument("--codex-thread-id",
-                        help="Exact existing Codex task UUID for --suite's read-only status probe")
+                        help="Optional exact existing Codex task UUID for --suite's read-only status probe")
     parser.add_argument("--app-path", type=Path,
                         help="Canonical absolute VoiceComputerPOC.app path, required for cases 13, 15, 16, 17, and 18")
     parser.add_argument("--single-mcp-step", action="store_true",
                         help="Run only one rightward MCP case and stop regardless of result")
     args = parser.parse_args()
-    if args.suite and args.case:
-        parser.error("--suite cannot be combined with --case")
-    if args.suite and (not args.codex_thread_id or not re.fullmatch(
+    try:
+        selected = selected_cases(args.suite, args.case, args.mission_control_gate)
+    except ValueError as error:
+        parser.error(str(error))
+    if args.browser_mode != "normal" and selected != [17]:
+        parser.error("--browser-mode requires a focused --case 17 run")
+    if args.codex_thread_id and not args.suite:
+        parser.error("--codex-thread-id requires --suite")
+    if args.codex_thread_id and not re.fullmatch(
             r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-            args.codex_thread_id)):
-        parser.error("--suite requires --codex-thread-id with an exact Codex task UUID")
-    selected = [13, 17, 18] if args.suite else args.case or list(range(1, 7))
+            args.codex_thread_id):
+        parser.error("--codex-thread-id requires an exact Codex task UUID")
     mcp_selected = any(index in MCP_CASES for index in selected)
     exact_selected = any(index in EXACT_APP_CASES for index in selected)
     if args.single_mcp_step and not mcp_selected:
@@ -832,7 +866,7 @@ def main():
                 run_id = uuid.uuid4().hex
                 temporary = tempfile.TemporaryDirectory(prefix="voice-browser-smoke-")
                 fixture_log = Path(temporary.name) / "requests.jsonl"
-                server = make_server(run_id, fixture_log)
+                server = make_server(run_id, fixture_log, args.browser_mode)
                 fixture_thread = threading.Thread(target=server.serve_forever, daemon=True)
                 fixture_thread.start()
                 fixtures.append((server, fixture_thread, temporary))
@@ -1016,7 +1050,8 @@ def main():
                         fixture_rows = [json.loads(line) for line in fixture_log.read_text().splitlines()]
                         exact_receipt = verify_browser_receipt(
                             rows, run_id, port, fixture_rows, driver.browser_observations,
-                            space_before["current"], after_id, prior_ids)
+                            space_before["current"], after_id, prior_ids,
+                            mode=args.browser_mode)
                         driver.record("browser_receipt_verified", **exact_receipt)
                     elif index == 18:
                         exact_receipt = verify_finder_receipt(
@@ -1054,7 +1089,7 @@ def main():
             failed = failed or not success
             if not success and (args.suite or index in MCP_CASES or index == 13):
                 break
-        if args.suite and not failed:
+        if args.suite and not failed and args.codex_thread_id:
             response = driver.wait_rpc(driver.rpc("thread/read", {
                 "threadId": args.codex_thread_id, "includeTurns": False,
             }))
@@ -1067,6 +1102,8 @@ def main():
             driver.record("codex_status_feasibility", thread_id=args.codex_thread_id,
                           protocol_status=protocol_status, interpretation=interpretation)
             print("Codex status: %s (%s)" % (interpretation, protocol_status), flush=True)
+        elif args.suite and not failed:
+            driver.record("codex_status_skipped", reason="no_exact_task_id")
     except Exception as error:
         failed = True
         driver.record("driver_error", error_type=type(error).__name__)

@@ -315,25 +315,30 @@ the live desktop Space did not change, and removes fixture data. The app still
 labels these Computer Use turns `model_report_only`; the runner's separate
 observation supplies the acceptance evidence.
 
-Use `--suite` to run the read-only Mission Control gate, Browser, Finder, and
-read-only Codex task status feasibility probe in order. The Codex probe accepts
-an existing exact task ID. A separate app-server currently reports a host task
+Use `--suite` to run Browser and Finder in order. Add `--codex-thread-id` with
+an existing exact task ID to include the read-only Codex status feasibility
+probe. A separate app-server currently reports a host task
 as `notLoaded`, so the suite records `unavailable_cross_process` rather than
 claiming its live desktop status.
 
 ```sh
 python3 scripts/smoke_app_server.py --suite \
-  --codex-thread-id YOUR-EXISTING-TASK-UUID \
   --app-path /absolute/path/to/VoiceComputerPOC.app \
   --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/capabilities-$(date +%s).jsonl"
 ```
 
 Run the same exact app build on an unlocked Mac with one matching process. The
-suite stops at the read-only gate if Mission Control does not expose its two
-Desktop controls. Individual `--case 17` and `--case 18` runs are available
-for focused diagnosis. The nested app-server has no built-in Browser (`iab`)
+suite checks the live Space before and after each action. Add
+`--mission-control-gate` to require read-only case 13 before Browser and Finder;
+that strict gate can stop the suite when another app takes focus as Mission
+Control opens. Individual `--case 13`, `--case 17`, and `--case 18` runs are
+available for focused diagnosis. The nested app-server has no built-in Browser (`iab`)
 surface; Safari is the supported UI target for this fixture. The Codex desktop
 task status route remains disabled pending a host-aware read-only interface.
+
+Focused Browser negatives use `--case 17 --browser-mode missing-link`,
+`home-404`, or `redirect`. The runner requires the exact local request sequence
+and rendered final page for each scenario; an observed wrong origin fails.
 
 ## Scope
 

@@ -195,6 +195,17 @@ final class AppServerClientNotificationTests: XCTestCase {
             })
     }
 
+    func testBrowserInstructionTargetsNativeSafariAndExactDocsURL() throws {
+        let client = makeClient()
+        client.browserDocsURL = try XCTUnwrap(
+            URL(string: "http://127.0.0.1:49328/home?run_id=fixture-1234"))
+        let instruction = client.turnInstruction(for: "Open the fixture")
+        XCTAssertTrue(instruction.contains("cua.getApp('com.apple.Safari')"))
+        XCTAssertTrue(instruction.contains("never use cua.getBrowser"))
+        XCTAssertTrue(
+            instruction.contains("http://127.0.0.1:49328/docs?run_id=fixture-1234"))
+    }
+
     private func makeClient() -> AppServerClient {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         addTeardownBlock { try FileManager.default.removeItem(at: directory) }

@@ -7,8 +7,9 @@ extension AppServerClient {
                 "Use only mcp__cua_repl.js with Finder (com.apple.finder). Get Finder, use Go to Folder (Command-Shift-G), enter exactly \(url.path), and press Return once. Inspect Finder's Accessibility state and report the selected item's exact file URL. Stop if Finder has no window, the file is missing, the selected item differs, access is declined, or the tool fails. Do not open or edit the file, use a shell, or control another app. User request: \(phrase)"
         }
         if let url = browserDocsURL {
+            let docsURL = url.absoluteString.replacingOccurrences(of: "/home?", with: "/docs?")
             return
-                "Use only mcp__cua_repl.js with Safari (com.apple.Safari). Get Safari, open one new tab, and enter exactly \(url.absoluteString) in its address field. Read the rendered Home page, click its Docs link once, then inspect the rendered page and address. Report the final URL and visible heading. Stop if Safari navigates to a different origin, the Docs link is absent, access is declined, or the tool fails. Do not use a shell, file operations, or another app. User request: \(phrase)"
+                "Use only mcp__cua_repl.js with the native Safari app. First bind with cua.getApp('com.apple.Safari'); never use cua.getBrowser or createBrowserTab because those browser surfaces are unavailable here. Open one new Safari tab and enter exactly \(url.absoluteString) in its address field. Read the rendered Home page, click its Docs link once, then inspect the rendered page and address. Report the final URL and visible heading. The intended final URL is exactly \(docsURL); report unverified if it differs or the Docs heading is absent. Stop if Safari navigates to a different origin, the Docs link is absent, access is declined, or the tool fails. Do not use a shell, file operations, or another app. User request: \(phrase)"
         }
         if let direction = requestedToolDirection ?? SpaceToolRequest.direction(for: phrase) {
             return
