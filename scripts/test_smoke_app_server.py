@@ -64,6 +64,7 @@ def read_only_rows():
         row("live_space_observed", phase="before_command", live_space_id="3"),
         row("mission_control_probe_started"),
         row("mission_control_ax_summary", trusted="true", dock_found="true",
+            control_source="dock",
             mission_present="true", mission_active="true", limit_reached="false",
             controls="Desktop 1:exit to Desktop 1:AXPress,AXRemoveDesktop; "
                      "Desktop 2:exit to Desktop 2:AXPress,AXRemoveDesktop"),
@@ -187,7 +188,8 @@ class ExactAppBindingTests(unittest.TestCase):
                          COMMAND_ID)
         cases = [
             (0, "command_id", "old"), (3, "trusted", "false"),
-            (3, "dock_found", "false"), (3, "mission_present", "false"),
+            (3, "dock_found", "false"), (3, "control_source", "none"),
+            (3, "mission_present", "false"),
             (3, "limit_reached", "true"), (3, "controls", "Desktop 1:wrong:AXPress"),
             (5, "live_space_id", "4"),
         ]
@@ -199,6 +201,14 @@ class ExactAppBindingTests(unittest.TestCase):
                     verify_read_only_receipt(changed, 3, 3)
         with self.assertRaisesRegex(ValueError, "stale"):
             verify_read_only_receipt(read_only_rows(), 3, 3, {COMMAND_ID})
+        manager_rows = read_only_rows()
+        manager_rows[3]["details"].update(
+            control_source="window_manager", dock_found="false",
+            window_manager_found="true", window_manager_lists="1", wm_limit_reached="false")
+        self.assertEqual(verify_read_only_receipt(manager_rows, 3, 3)["controls"], 2)
+        manager_rows[3]["details"]["window_manager_lists"] = "2"
+        with self.assertRaises(ValueError):
+            verify_read_only_receipt(manager_rows, 3, 3)
         with self.assertRaisesRegex(ValueError, "changed"):
             verify_read_only_receipt(read_only_rows(), 3, 4)
         for event in ("native_space_requested", "native_space_ax_pressed",

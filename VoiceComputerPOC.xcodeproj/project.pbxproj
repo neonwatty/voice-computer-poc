@@ -29,6 +29,7 @@
 		8832F6771617F802E160B22F /* ApprovalProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0021295ABADC32033A3EDE68 /* ApprovalProtocolTests.swift */; };
 		8C8E6085BEBB050DAC7DE0EB /* AppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5685373ED6C8075DD282EA /* AppServerClient.swift */; };
 		956571D06FD82926DEBD3B4D /* SpaceToolContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7EBF26FA90A2A71786A1435 /* SpaceToolContractTests.swift */; };
+		99965E951BC65D2FC6AE76D9 /* WindowManagerAXProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5D25FC23DE94B511E999EB7 /* WindowManagerAXProbe.swift */; };
 		A8852D260D8504D5024ABB58 /* AppServerClient+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DA61CCE4D3F6CC8236658A /* AppServerClient+Lifecycle.swift */; };
 		AA621174BB334EDF6B44707F /* SpaceToolBridgePythonPeerSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17C96BB825E16BE3B775FD87 /* SpaceToolBridgePythonPeerSupport.swift */; };
 		B00819EC5F0AB40C9AEDB658 /* LocalVoiceInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */; };
@@ -74,6 +75,7 @@
 		8D890B71ED4ECE57D20290F2 /* SpaceToolContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolContract.swift; sourceTree = "<group>"; };
 		94DE2CF9444DF65BD537012E /* VoiceComputerPOC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VoiceComputerPOC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9FBF783BA4090E303FF1E695 /* MissionControlAXDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissionControlAXDiscovery.swift; sourceTree = "<group>"; };
+		A5D25FC23DE94B511E999EB7 /* WindowManagerAXProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManagerAXProbe.swift; sourceTree = "<group>"; };
 		AAEE0B9B8B1A5F7E5359DD50 /* AppServerClient+Routing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Routing.swift"; sourceTree = "<group>"; };
 		B4892574811141080E9E93FE /* SpaceNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceNavigator.swift; sourceTree = "<group>"; };
 		BED1EF7D88AEDFF253DD76FC /* router-instruction.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "router-instruction.txt"; sourceTree = "<group>"; };
@@ -163,6 +165,7 @@
 				EB2CE7E2613EEBFB29969E02 /* SpaceToolBridge.swift */,
 				8D890B71ED4ECE57D20290F2 /* SpaceToolContract.swift */,
 				03E832F80A1C092C60825323 /* VoiceComputerPOCApp.swift */,
+				A5D25FC23DE94B511E999EB7 /* WindowManagerAXProbe.swift */,
 			);
 			path = VoiceComputerPOC;
 			sourceTree = "<group>";
@@ -316,6 +319,7 @@
 				0A5EEDD1B1A4032FCBA313DC /* SpaceToolBridge.swift in Sources */,
 				0EF5A8F7A156B5D7DA21AB23 /* SpaceToolContract.swift in Sources */,
 				0E6B219B0F072ED018D3065B /* VoiceComputerPOCApp.swift in Sources */,
+				99965E951BC65D2FC6AE76D9 /* WindowManagerAXProbe.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

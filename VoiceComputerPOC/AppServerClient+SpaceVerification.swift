@@ -132,10 +132,16 @@ extension AppServerClient {
     ) {
         guard isWorking, activeCommandID == commandID else { return }
         DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.2) { [weak self] in
-            let probe = MissionControlAXProbe.inspectDock()
+            let dock = MissionControlAXProbe.inspectDock()
+            let manager = WindowManagerAXProbe.inspect()
             DispatchQueue.main.async {
                 guard let self, self.isWorking, self.activeCommandID == commandID else { return }
-                if probe.nodes.count < 2 && !probe.limitReached
+                let source =
+                    dock.nodes.count == 2
+                    ? "dock"
+                    : manager.nodes.count == 2 && manager.lists == 1 ? "window_manager" : "none"
+                let nodes = source == "dock" ? dock.nodes : manager.nodes
+                if nodes.count < 2 && !dock.limitReached && !manager.limitReached
                     && ProcessInfo.processInfo.systemUptime < deadline
                 {
                     self.pollMissionControlProbe(
@@ -144,24 +150,31 @@ extension AppServerClient {
                     return
                 }
                 let summary = [
-                    "trusted": String(probe.trusted), "dock_found": String(probe.dockFound),
-                    "visited": String(probe.visited), "limit_reached": String(probe.limitReached),
-                    "root_windows": String(probe.rootWindows),
+                    "trusted": String(dock.trusted), "dock_found": String(dock.dockFound),
+                    "visited": String(dock.visited), "limit_reached": String(dock.limitReached),
+                    "root_windows": String(dock.rootWindows),
+                    "control_source": source,
+                    "window_manager_found": String(manager.found),
+                    "window_manager_lists": String(manager.lists),
+                    "wm_visited": String(manager.visited),
+                    "wm_limit_reached": String(manager.limitReached),
                     "attempts": String(attempts), "mission_present": String(launched),
                     "mission_active": String(activeAtLaunch),
                     "frontmost_bundle_id": NSWorkspace.shared.frontmostApplication?.bundleIdentifier
                         ?? "unknown",
-                    "controls": probe.nodes.map { "\($0.title):\($0.description):\($0.actions)" }
+                    "controls": nodes.map { "\($0.title):\($0.description):\($0.actions)" }
                         .joined(separator: "; "),
                 ]
                 self.record("mission_control_ax_summary", details: summary)
-                let found =
-                    launched && probe.trusted && probe.dockFound
-                    && !probe.limitReached && probe.nodes.count == 2
+                let complete =
+                    source == "dock"
+                    ? dock.dockFound && !dock.limitReached
+                    : source == "window_manager" ? manager.found && !manager.limitReached : false
+                let found = launched && dock.trusted && complete
                 self.status = "Ready"
                 self.result =
                     found
-                    ? "Inspected Dock desktop controls. See Diagnostic Log."
+                    ? "Inspected desktop controls. See Diagnostic Log."
                     : "Mission Control did not expose two desktop controls. See Diagnostic Log."
                 self.record(
                     "command_finished",

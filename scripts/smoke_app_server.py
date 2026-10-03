@@ -295,9 +295,19 @@ def verify_read_only_receipt(rows, before, after, prior_command_ids=()):
     if finishes[0][1].get("status") != "completed":
         raise ValueError("Read-only command did not finish")
     summary = summaries[0][1]
-    if (summary.get("trusted") != "true" or summary.get("dock_found") != "true"
-            or summary.get("mission_present") != "true" or summary.get("limit_reached") != "false"):
-        raise ValueError("Accessibility trust, Mission Control launch, or complete Dock scan missing")
+    if summary.get("trusted") != "true" or summary.get("mission_present") != "true":
+        raise ValueError("Accessibility trust or Mission Control launch missing")
+    source = summary.get("control_source")
+    if source == "dock":
+        complete = summary.get("dock_found") == "true" and summary.get("limit_reached") == "false"
+    elif source == "window_manager":
+        complete = (summary.get("window_manager_found") == "true"
+                    and summary.get("window_manager_lists") == "1"
+                    and summary.get("wm_limit_reached") == "false")
+    else:
+        complete = False
+    if not complete:
+        raise ValueError("Exact Mission Control control source or complete scan missing")
     controls = [part.strip().split(":", 2) for part in summary.get("controls", "").split(";")]
     if len(controls) != 2 or any(len(part) != 3 for part in controls):
         raise ValueError("Expected exactly two Desktop controls")
