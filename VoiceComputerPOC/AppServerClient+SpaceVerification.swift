@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 extension AppServerClient {
@@ -67,6 +68,37 @@ extension AppServerClient {
                     ? "Switched right one desktop Space and returned left to the original Space."
                     : "Switched one desktop Space to the \(direction.rawValue).",
                 details: fields)
+        }
+    }
+
+    func runMissionControlProbe() {
+        status = "Inspecting Mission Control…"
+        record("mission_control_probe_started")
+        let commandID = activeCommandID
+        let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
+        NSWorkspace.shared.openApplication(at: url, configuration: .init()) { [weak self] _, error in
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.8) {
+                let probe = MissionControlAXProbe.inspectDock()
+                DispatchQueue.main.async {
+                    guard let self, self.isWorking, self.activeCommandID == commandID else { return }
+                    if error != nil { self.record("mission_control_launch_failed") }
+                    let summary = [
+                        "trusted": String(probe.trusted), "dock_found": String(probe.dockFound),
+                        "controls": probe.nodes.map { "\($0.title):\($0.description):\($0.actions)" }
+                            .joined(separator: "; "),
+                    ]
+                    self.record("mission_control_ax_summary", details: summary)
+                    self.status = "Ready"
+                    self.result = "Inspected Dock desktop controls. See Diagnostic Log."
+                    self.record(
+                        "command_finished",
+                        details: ["status": "completed", "elapsed_ms": self.commandElapsedMilliseconds])
+                    self.queuedPhrase = nil
+                    self.isWorking = false
+                    self.finishCommand()
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            }
         }
     }
 }
