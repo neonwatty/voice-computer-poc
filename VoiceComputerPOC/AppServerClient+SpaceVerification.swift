@@ -74,9 +74,44 @@ extension AppServerClient {
     func runMissionControlProbe() {
         status = "Inspecting Mission Control…"
         record("mission_control_probe_started")
-        let commandID = activeCommandID
+        guard let commandID = activeCommandID else { return }
+        let started = ProcessInfo.processInfo.systemUptime
+        NSApp.activate()
+        pollMissionControlProbeForeground(commandID: commandID, started: started)
+    }
+
+    private func pollMissionControlProbeForeground(commandID: String, started: TimeInterval) {
+        guard isWorking, activeCommandID == commandID else { return }
+        let active = NSApp.isActive
+        let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        if active && frontmost == "com.neonwatty.VoiceComputerPOC" {
+            record("mission_control_probe_foreground_observed")
+            launchMissionControlProbe(commandID: commandID)
+            return
+        }
+        if ProcessInfo.processInfo.systemUptime - started >= 0.8 {
+            record(
+                "mission_control_probe_failed",
+                details: ["reason": active ? "frontmost_mismatch" : "voice_inactive"])
+            status = "Ready"
+            result = "Could not verify Voice Computer in the foreground for inspection."
+            record(
+                "command_finished",
+                details: ["status": "failed", "elapsed_ms": commandElapsedMilliseconds])
+            queuedPhrase = nil
+            isWorking = false
+            finishCommand()
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.pollMissionControlProbeForeground(commandID: commandID, started: started)
+        }
+    }
+
+    private func launchMissionControlProbe(commandID: String) {
         let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
-        NSWorkspace.shared.openApplication(at: url, configuration: .init()) { [weak self] _, error in
+        NSWorkspace.shared.openApplication(at: url, configuration: .init()) {
+            [weak self] application, error in
             DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.8) {
                 let probe = MissionControlAXProbe.inspectDock()
                 DispatchQueue.main.async {
@@ -84,6 +119,12 @@ extension AppServerClient {
                     if error != nil { self.record("mission_control_launch_failed") }
                     let summary = [
                         "trusted": String(probe.trusted), "dock_found": String(probe.dockFound),
+                        "visited": String(probe.visited),
+                        "limit_reached": String(probe.limitReached),
+                        "mission_present": String(application != nil),
+                        "mission_active": String(application?.isActive ?? false),
+                        "frontmost_bundle_id": NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+                            ?? "unknown",
                         "controls": probe.nodes.map { "\($0.title):\($0.description):\($0.actions)" }
                             .joined(separator: "; "),
                     ]

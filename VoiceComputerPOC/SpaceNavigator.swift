@@ -206,13 +206,14 @@ enum MissionControlAXError: LocalizedError {
 enum MissionControlAXProbe {
     static var isTrusted: Bool { AXIsProcessTrusted() }
     static func inspectDock(limit: Int = 120) -> (
-        trusted: Bool, dockFound: Bool, nodes: [MissionControlAXNode]
+        trusted: Bool, dockFound: Bool, nodes: [MissionControlAXNode],
+        visited: Int, limitReached: Bool
     ) {
-        guard AXIsProcessTrusted() else { return (false, false, []) }
+        guard AXIsProcessTrusted() else { return (false, false, [], 0, false) }
         guard
             let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock")
                 .first
-        else { return (true, false, []) }
+        else { return (true, false, [], 0, false) }
         var queue = [AXUIElementCreateApplication(dock.processIdentifier)]
         var nodes: [MissionControlAXNode] = []
         var visited = 0
@@ -232,7 +233,7 @@ enum MissionControlAXProbe {
             }
             queue.append(contentsOf: children(of: element))
         }
-        return (true, true, nodes)
+        return (true, true, nodes, visited, !queue.isEmpty)
     }
     private static func string(_ element: AXUIElement, attribute: String) -> String {
         var value: CFTypeRef?

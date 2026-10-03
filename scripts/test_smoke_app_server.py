@@ -64,6 +64,7 @@ def read_only_rows():
         row("live_space_observed", phase="before_command", live_space_id="3"),
         row("mission_control_probe_started"),
         row("mission_control_ax_summary", trusted="true", dock_found="true",
+            mission_present="true", mission_active="true", limit_reached="false",
             controls="Desktop 1:exit to Desktop 1:AXPress,AXRemoveDesktop; "
                      "Desktop 2:exit to Desktop 2:AXPress,AXRemoveDesktop"),
         row("command_finished", status="completed"),
@@ -186,7 +187,8 @@ class ExactAppBindingTests(unittest.TestCase):
                          COMMAND_ID)
         cases = [
             (0, "command_id", "old"), (3, "trusted", "false"),
-            (3, "dock_found", "false"), (3, "controls", "Desktop 1:wrong:AXPress"),
+            (3, "dock_found", "false"), (3, "mission_active", "false"),
+            (3, "limit_reached", "true"), (3, "controls", "Desktop 1:wrong:AXPress"),
             (5, "live_space_id", "4"),
         ]
         for index, field, value in cases:
