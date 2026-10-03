@@ -207,18 +207,24 @@ enum MissionControlAXProbe {
     static var isTrusted: Bool { AXIsProcessTrusted() }
     static func inspectDock(limit: Int = 120) -> (
         trusted: Bool, dockFound: Bool, nodes: [MissionControlAXNode],
-        visited: Int, limitReached: Bool
+        visited: Int, limitReached: Bool, rootWindows: Int
     ) {
-        guard AXIsProcessTrusted() else { return (false, false, [], 0, false) }
+        guard AXIsProcessTrusted() else { return (false, false, [], 0, false, 0) }
         guard
             let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock")
                 .first
-        else { return (true, false, [], 0, false) }
-        var queue = [AXUIElementCreateApplication(dock.processIdentifier)]
+        else { return (true, false, [], 0, false, 0) }
+        let root = AXUIElementCreateApplication(dock.processIdentifier)
+        AXUIElementSetMessagingTimeout(root, 0.1)
+        let windows = elements(of: root, attribute: kAXWindowsAttribute)
+        var queue = [root] + windows
+        var seen: [AXUIElement] = []
         var nodes: [MissionControlAXNode] = []
         var visited = 0
         while !queue.isEmpty && visited < limit {
             let element = queue.removeFirst()
+            if seen.contains(where: { CFEqual($0, element) }) { continue }
+            seen.append(element)
             visited += 1
             AXUIElementSetMessagingTimeout(element, 0.1)
             let title = string(element, attribute: kAXTitleAttribute)
@@ -233,7 +239,7 @@ enum MissionControlAXProbe {
             }
             queue.append(contentsOf: children(of: element))
         }
-        return (true, true, nodes, visited, !queue.isEmpty)
+        return (true, true, nodes, visited, !queue.isEmpty, windows.count)
     }
     private static func string(_ element: AXUIElement, attribute: String) -> String {
         var value: CFTypeRef?
@@ -243,10 +249,12 @@ enum MissionControlAXProbe {
         return value as? String ?? ""
     }
     private static func children(of element: AXUIElement) -> [AXUIElement] {
+        elements(of: element, attribute: kAXChildrenAttribute)
+    }
+    private static func elements(of element: AXUIElement, attribute: String) -> [AXUIElement] {
         var value: CFTypeRef?
         guard
-            AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &value)
-                == .success
+            AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success
         else { return [] }
         return value as? [AXUIElement] ?? []
     }

@@ -146,6 +146,7 @@ extension AppServerClient {
                 let summary = [
                     "trusted": String(probe.trusted), "dock_found": String(probe.dockFound),
                     "visited": String(probe.visited), "limit_reached": String(probe.limitReached),
+                    "root_windows": String(probe.rootWindows),
                     "attempts": String(attempts), "mission_present": String(launched),
                     "mission_active": String(activeAtLaunch),
                     "frontmost_bundle_id": NSWorkspace.shared.frontmostApplication?.bundleIdentifier
