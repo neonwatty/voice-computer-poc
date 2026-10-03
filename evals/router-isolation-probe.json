@@ -1,0 +1,34 @@
+{
+  "shared_cli_arguments": [
+    "exec",
+    "--ignore-user-config",
+    "--ignore-rules",
+    "--ephemeral",
+    "--skip-git-repo-check",
+    "--sandbox",
+    "read-only",
+    "--disable",
+    "shell_tool",
+    "--disable",
+    "plugins",
+    "--disable",
+    "multi_agent",
+    "-c",
+    "apps._default.enabled=false",
+    "--json"
+  ],
+  "probes": [
+    {
+      "tool": "desktop_tool.switch_space",
+      "tool_item_count": 0,
+      "model_reports_unavailable": true,
+      "turn_completed": true
+    },
+    {
+      "tool": "Computer Use",
+      "tool_item_count": 0,
+      "model_reports_unavailable": true,
+      "turn_completed": true
+    }
+  ]
+}

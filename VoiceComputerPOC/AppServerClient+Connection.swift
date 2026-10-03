@@ -4,30 +4,70 @@ import Foundation
 extension AppServerClient {
     func decideApproval(allow: Bool, forSession: Bool = false) {
         guard let request = approval else { return }
-        sendRaw(request.response(allow: allow, forSession: forSession))
-        let decision = allow ? (forSession ? "Allowed for session" : "Allowed once") : "Declined"
-        append("\(decision): \(request.detail)")
+        let accepted =
+            request.serverName == "desktop_tool"
+            ? decideSpaceApproval(request, allow: allow, forSession: forSession) : allow
+        sendRaw(request.response(allow: accepted, forSession: forSession))
+        if !accepted, request.serverName == "cua_repl" {
+            generalTurnFailure = .accessDeclined
+        }
+        let decision = accepted ? (forSession ? "Allowed for session" : "Allowed once") : "Declined"
+        append("\(decision): \(request.serverName)")
         record(
             "approval_decided",
             details: [
-                "request_id": String(request.id), "decision": decision, "detail": request.detail,
+                "request_id": String(request.id), "decision": decision,
+                "server_name": request.serverName,
             ])
         approval = queuedApprovals.isEmpty ? nil : queuedApprovals.removeFirst()
         if approval == nil && isWorking { status = "Codex is working…" }
     }
 
     func startServer() {
-        guard let (task, executable) = makeServerProcess() else { return }
+        let commandID = activeCommandID
+        status = "Preparing desktop tool…"
+        record("mcp_preflight_started")
+        let preflight = DesktopToolPreflight()
+        desktopToolPreflight = preflight
+        preflight.start { [weak self] outcome in
+            guard let self, self.isWorking, self.activeCommandID == commandID else { return }
+            self.desktopToolPreflight = nil
+            switch outcome {
+            case .ready(let path):
+                self.record("mcp_preflight_ready", details: ["path_kind": "verified_bundle_helper"])
+                self.launchServer(helperExecutable: path)
+            case .failed(let reason):
+                self.record("mcp_preflight_failed", details: ["reason": reason])
+                if self.requestedToolDirection == nil {
+                    self.launchServer(helperExecutable: nil)
+                } else {
+                    self.fail("The desktop tool could not be prepared (\(reason)).")
+                }
+            }
+        }
+    }
+
+    private func launchServer(helperExecutable: String?) {
+        guard let (task, executable) = makeServerProcess(helperExecutable: helperExecutable) else { return }
         process = task
         observeServerProcess(task)
         do {
             try task.run()
+            spaceToolBridge?.serverPID = task.processIdentifier
             status = "Connecting to Codex…"
             append("Started codex app-server")
             record(
                 "server_started",
                 details: [
                     "executable": executable, "pid": String(task.processIdentifier),
+                ])
+            record(
+                "mcp_local_config",
+                details: [
+                    "server": spaceToolBridge == nil ? "unavailable" : "desktop_tool",
+                    "startup_grace_ms": "0", "startup_timeout_sec": "30",
+                    "launcher": helperExecutable == nil ? "none" : "direct_executable",
+                    "safe_probe": String(Self.safeSpaceProbe),
                 ])
             _ = send(
                 "initialize",
@@ -44,7 +84,14 @@ extension AppServerClient {
         }
     }
 
-    func makeServerProcess() -> (Process, String)? {
+    func makeServerProcess(helperExecutable: String?) -> (Process, String)? {
+        let bridge = helperExecutable == nil ? nil : SpaceToolBridge()
+        bridge?.expectedExecutablePath = helperExecutable
+        bridge?.onRequest = { [weak self] request, peer, reply in
+            self?.handleSpaceToolRequest(request, peer: peer, reply: reply)
+        }
+        spaceToolBridge = bridge
+        if bridge == nil { record("mcp_bridge_unavailable") }
         let home = FileManager.default.homeDirectoryForCurrentUser
         let candidates = [
             home.appendingPathComponent(".local/bin/codex").path,
@@ -72,7 +119,11 @@ extension AppServerClient {
 
         let task = Process()
         task.executableURL = URL(fileURLWithPath: executable)
-        task.arguments = ["app-server"]
+        task.arguments =
+            ["app-server", "-c", "mcp_optional_startup_grace_ms=0"]
+            + (bridge.flatMap { bridge in
+                helperExecutable.map { ["-c", toolServerConfig(bridge, executable: $0)] }
+            } ?? [])
         task.currentDirectoryURL = directory
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = [
@@ -93,6 +144,21 @@ extension AppServerClient {
         return (task, executable)
     }
 
+    private func toolServerConfig(_ bridge: SpaceToolBridge, executable: String) -> String {
+        func quoted(_ text: String) -> String {
+            guard
+                let data = try? JSONSerialization.data(
+                    withJSONObject: text, options: [.fragmentsAllowed, .withoutEscapingSlashes])
+            else { return "\"\"" }
+            return String(decoding: data, as: UTF8.self)
+        }
+        let bridgePath =
+            Self.safeSpaceProbe
+            ? "/tmp/voice-computer-safe-probe-no-bridge.sock" : bridge.socketPath
+        return
+            "mcp_servers.desktop_tool={command=\(quoted(executable)),args=[],env={SPACE_SESSION_ID=\(quoted(bridge.sessionID)),SPACE_BRIDGE_PATH=\(quoted(bridgePath))},enabled=true,startup_timeout_sec=30,tool_timeout_sec=15}"
+    }
+
     func observeServerProcess(_ task: Process) {
         guard let output, let errorOutput else { return }
         output.fileHandleForReading.readabilityHandler = { [weak self] handle in
@@ -111,9 +177,11 @@ extension AppServerClient {
     func startTurn(threadID: String) {
         guard let phrase = queuedPhrase else { return }
         queuedPhrase = nil
-        var instruction =
-            "This prototype is for reversible, low-impact desktop tests. For other requests, explain that the prototype does not support them. Use only mcp__cua_repl.js for desktop UI interaction. Do not use shell commands, AppleScript, or file operations. If Computer Use access is needed, request it. Check the visible result before reporting success. Distinguish a declined access request from a tool failure; do not call a tool failure an access denial."
-        if phrase.localizedCaseInsensitiveContains("chrome"),
+        var instruction = turnInstruction(for: phrase)
+        if let direction = requestedToolDirection {
+            record("mcp_action_requested", details: ["direction": direction.rawValue])
+        }
+        if requestedToolDirection == nil, phrase.localizedCaseInsensitiveContains("chrome"),
             let runningChrome = NSWorkspace.shared.runningApplications.first(where: {
                 $0.bundleIdentifier == "com.google.Chrome" && $0.activationPolicy == .regular
             }), let path = runningChrome.bundleURL?.path
@@ -122,16 +190,30 @@ extension AppServerClient {
                 " Google Chrome is already running from this exact app bundle path: \(path). When using cua.getApp, target this path because this Mac has another Chrome bundle with the same identifier."
             append("Resolved running Chrome: \(path)")
         }
-        instruction += " User request: \(phrase)"
         status = "Codex is working…"
         append("Sent phrase to Codex")
-        record("turn_requested", details: ["thread_id": threadID])
+        record(
+            "turn_requested",
+            details: [
+                "thread_id": threadID, "model": selectedModel ?? "unknown",
+                "route": requestedToolDirection == nil ? "computer_use" : "space",
+            ])
         _ = send(
             "turn/start",
             params: [
                 "threadId": threadID,
                 "input": [["type": "text", "text": instruction]],
             ], pendingKind: .turn)
+    }
+
+    func turnInstruction(for phrase: String) -> String {
+        if let direction = requestedToolDirection ?? SpaceToolRequest.direction(for: phrase) {
+            return
+                "Call the MCP tool mcp__desktop_tool__switch_space from desktop_tool exactly once with JSON arguments {\"direction\":\"\(direction.rawValue)\"}. This is one adjacent desktop Space move. Do not use Computer Use or another tool. Report the typed tool result; do not claim success without verified status. User request: \(phrase)"
+        }
+        return
+            "This prototype is for reversible, low-impact desktop tests. For other requests, explain that the prototype does not support them. Use only mcp__cua_repl.js for desktop UI interaction. Do not use shell commands, AppleScript, or file operations. If Computer Use access is needed, request it. Check the visible result before reporting success. Distinguish a declined access request from a tool failure; do not call a tool failure an access denial."
+            + " User request: \(phrase)"
     }
 
     @discardableResult
