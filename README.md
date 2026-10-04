@@ -305,6 +305,54 @@ checks passed on the unlocked MacBook Air. Computer Use-only Space commands
 failed there, while the native Accessibility round trip passed; results are in
 [PLAN.md](PLAN.md).
 
+### Browser and Finder fixture suite
+
+Case 17 routes an exact loopback Home → Docs request through Safari Computer
+Use. Case 18 routes an exact disposable report path through Finder Computer
+Use. The runner creates unique fixtures, checks the app's command ID and route,
+requires the app's bounded native Accessibility check to verify the exact Docs
+URL and heading or selected report URL, then reads Safari or Finder independently.
+It also checks that the live desktop Space did not change and removes fixture data.
+
+Use `--suite` to run Browser and Finder in order. Add `--codex-thread-id` with
+an existing exact task ID to include the read-only Codex status feasibility
+probe. A separate app-server currently reports a host task
+as `notLoaded`, so the suite records `unavailable_cross_process` rather than
+claiming its live desktop status.
+
+```sh
+python3 scripts/smoke_app_server.py --suite \
+  --app-path /absolute/path/to/VoiceComputerPOC.app \
+  --log "$HOME/Library/Application Support/VoiceComputerPOC/SmokeLogs/capabilities-$(date +%s).jsonl"
+```
+
+Run the same exact app build on an unlocked Mac with one matching process. The
+suite checks the live Space before and after each action. Add
+`--mission-control-gate` to require read-only case 13 before Browser and Finder;
+that strict gate can stop the suite when another app takes focus as Mission
+Control opens. Individual `--case 13`, `--case 17`, and `--case 18` runs are
+available for focused diagnosis. The nested app-server has no built-in Browser (`iab`)
+surface; Safari is the supported UI target for this fixture. The Codex desktop
+task status route remains disabled pending a host-aware read-only interface.
+
+Focused Browser negatives use `--case 17 --browser-mode missing-link`,
+`home-404`, or `redirect`. The runner requires the exact local request sequence
+and rendered final page for each scenario, plus an app-owned `unverified` result.
+An observed wrong origin fails.
+Run `--case 17 --browser-mode stop-before-docs` to test interruption. The local
+fixture holds its Home response while the runner presses the exact app's Stop
+button through Accessibility. The receipt requires the app's interrupted,
+unverified result, one Home request, zero Docs requests, and an unchanged Space.
+The runner releases the held response and removes the fixture on exit.
+Run `--case 17 --browser-mode form-submit` for the bounded Docs form. The app
+accepts only the fixture's run-specific `test-<run-id>` query. The receipt
+requires one Docs load, one exact submission, the matching rendered Safari URL
+and heading, an app-owned verified result, and an unchanged Space.
+Focused Finder negatives use `--case 18 --finder-mode missing-file`,
+`symlink-escape`, or `decoy-target`. Each requires a fresh app command that
+finishes with `no_action`, without starting a Finder acting turn or changing
+the desktop Space. Fixture files are removed after the receipt is written.
+
 ## Scope
 
 This proves the local Codex app-server and Computer Use connection on a machine

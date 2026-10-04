@@ -45,6 +45,65 @@ final class CommandRouteTests: XCTestCase {
             .computerUse("calculator"))
     }
 
+    func testBrowserFixtureRouteRequiresExactLocalWorkflow() throws {
+        let output = try data("browser", [], "local_docs")
+        let phrase = "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link."
+        let url = try XCTUnwrap(URL(string: "http://127.0.0.1:49328/home?run_id=fixture-1234"))
+        XCTAssertEqual(CommandRoute.parse(output, originalPhrase: phrase), .browserDocs(url))
+        XCTAssertEqual(RouteHandoff.decide(output, phrase: phrase), .browserDocs(url))
+        for unsafe in [
+            "Open https://example.com/home?run_id=fixture-1234 and follow the Docs link.",
+            "Open file:///home?run_id=fixture-1234 and follow the Docs link.",
+            "Open http://127.0.0.1:49328/home and follow the Docs link.",
+            "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link, then delete it.",
+            "Open http://127.0.0.1:99999/home?run_id=fixture-1234 and follow the Docs link.",
+            "Do not open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+        ] {
+            XCTAssertNil(CommandRoute.parse(output, originalPhrase: unsafe), unsafe)
+        }
+        XCTAssertNil(CommandRoute.parse(try data("browser", ["left"], "local_docs"), originalPhrase: phrase))
+        XCTAssertNil(CommandRoute.parse(try data("browser", [], "calculator"), originalPhrase: phrase))
+    }
+
+    func testFinderRouteRequiresCanonicalExistingFixtureReport() throws {
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("VoiceComputerPOC/TestFixtures", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let report = root.appendingPathComponent("report.txt")
+        try Data("test report".utf8).write(to: report)
+        let decoy = root.appendingPathComponent("report-copy.txt")
+        try Data("decoy".utf8).write(to: decoy)
+        let output = try data("finder", [], "fixture_report")
+        let phrase = "Reveal the test report at \(report.path) in Finder."
+        XCTAssertEqual(CommandRoute.parse(output, originalPhrase: phrase), .finderReveal(report))
+        XCTAssertEqual(RouteHandoff.decide(output, phrase: phrase), .finderReveal(report))
+        for unsafe in [
+            "Reveal the test report at \(decoy.path) in Finder.",
+            "Reveal the test report at \(root.appendingPathComponent("missing.txt").path) in Finder.",
+            "Delete the test report at \(report.path) in Finder.",
+            "Reveal the test report at \(report.path) in Finder, then open it.",
+        ] {
+            XCTAssertNil(CommandRoute.parse(output, originalPhrase: unsafe), unsafe)
+        }
+        let outside = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: outside) }
+        try Data("outside".utf8).write(to: outside.appendingPathComponent("report.txt"))
+        let linkedDirectory = root.deletingLastPathComponent()
+            .appendingPathComponent(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())
+        try FileManager.default.createSymbolicLink(at: linkedDirectory, withDestinationURL: outside)
+        defer { try? FileManager.default.removeItem(at: linkedDirectory) }
+        XCTAssertNil(
+            CommandRoute.parse(
+                output,
+                originalPhrase:
+                    "Reveal the test report at \(linkedDirectory.appendingPathComponent("report.txt").path) in Finder."
+            ))
+    }
+
     func testReversedNegatedAndUncertainDirectionsAreRejected() throws {
         let roundTrip = try data("space", ["right", "left"], "")
         for phrase in [
@@ -100,9 +159,9 @@ final class CommandRouteTests: XCTestCase {
     func testPackagedRouterResourcesMatchCanonicalBytes() throws {
         let directory = try XCTUnwrap(Bundle.main.resourceURL)
         let expectedHashes = [
-            "router-instruction.txt": "113c35efb5a7aabd1beca9a18ae3e30e9f45690034c64718559bb182bb17b366",
+            "router-instruction.txt": "b5ae643cbd3fbaaab1d255267c3130caddad2cc284f8be2b92734cfdfa777b67",
             "router-cli-args.json": "8284e45d79194b0fc3660c0bda624b87cc6885781813d785d420abacc586014a",
-            "router-output.schema.json": "8399fb70f2fd0c831eac280fd3cc2bde370ec9484571423013f3d5f82b51f67f",
+            "router-output.schema.json": "986f05cae126a240abd24c24912cef0f041814230bcb59a5595ff6eeab7f10ee",
         ]
         for (name, expected) in expectedHashes {
             let data = try Data(contentsOf: directory.appendingPathComponent(name))

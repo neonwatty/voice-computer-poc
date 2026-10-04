@@ -14,9 +14,13 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).parent))
 from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path,
                               cua_exact_path_call, mcp_case_phrase, parse_open_session_log,
-                              running_app_pids, screen_is_locked, validate_exact_space_state,
+                              running_app_pids, screen_is_locked, selected_cases,
+                              validate_exact_space_state,
                               validate_mcp_cases, verify_mcp_receipt,
-                              verify_read_only_receipt)  # noqa: E402
+                              verify_read_only_receipt, verify_browser_receipt,
+                              verify_browser_interruption_receipt,
+                              verify_finder_receipt,
+                              verify_finder_rejection_receipt)  # noqa: E402
 
 
 COMMAND_ID = "A1B2C3D4"
@@ -26,6 +30,16 @@ TURN_ID = "turn-1"
 
 def row(event, **details):
     return {"event": event, "details": {"command_id": COMMAND_ID, **details}}
+
+
+class SuiteSelectionTests(unittest.TestCase):
+    def test_mission_control_is_explicit_for_browser_finder_suite(self):
+        self.assertEqual(selected_cases(True, None, False), [17, 18])
+        self.assertEqual(selected_cases(True, None, True), [13, 17, 18])
+        with self.assertRaisesRegex(ValueError, "requires --suite"):
+            selected_cases(False, [17], True)
+        with self.assertRaisesRegex(ValueError, "cannot be combined"):
+            selected_cases(True, [13], False)
 
 
 def valid_rows(direction="right", before=3, after=4):
@@ -219,6 +233,237 @@ class ExactAppBindingTests(unittest.TestCase):
         changed[3]["details"]["raw_audio"] = "private"
         with self.assertRaisesRegex(ValueError, "Private"):
             verify_read_only_receipt(changed, 3, 3)
+
+
+class BrowserReceiptTests(unittest.TestCase):
+    def test_form_receipt_requires_exact_query_and_rendered_result(self):
+        run_id, port = "fixture-1234", 49328
+        rows = [
+            row("command_started", user_action="run"),
+            row("router_decided", route="browser", action="submit_form", target="loopback_fixture"),
+            row("turn_requested", route="browser"),
+            row("tool_started", server="cua_repl", tool="js"),
+            row("fixture_ax_verification", target="browser_form", verified="true",
+                reason="exact_url_and_heading"),
+            row("turn_completed", status="completed", verification="verified"),
+            row("command_finished", status="completed", verification="verified"),
+        ]
+        requests = [
+            {"method": "GET", "path": "/docs", "run_id": [run_id]},
+            {"method": "GET", "path": "/submitted", "run_id": [run_id],
+             "query": [f"test-{run_id}"]},
+        ]
+        url = (f"http://127.0.0.1:{port}/submitted?run_id={run_id}"
+               f"&query=test-{run_id}")
+        observation = (f"Window: Voice Computer Fixture, App: Safari\n"
+                       f"HTML content URL: {url.removeprefix('http://')}\n"
+                       f"2 heading Voice Computer Submitted {run_id} test-{run_id}")
+        self.assertEqual(verify_browser_receipt(
+            rows, run_id, port, requests, [observation], 5, 5,
+            mode="form-submit")["scenario"], "form-submit")
+        wrong = copy.deepcopy(requests)
+        wrong[1]["query"] = ["wrong"]
+        with self.assertRaisesRegex(ValueError, "request sequence"):
+            verify_browser_receipt(rows, run_id, port, wrong, [observation], 5, 5,
+                                   mode="form-submit")
+
+    def test_interruption_requires_stop_and_no_docs_request(self):
+        run_id = "fixture-1234"
+        rows = [
+            row("command_started", user_action="run"),
+            row("router_decided", route="browser", action="follow_docs", target="loopback_fixture"),
+            row("turn_requested", route="browser"),
+            row("tool_started", server="cua_repl", tool="js"),
+            row("stop_requested"),
+            row("fixture_ax_verification", target="browser", verified="false",
+                reason="turn_incomplete"),
+            row("turn_completed", status="interrupted", verification="unverified"),
+            row("command_finished", status="interrupted", verification="unverified"),
+        ]
+        requests = [{"method": "GET", "path": "/home", "run_id": [run_id]}]
+        receipt = verify_browser_interruption_receipt(rows, run_id, requests, 5, 5)
+        self.assertEqual(receipt["docs_requests"], 0)
+        with self.assertRaisesRegex(ValueError, "requested Docs"):
+            verify_browser_interruption_receipt(rows, run_id, requests + [
+                {"method": "GET", "path": "/docs", "run_id": [run_id]}], 5, 5)
+        with self.assertRaisesRegex(ValueError, "lifecycle"):
+            verify_browser_interruption_receipt(
+                [entry for entry in rows if entry["event"] != "stop_requested"],
+                run_id, requests, 5, 5)
+        premature = copy.deepcopy(rows)
+        premature[6]["details"]["status"] = "completed"
+        with self.assertRaisesRegex(ValueError, "successful"):
+            verify_browser_interruption_receipt(premature, run_id, requests, 5, 5)
+
+    def test_browser_receipt_requires_correlated_render_and_requests(self):
+        run_id = "fixture-1234"
+        port = 49328
+        url = f"http://127.0.0.1:{port}/docs?run_id={run_id}"
+        rows = [
+            row("command_started", user_action="run"),
+            row("router_decided", route="browser", action="follow_docs", target="loopback_fixture"),
+            row("turn_requested", route="browser"),
+            row("tool_started", server="cua_repl", tool="js"),
+            row("approval_decided", server_name="cua_repl", decision="Allowed once"),
+            row("tool_completed", server="cua_repl", tool="js", status="completed"),
+            row("fixture_ax_verification", target="browser", verified="true",
+                reason="exact_url_and_heading"),
+            row("turn_completed", status="completed", verification="verified"),
+            row("command_finished", status="completed", verification="verified"),
+        ]
+        requests = [
+            {"method": "GET", "path": "/home", "run_id": [run_id]},
+            {"method": "GET", "path": "/docs", "run_id": [run_id]},
+        ]
+        observations = [f"Window: Voice Computer Fixture, App: Safari\n"
+                        f"HTML content URL: {url.removeprefix('http://')}\n"
+                        f"2 heading Voice Computer Docs {run_id}"]
+        self.assertEqual(verify_browser_receipt(
+            rows, run_id, port, requests, observations, 5, 5)["command_id"], COMMAND_ID)
+        session_rows = copy.deepcopy(rows)
+        session_rows[4]["details"]["decision"] = "Allowed for session"
+        self.assertEqual(verify_browser_receipt(
+            session_rows, run_id, port, requests, observations, 5, 5)["command_id"], COMMAND_ID)
+        reused_rows = [entry for entry in rows if entry["event"] != "approval_decided"]
+        self.assertEqual(verify_browser_receipt(
+            reused_rows, run_id, port, requests, observations, 5, 5)["command_id"], COMMAND_ID)
+        declined_rows = copy.deepcopy(rows)
+        declined_rows[4]["details"]["decision"] = "Declined"
+        with self.assertRaisesRegex(ValueError, "unexpected or declined"):
+            verify_browser_receipt(declined_rows, run_id, port, requests, observations, 5, 5)
+        with self.assertRaisesRegex(ValueError, "stale"):
+            verify_browser_receipt(rows, run_id, port, requests, observations, 5, 5, {COMMAND_ID})
+        with self.assertRaisesRegex(ValueError, "rendered"):
+            verify_browser_receipt(rows, run_id, port, requests, ["Docs loaded"], 5, 5)
+        with self.assertRaisesRegex(ValueError, "request sequence"):
+            verify_browser_receipt(rows, run_id, port, requests[:1], observations, 5, 5)
+        with self.assertRaisesRegex(ValueError, "changed desktop"):
+            verify_browser_receipt(rows, run_id, port, requests, observations, 5, 6)
+        unsafe = copy.deepcopy(rows)
+        unsafe[3]["details"]["server"] = "desktop_tool"
+        with self.assertRaisesRegex(ValueError, "only Computer Use"):
+            verify_browser_receipt(unsafe, run_id, port, requests, observations, 5, 5)
+        missing_ax = [entry for entry in rows if entry["event"] != "fixture_ax_verification"]
+        with self.assertRaisesRegex(ValueError, "app-owned"):
+            verify_browser_receipt(missing_ax, run_id, port, requests, observations, 5, 5)
+
+    def test_negative_browser_modes_require_exact_local_result(self):
+        run_id = "fixture-1234"
+        port = 49328
+        rows = [
+            row("command_started", user_action="run"),
+            row("router_decided", route="browser", action="follow_docs", target="loopback_fixture"),
+            row("turn_requested", route="browser"),
+            row("tool_started", server="cua_repl", tool="js"),
+            row("approval_decided", server_name="cua_repl", decision="Allowed once"),
+            row("fixture_ax_verification", target="browser", verified="false",
+                reason="url_or_heading_mismatch"),
+            row("turn_completed", status="completed", verification="unverified"),
+            row("command_finished", status="completed", verification="unverified"),
+        ]
+        for mode, paths, final_path, heading in [
+            ("missing-link", ["/home"], "/home", f"Voice Computer Home {run_id}"),
+            ("home-404", ["/home"], "/home", "Fixture page not found"),
+            ("redirect", ["/home", "/docs", "/error"], "/error", "Fixture page not found"),
+        ]:
+            with self.subTest(mode=mode):
+                requests = [{"method": "GET", "path": path, "run_id": [run_id]}
+                            for path in paths]
+                observation = (f"Window: Voice Computer Fixture, App: Safari\n"
+                               f"HTML content URL: 127.0.0.1:{port}{final_path}?run_id={run_id}\n"
+                               f"2 heading {heading}")
+                receipt = verify_browser_receipt(rows, run_id, port, requests,
+                                                 [observation], 5, 5, mode=mode)
+                self.assertEqual(receipt["scenario"], mode)
+                with self.assertRaisesRegex(ValueError, "request sequence"):
+                    verify_browser_receipt(rows, run_id, port, requests + requests[:1],
+                                           [observation], 5, 5, mode=mode)
+
+
+class FinderReceiptTests(unittest.TestCase):
+    def test_missing_and_symlinked_reports_start_no_actor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "report.txt"
+            rows = [
+                row("command_started", user_action="run"),
+                row("router_requested", mode="isolated_codex_exec"),
+                row("router_decided", route="clarification"),
+                row("command_finished", status="clarification", verification="no_action"),
+            ]
+            self.assertEqual(verify_finder_rejection_receipt(
+                rows, report, 5, 5)["scenario"], "missing-file")
+            with self.assertRaisesRegex(ValueError, "started an action"):
+                verify_finder_rejection_receipt(
+                    rows[:3] + [row("turn_requested", route="finder")] + rows[3:],
+                    report, 5, 5)
+            with self.assertRaisesRegex(ValueError, "acting route"):
+                verify_finder_rejection_receipt(
+                    rows[:2] + [row("router_decided", route="finder")] + rows[3:],
+                    report, 5, 5)
+            with self.assertRaisesRegex(ValueError, "changed desktop"):
+                verify_finder_rejection_receipt(rows, report, 5, 6)
+            with self.assertRaisesRegex(ValueError, "stale"):
+                verify_finder_rejection_receipt(rows, report, 5, 5, {COMMAND_ID})
+            outside = root / "outside.txt"
+            outside.write_text("outside")
+            report.symlink_to(outside)
+            self.assertEqual(verify_finder_rejection_receipt(
+                rows, report, 5, 5, mode="symlink-escape")["scenario"],
+                "symlink-escape")
+            with self.assertRaisesRegex(ValueError, "unexpectedly exists"):
+                verify_finder_rejection_receipt(rows, report, 5, 5)
+            decoy = root / "report-copy.txt"
+            decoy.write_text("decoy")
+            self.assertEqual(verify_finder_rejection_receipt(
+                rows, decoy, 5, 5, mode="decoy-target")["scenario"],
+                "decoy-target")
+
+    def test_exact_selected_report_and_decoy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "report.txt"
+            report.write_text("test")
+            decoy = root / "report-copy.txt"
+            decoy.write_text("decoy")
+            rows = [
+                row("command_started", user_action="run"),
+                row("router_decided", route="finder", action="reveal_file", target="fixture_report"),
+                row("turn_requested", route="finder"),
+                row("tool_started", server="cua_repl", tool="js"),
+                row("approval_decided", server_name="cua_repl", decision="Allowed once"),
+                row("tool_completed", server="cua_repl", tool="js", status="completed"),
+                row("fixture_ax_verification", target="finder", verified="true",
+                    reason="exact_selected_file"),
+                row("turn_completed", status="completed", verification="verified"),
+                row("command_finished", status="completed", verification="verified"),
+            ]
+            selected = ("Window: fixture, App: Finder\n"
+                        f"10 row\n11 text field URL: {decoy.as_uri()}\n"
+                        f"12 row (selected)\n13 cell (selected)\n"
+                        f"14 text field URL: {report.as_uri()}\n")
+            self.assertEqual(verify_finder_receipt(
+                rows, report, [selected], 5, 5)["command_id"], COMMAND_ID)
+            session_rows = copy.deepcopy(rows)
+            session_rows[4]["details"]["decision"] = "Allowed for session"
+            self.assertEqual(verify_finder_receipt(
+                session_rows, report, [selected], 5, 5)["command_id"], COMMAND_ID)
+            reused_rows = [entry for entry in rows if entry["event"] != "approval_decided"]
+            self.assertEqual(verify_finder_receipt(
+                reused_rows, report, [selected], 5, 5)["command_id"], COMMAND_ID)
+            declined_rows = copy.deepcopy(rows)
+            declined_rows[4]["details"]["decision"] = "Declined"
+            with self.assertRaisesRegex(ValueError, "unexpected or declined"):
+                verify_finder_receipt(declined_rows, report, [selected], 5, 5)
+            self.assertEqual(verify_finder_receipt(
+                rows, report, [selected + selected], 5, 5)["command_id"], COMMAND_ID)
+            with self.assertRaisesRegex(ValueError, "selection"):
+                verify_finder_receipt(rows, report, [selected.replace(
+                    "12 row (selected)", "12 row")], 5, 5)
+            with self.assertRaisesRegex(ValueError, "stale"):
+                verify_finder_receipt(rows, report, [selected], 5, 5, {COMMAND_ID})
+            with self.assertRaisesRegex(ValueError, "changed desktop"):
+                verify_finder_receipt(rows, report, [selected], 5, 6)
 
 
 class MCPReceiptTests(unittest.TestCase):
