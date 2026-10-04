@@ -17,7 +17,8 @@ RUN_ID = re.compile(r"[A-Za-z0-9-]{8,64}\Z")
 def make_server(run_id, log_path, mode="normal", home_requested=None, home_release=None):
     if not RUN_ID.fullmatch(run_id):
         raise ValueError("run ID must be 8–64 letters, digits, or hyphens")
-    if mode not in {"normal", "missing-link", "redirect", "home-404", "hold-home"}:
+    if mode not in {"normal", "missing-link", "redirect", "home-404", "hold-home",
+                    "form-submit"}:
         raise ValueError("unsupported fixture mode")
     if mode == "hold-home" and (home_requested is None or home_release is None):
         raise ValueError("hold-home requires both synchronization events")
@@ -27,10 +28,13 @@ def make_server(run_id, log_path, mode="normal", home_requested=None, home_relea
         def do_GET(self):
             parsed = urlsplit(self.path)
             supplied_id = parse_qs(parsed.query).get("run_id", [])
+            query = parse_qs(parsed.query).get("query", [])
             path = parsed.path
+            entry = {"method": "GET", "path": path, "run_id": supplied_id}
+            if path == "/submitted":
+                entry["query"] = query
             with log_path.open("a", encoding="utf-8") as receipt:
-                receipt.write(json.dumps({"method": "GET", "path": path,
-                                          "run_id": supplied_id}, sort_keys=True) + "\n")
+                receipt.write(json.dumps(entry, sort_keys=True) + "\n")
             if supplied_id != [run_id]:
                 self.respond(404, "Unknown test run")
             elif path == "/home" and mode == "home-404":
@@ -53,6 +57,9 @@ def make_server(run_id, log_path, mode="normal", home_requested=None, home_relea
                          f'<form method="get" action="/submitted">'
                          f'<input name="run_id" value="{run_id}" type="hidden">'
                          '<input name="query" aria-label="Query"><button>Submit</button></form>')
+            elif path == "/submitted" and mode == "form-submit" and query == [f"test-{run_id}"]:
+                self.respond(200, f"<h1>Voice Computer Submitted {html.escape(run_id)} "
+                         f"{html.escape(query[0])}</h1>")
             else:
                 self.respond(404, "<h1>Fixture page not found</h1>")
 
@@ -78,7 +85,8 @@ def main():
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--log", type=Path, required=True)
     parser.add_argument("--mode", default="normal",
-                        choices=("normal", "missing-link", "redirect", "home-404"))
+                        choices=("normal", "missing-link", "redirect", "home-404",
+                                 "form-submit"))
     args = parser.parse_args()
     os.umask(0o077)
     args.log.parent.mkdir(parents=True, exist_ok=True, mode=0o700)

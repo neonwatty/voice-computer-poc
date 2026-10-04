@@ -50,6 +50,14 @@ extension AppServerClient {
             browserDocsURL = url
             queuedPhrase = "Open \(url.absoluteString) and follow the Docs link."
             beginActingTurn()
+        case .browserForm(let url, let query):
+            record(
+                "router_decided",
+                details: ["route": "browser", "action": "submit_form", "target": "loopback_fixture"])
+            browserFormURL = url
+            browserFormQuery = query
+            queuedPhrase = "Open \(url.absoluteString) and submit query \(query)."
+            beginActingTurn()
         case .finderReveal(let url):
             record(
                 "router_decided",

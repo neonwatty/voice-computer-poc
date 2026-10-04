@@ -190,6 +190,8 @@ extension AppServerClient {
         routedOriginalPhrase = nil
         focusTargetBundleID = nil
         browserDocsURL = nil
+        browserFormURL = nil
+        browserFormQuery = nil
         finderReportURL = nil
         let finishedSpaceTool = requestedToolDirection != nil
         requestedToolDirection = nil

@@ -344,6 +344,10 @@ fixture holds its Home response while the runner presses the exact app's Stop
 button through Accessibility. The receipt requires the app's interrupted,
 unverified result, one Home request, zero Docs requests, and an unchanged Space.
 The runner releases the held response and removes the fixture on exit.
+Run `--case 17 --browser-mode form-submit` for the bounded Docs form. The app
+accepts only the fixture's run-specific `test-<run-id>` query. The receipt
+requires one Docs load, one exact submission, the matching rendered Safari URL
+and heading, an app-owned verified result, and an unchanged Space.
 Focused Finder negatives use `--case 18 --finder-mode missing-file`,
 `symlink-escape`, or `decoy-target`. Each requires a fresh app command that
 finishes with `no_action`, without starting a Finder acting turn or changing

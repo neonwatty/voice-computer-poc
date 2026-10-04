@@ -206,6 +206,19 @@ final class AppServerClientNotificationTests: XCTestCase {
             instruction.contains("http://127.0.0.1:49328/docs?run_id=fixture-1234"))
     }
 
+    func testFormInstructionBoundsInputAndResult() throws {
+        let client = makeClient()
+        client.browserFormURL = try XCTUnwrap(
+            URL(string: "http://127.0.0.1:49328/docs?run_id=fixture-1234"))
+        client.browserFormQuery = "test-fixture-1234"
+        let instruction = client.turnInstruction(for: "Submit the fixture")
+        XCTAssertTrue(instruction.contains("cua.getApp('com.apple.Safari')"))
+        XCTAssertTrue(instruction.contains("Enter exactly test-fixture-1234"))
+        XCTAssertTrue(
+            instruction.contains(
+                "http://127.0.0.1:49328/submitted?run_id=fixture-1234&query=test-fixture-1234"))
+    }
+
     private func makeClient() -> AppServerClient {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         addTeardownBlock { try FileManager.default.removeItem(at: directory) }

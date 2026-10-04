@@ -86,6 +86,17 @@ class BrowserFixtureTests(unittest.TestCase):
         status, _, _, _ = self.request("normal", "/home?run_id=other-run")
         self.assertEqual(status, 404)
 
+    def test_form_submission_requires_exact_query(self):
+        run_id = "fixture-1234"
+        status, body, _, rows = self.request(
+            "form-submit", f"/submitted?run_id={run_id}&query=test-{run_id}")
+        self.assertEqual(status, 200)
+        self.assertIn(f"Voice Computer Submitted {run_id} test-{run_id}", body)
+        self.assertEqual(rows[0]["query"], [f"test-{run_id}"])
+        status, _, _, _ = self.request(
+            "form-submit", f"/submitted?run_id={run_id}&query=wrong")
+        self.assertEqual(status, 404)
+
 
 if __name__ == "__main__":
     unittest.main()

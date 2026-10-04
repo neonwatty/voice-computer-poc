@@ -357,8 +357,9 @@ def verify_browser_receipt(rows, run_id, port, fixture_rows, observations,
     turns = events("turn_requested")
     tools = events("tool_started")
     finishes = events("command_finished")
+    form = mode == "form-submit"
     if len(routes) != 1 or routes[0].get("route") != "browser" \
-            or routes[0].get("action") != "follow_docs" \
+            or routes[0].get("action") != ("submit_form" if form else "follow_docs") \
             or routes[0].get("target") != "loopback_fixture":
         raise ValueError("Expected Browser route was not selected")
     if len(turns) != 1 or turns[0].get("route") != "browser":
@@ -372,10 +373,10 @@ def verify_browser_receipt(rows, run_id, port, fixture_rows, observations,
         raise ValueError("Browser Computer Use approval was unexpected or declined")
     if len(finishes) != 1 or finishes[0].get("status") != "completed":
         raise ValueError("Browser app command did not complete")
-    expected_verified = mode == "normal"
+    expected_verified = mode in ("normal", "form-submit")
     expected_status = "verified" if expected_verified else "unverified"
     ax, app_turns = events("fixture_ax_verification"), events("turn_completed")
-    if len(ax) != 1 or ax[0].get("target") != "browser" \
+    if len(ax) != 1 or ax[0].get("target") != ("browser_form" if form else "browser") \
             or ax[0].get("verified") != str(expected_verified).lower() \
             or ax[0].get("reason") != ("exact_url_and_heading" if expected_verified
                                             else "url_or_heading_mismatch") \
@@ -393,16 +394,21 @@ def verify_browser_receipt(rows, run_id, port, fixture_rows, observations,
         "missing-link": ["/home"],
         "home-404": ["/home"],
         "redirect": ["/home", "/docs", "/error"],
+        "form-submit": ["/docs", "/submitted"],
     }.get(mode)
     if expected_paths is None:
         raise ValueError("Unsupported Browser fixture mode")
-    if [(row.get("method"), row.get("path"), row.get("run_id"))
+    if [(row.get("method"), row.get("path"), row.get("run_id"), row.get("query"))
             for row in fixture_rows] != [
-                ("GET", path, [run_id]) for path in expected_paths]:
+                ("GET", path, [run_id], [f"test-{run_id}"] if path == "/submitted" else None)
+                for path in expected_paths]:
         raise ValueError("Fixture request sequence did not match Browser scenario")
     final_path = expected_paths[-1]
     expected_url = f"http://127.0.0.1:{port}{final_path}?run_id={run_id}"
-    heading = (f"Voice Computer Docs {run_id}" if mode == "normal" else
+    if form:
+        expected_url += f"&query=test-{run_id}"
+    heading = (f"Voice Computer Submitted {run_id} test-{run_id}" if form else
+               f"Voice Computer Docs {run_id}" if mode == "normal" else
                f"Voice Computer Home {run_id}" if mode == "missing-link" else
                "Fixture page not found")
     if not any(expected_url.removeprefix("http://") in observation and heading in observation
@@ -933,7 +939,7 @@ def main():
                         help="Require read-only Mission Control case 13 before --suite acts")
     parser.add_argument("--browser-mode", default="normal",
                         choices=("normal", "missing-link", "home-404", "redirect",
-                                 "stop-before-docs"),
+                                 "stop-before-docs", "form-submit"),
                         help="Fixture scenario for a focused --case 17 run")
     parser.add_argument("--finder-mode", default="normal",
                         choices=("normal", "missing-file", "symlink-escape", "decoy-target"),
@@ -1020,9 +1026,12 @@ def main():
                 fixture_thread.start()
                 fixtures.append((server, fixture_thread, temporary, home_release))
                 fixture = (run_id, server.server_port, fixture_log)
-                url = f"http://127.0.0.1:{server.server_port}/home?run_id={run_id}"
+                form = args.browser_mode == "form-submit"
+                path = "docs" if form else "home"
+                url = f"http://127.0.0.1:{server.server_port}/{path}?run_id={run_id}"
+                action = (f"submit query test-{run_id}" if form else "follow the Docs link")
                 phrase = (f'In the exact Voice Computer POC app, enter "Open {url} '
-                          'and follow the Docs link." in the command field and press Return once. '
+                          f'and {action}." in the command field and press Return once. '
                           'Approve only Safari if the app shows a Computer Use approval. '
                           'Wait for the app result, then independently inspect the Safari '
                           'window and report its exact URL and visible heading. Do not navigate Safari '

@@ -27,6 +27,8 @@ struct RouteValidator {
             case .calculator: result = ["route": "calculator"]
             case .browserDocs(let url):
                 result = ["route": "browser", "url": url.absoluteString]
+            case .browserForm(let url, let query):
+                result = ["route": "browser_form", "url": url.absoluteString, "query": query]
             case .finderReveal(let url):
                 result = ["route": "finder", "path": url.path]
             case .space(let first, let remaining):

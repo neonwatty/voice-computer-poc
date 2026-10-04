@@ -39,6 +39,27 @@ enum FixtureAXVerifier {
         var docs = components
         docs.path = "/docs"
         guard let expectedURL = docs.url else { return .reject("invalid_target") }
+        return verifyBrowserPage(
+            expectedURL: expectedURL, expectedHeading: "Voice Computer Docs \(runID)")
+    }
+
+    static func verifyBrowserForm(docsURL: URL, query: String) -> FixtureAXObservation {
+        guard
+            var components = URLComponents(url: docsURL, resolvingAgainstBaseURL: false),
+            let runID = components.queryItems?.first(where: { $0.name == "run_id" })?.value,
+            query == "test-\(runID)"
+        else { return .reject("invalid_target") }
+        components.path = "/submitted"
+        components.queryItems?.append(URLQueryItem(name: "query", value: query))
+        guard let expectedURL = components.url else { return .reject("invalid_target") }
+        return verifyBrowserPage(
+            expectedURL: expectedURL,
+            expectedHeading: "Voice Computer Submitted \(runID) \(query)")
+    }
+
+    private static func verifyBrowserPage(
+        expectedURL: URL, expectedHeading: String
+    ) -> FixtureAXObservation {
         guard let windows = windows(for: "com.apple.Safari") else {
             return .reject("accessibility_unavailable")
         }
@@ -72,7 +93,7 @@ enum FixtureAXVerifier {
             }
         }
         let matched = browserMatches(
-            areas, expectedURL: expectedURL, expectedHeading: "Voice Computer Docs \(runID)")
+            areas, expectedURL: expectedURL, expectedHeading: expectedHeading)
         return FixtureAXObservation(
             verified: matched,
             reason: matched ? "exact_url_and_heading" : "url_or_heading_mismatch",

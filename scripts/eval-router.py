@@ -12,7 +12,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 EVALS = ROOT / "evals"
-FIXTURES = json.loads((EVALS / "router-v3.json").read_text())
+FIXTURES = json.loads((EVALS / "router-v4.json").read_text())
 INSTRUCTION = (EVALS / "router-instruction.txt").read_text()
 CLI_ARGS = json.loads((EVALS / "router-cli-args.json").read_text())
 SCHEMA = EVALS / "router-output.schema.json"
@@ -87,7 +87,7 @@ def evaluate():
         results.sort(key=lambda row: (row[0], row[1]))
         decisions = handoffs(validator, results)
 
-    report = {"corpus": "router-v3", "fixture_count": len(FIXTURES),
+    report = {"corpus": "router-v4", "fixture_count": len(FIXTURES),
               "independent_model_turns": len(results), "trials": [], "misses": []}
     for (index, trial, output), handoff in zip(results, decisions):
         expected = FIXTURES[index]
@@ -100,8 +100,12 @@ def evaluate():
         elif expected["route"] == "computer_use":
             correct = correct and handoff.get("route") == "calculator"
         elif expected["route"] == "browser":
-            correct = correct and handoff.get("route") == "browser" \
+            expected_handoff = ("browser_form" if expected["target"] == "local_form"
+                                else "browser")
+            correct = correct and handoff.get("route") == expected_handoff \
                 and handoff.get("url") in expected["phrase"]
+            if expected_handoff == "browser_form":
+                correct = correct and handoff.get("query") == "test-fixture-1234"
         elif expected["route"] == "finder":
             correct = correct and handoff.get("route") == "finder" \
                 and handoff.get("path") in expected["phrase"]
@@ -120,9 +124,9 @@ def evaluate():
         for row in report["trials"])
     report["clarification_actions"] = sum(
         row["expected"]["route"] == "clarification"
-        and row["handoff"]["route"] in ("space", "calculator", "browser", "finder")
+        and row["handoff"]["route"] in ("space", "calculator", "browser", "browser_form", "finder")
         for row in report["trials"])
-    (EVALS / "router-v3-report.json").write_text(
+    (EVALS / "router-v4-report.json").write_text(
         json.dumps(report, indent=2).replace(FINDER_PATH, "@FINDER_REPORT@") + "\n")
     summary = {key: report[key] for key in ("fixture_count", "independent_model_turns", "accuracy",
                                           "wrong_direction_actions", "clarification_actions")}

@@ -4,6 +4,7 @@ enum CommandRoute: Equatable {
     case space([SpaceDirection])
     case computerUse(String)
     case browserDocs(URL)
+    case browserForm(URL, String)
     case finderReveal(URL)
     case clarification
 
@@ -33,10 +34,7 @@ enum CommandRoute: Equatable {
             }
             return .computerUse("calculator")
         case "browser":
-            guard directions.isEmpty, target == "local_docs",
-                let url = RouteSafety.browserFixtureURL(in: originalPhrase)
-            else { return nil }
-            return .browserDocs(url)
+            return parseBrowser(target: target, directions: directions, phrase: originalPhrase)
         case "finder":
             guard directions.isEmpty, target == "fixture_report",
                 let url = RouteSafety.finderFixtureURL(in: originalPhrase)
@@ -50,6 +48,17 @@ enum CommandRoute: Equatable {
         }
     }
 
+    private static func parseBrowser(target: String, directions: [String], phrase: String) -> Self? {
+        guard directions.isEmpty else { return nil }
+        if target == "local_docs", let url = RouteSafety.browserFixtureURL(in: phrase) {
+            return .browserDocs(url)
+        }
+        if target == "local_form", let (url, query) = RouteSafety.browserFormRequest(in: phrase) {
+            return .browserForm(url, query)
+        }
+        return nil
+    }
+
 }
 
 enum RouteHandoff: Equatable {
@@ -58,6 +67,7 @@ enum RouteHandoff: Equatable {
     case space(SpaceDirection, remaining: [SpaceDirection])
     case calculator
     case browserDocs(URL)
+    case browserForm(URL, String)
     case finderReveal(URL)
 
     static func decide(_ data: Data?, phrase: String) -> Self {
@@ -70,6 +80,7 @@ enum RouteHandoff: Equatable {
             return .space(directions[0], remaining: Array(directions.dropFirst()))
         case .computerUse: return .calculator
         case .browserDocs(let url): return .browserDocs(url)
+        case .browserForm(let url, let query): return .browserForm(url, query)
         case .finderReveal(let url): return .finderReveal(url)
         }
     }
@@ -123,6 +134,30 @@ enum RouteSafety {
         return url
     }
 
+    static func browserFormRequest(in phrase: String) -> (URL, String)? {
+        let trimmed = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pattern =
+            #"^Open http://127\.0\.0\.1:[0-9]{1,5}/docs\?run_id=[A-Za-z0-9-]{8,64} and submit query test-[A-Za-z0-9-]{8,64}\.$"#
+        guard let match = trimmed.range(of: pattern, options: .regularExpression),
+            match == trimmed.startIndex..<trimmed.endIndex
+        else { return nil }
+        let tokens = trimmed.split(separator: " ")
+        guard tokens.count == 6,
+            let url = URL(string: String(tokens[1])),
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+            components.scheme == "http", components.host == "127.0.0.1",
+            let port = components.port, (1...65535).contains(port),
+            components.path == "/docs", components.queryItems?.count == 1,
+            components.queryItems?.first?.name == "run_id",
+            let runID = components.queryItems?.first?.value,
+            runID.range(of: #"^[A-Za-z0-9-]{8,64}$"#, options: .regularExpression) != nil,
+            components.fragment == nil, components.user == nil, components.password == nil
+        else { return nil }
+        let query = String(tokens[5].dropLast())
+        guard query == "test-\(runID)" else { return nil }
+        return (url, query)
+    }
+
     static func permits(_ route: CommandRoute, phrase: String) -> Bool {
         let lowercase = phrase.lowercased()
         let tokens = lowercase.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
@@ -163,6 +198,9 @@ enum RouteSafety {
                 && !words.isDisjoint(with: ["open", "launch", "bring", "show", "start", "need"])
         case .browserDocs(let url):
             return browserFixtureURL(in: phrase) == url
+        case .browserForm(let url, let query):
+            guard let request = browserFormRequest(in: phrase) else { return false }
+            return request.0 == url && request.1 == query
         case .finderReveal(let url):
             return finderFixtureURL(in: phrase) == url
         case .clarification:

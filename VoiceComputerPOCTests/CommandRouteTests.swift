@@ -159,9 +159,9 @@ final class CommandRouteTests: XCTestCase {
     func testPackagedRouterResourcesMatchCanonicalBytes() throws {
         let directory = try XCTUnwrap(Bundle.main.resourceURL)
         let expectedHashes = [
-            "router-instruction.txt": "35432afc1623c03aeb08f851d0a1a0de63a290e398cc6efbd09f0033a4c7c9cf",
+            "router-instruction.txt": "b5ae643cbd3fbaaab1d255267c3130caddad2cc284f8be2b92734cfdfa777b67",
             "router-cli-args.json": "8284e45d79194b0fc3660c0bda624b87cc6885781813d785d420abacc586014a",
-            "router-output.schema.json": "f1cd5b66dcbee8723556910ca373e47641f5a285f6bd7ce0a5c01e35c731a391",
+            "router-output.schema.json": "986f05cae126a240abd24c24912cef0f041814230bcb59a5595ff6eeab7f10ee",
         ]
         for (name, expected) in expectedHashes {
             let data = try Data(contentsOf: directory.appendingPathComponent(name))

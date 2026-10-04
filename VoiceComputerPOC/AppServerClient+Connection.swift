@@ -198,7 +198,7 @@ extension AppServerClient {
                 "thread_id": threadID, "model": selectedModel ?? "unknown",
                 "route": requestedToolDirection != nil
                     ? "space"
-                    : browserDocsURL != nil
+                    : browserDocsURL != nil || browserFormURL != nil
                         ? "browser"
                         : finderReportURL != nil ? "finder" : "computer_use",
             ])

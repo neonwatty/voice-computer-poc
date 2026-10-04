@@ -3,14 +3,17 @@
 Status: October 4, 2026. The narrow Safari and Finder slices are implemented;
 three isolated Safari runs and multiple Safari→Finder sequences passed, as did
 repeated Finder runs. The default suite passed on the final app build, and all
-three focused Browser negatives, the Stop-before-Docs case, and three Finder
-rejection cases passed. The
+three focused Browser negatives, the Stop-before-Docs case, the bounded form
+submission, and three Finder rejection cases passed. The
 optional Mission Control gate is intermittent. The Codex host task
 status route is deferred because a separate app-server process cannot read the
 host's live state. Speech transcription and Foil integration remain deferred.
 The app now verifies exact Safari and Finder fixture results with bounded native
 Accessibility reads. The [capability inventory](tool-capability-inventory.md)
 records the measured boundary.
+Router v4 classified 208 of 210 independent model turns correctly, with zero
+unsafe clarification actions; the validator rejected the one overbroad Browser
+classification before it reached an actor.
 
 ## Goal and scope
 
@@ -93,8 +96,8 @@ Build a tiny HTTP fixture bound to `127.0.0.1` on a temporary port. It should
 serve a Home page, a Docs page with a unique heading and run ID, a simple form,
 and an intentional error page. The runner places its exact fixture URL in the
 test phrase, so neither the router nor the app hardcodes a port. The first
-shipped request is Home → Docs; form
-submission and tabs are follow-on cases after navigation is reliable.
+shipped request is Home → Docs. A bounded form submission is now a focused
+follow-on case; tab handling remains future work.
 
 The acting turn uses Computer Use with Safari. It opens the exact
 fixture URL, reads the rendered page, clicks the Docs link, and reports the
@@ -126,6 +129,11 @@ The timed interruption case held the Home response, pressed the exact app's
 Stop button through Accessibility, and passed on the October 4 exact build:
 one Home request, zero Docs requests, an interrupted and unverified app result,
 and unchanged live Space ID 5. The fixture was released and removed afterward.
+The follow-on form case loaded the local Docs page and submitted only its
+run-specific test query. An October 4 exact-app run matched the fixture's one
+Docs request and one submitted request, the app-owned Safari URL and heading,
+an independent Safari observation, and unchanged live Space ID 5. Tab handling
+and other form inputs remain separate future cases.
 
 ## Work package 3: Finder vertical slice
 

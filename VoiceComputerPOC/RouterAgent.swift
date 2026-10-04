@@ -46,7 +46,10 @@ enum RouterAgent {
                 "directions": [
                     "type": "array", "items": ["type": "string", "enum": ["left", "right"]],
                 ],
-                "target": ["type": "string", "enum": ["", "calculator", "local_docs", "fixture_report"]],
+                "target": [
+                    "type": "string",
+                    "enum": ["", "calculator", "local_docs", "local_form", "fixture_report"],
+                ],
             ],
         ]
         return NSDictionary(dictionary: actual).isEqual(to: expected)

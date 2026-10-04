@@ -236,6 +236,37 @@ class ExactAppBindingTests(unittest.TestCase):
 
 
 class BrowserReceiptTests(unittest.TestCase):
+    def test_form_receipt_requires_exact_query_and_rendered_result(self):
+        run_id, port = "fixture-1234", 49328
+        rows = [
+            row("command_started", user_action="run"),
+            row("router_decided", route="browser", action="submit_form", target="loopback_fixture"),
+            row("turn_requested", route="browser"),
+            row("tool_started", server="cua_repl", tool="js"),
+            row("fixture_ax_verification", target="browser_form", verified="true",
+                reason="exact_url_and_heading"),
+            row("turn_completed", status="completed", verification="verified"),
+            row("command_finished", status="completed", verification="verified"),
+        ]
+        requests = [
+            {"method": "GET", "path": "/docs", "run_id": [run_id]},
+            {"method": "GET", "path": "/submitted", "run_id": [run_id],
+             "query": [f"test-{run_id}"]},
+        ]
+        url = (f"http://127.0.0.1:{port}/submitted?run_id={run_id}"
+               f"&query=test-{run_id}")
+        observation = (f"Window: Voice Computer Fixture, App: Safari\n"
+                       f"HTML content URL: {url.removeprefix('http://')}\n"
+                       f"2 heading Voice Computer Submitted {run_id} test-{run_id}")
+        self.assertEqual(verify_browser_receipt(
+            rows, run_id, port, requests, [observation], 5, 5,
+            mode="form-submit")["scenario"], "form-submit")
+        wrong = copy.deepcopy(requests)
+        wrong[1]["query"] = ["wrong"]
+        with self.assertRaisesRegex(ValueError, "request sequence"):
+            verify_browser_receipt(rows, run_id, port, wrong, [observation], 5, 5,
+                                   mode="form-submit")
+
     def test_interruption_requires_stop_and_no_docs_request(self):
         run_id = "fixture-1234"
         rows = [

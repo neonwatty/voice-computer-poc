@@ -9,7 +9,7 @@ struct FixtureTurnResult {
 
 extension AppServerClient {
     func observeFixtureToolStarted(_ item: [String: Any], eventTurnID: String?) {
-        guard browserDocsURL != nil || finderReportURL != nil,
+        guard browserDocsURL != nil || browserFormURL != nil || finderReportURL != nil,
             item["server"] as? String == "cua_repl",
             let turnID, eventTurnID == turnID,
             let itemID = item["id"] as? String, !itemID.isEmpty
@@ -34,7 +34,9 @@ extension AppServerClient {
     }
 
     func rejectMismatchedFixtureTurn(_ turn: [String: Any]) -> Bool {
-        guard browserDocsURL != nil || finderReportURL != nil else { return false }
+        guard browserDocsURL != nil || browserFormURL != nil || finderReportURL != nil else {
+            return false
+        }
         guard let turnID, turn["id"] as? String == turnID else {
             record("fixture_turn_mismatch")
             fail("The acting turn did not match this fixture command.")
@@ -44,7 +46,10 @@ extension AppServerClient {
     }
 
     func fixtureTurnResult(outcome: String) -> FixtureTurnResult? {
-        let kind = browserDocsURL != nil ? "browser" : finderReportURL != nil ? "finder" : nil
+        let kind =
+            browserDocsURL != nil
+            ? "browser"
+            : browserFormURL != nil ? "browser_form" : finderReportURL != nil ? "finder" : nil
         guard let kind else { return nil }
         let observation: FixtureAXObservation
         if outcome != "completed" {
@@ -57,6 +62,9 @@ extension AppServerClient {
             observation = .reject("tool_not_completed")
         } else if let browserDocsURL {
             observation = FixtureAXVerifier.verifyBrowser(homeURL: browserDocsURL)
+        } else if let browserFormURL, let browserFormQuery {
+            observation = FixtureAXVerifier.verifyBrowserForm(
+                docsURL: browserFormURL, query: browserFormQuery)
         } else if let finderReportURL {
             observation = FixtureAXVerifier.verifyFinder(reportURL: finderReportURL)
         } else {
@@ -79,16 +87,18 @@ extension AppServerClient {
     func displayFixtureTurnResult(_ fixture: FixtureTurnResult, outcome: String) {
         guard outcome == "completed", generalTurnFailure == nil else { return }
         if fixture.observation.verified {
-            result =
-                fixture.kind == "browser"
-                ? "Verified: Safari displays the exact Docs URL and heading."
-                : "Verified: Finder selected the exact test report."
+            switch fixture.kind {
+            case "browser": result = "Verified: Safari displays the exact Docs URL and heading."
+            case "browser_form": result = "Verified: Safari displays the exact form result."
+            default: result = "Verified: Finder selected the exact test report."
+            }
         } else {
             status = "Unverified"
-            result =
-                fixture.kind == "browser"
-                ? "Safari did not expose the expected Docs URL and heading."
-                : "Finder did not expose the exact selected test report."
+            switch fixture.kind {
+            case "browser": result = "Safari did not expose the expected Docs URL and heading."
+            case "browser_form": result = "Safari did not expose the exact form result."
+            default: result = "Finder did not expose the exact selected test report."
+            }
         }
         append(result)
     }

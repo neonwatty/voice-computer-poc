@@ -24,7 +24,6 @@ final class AppServerClient: ObservableObject {
     @Published var lastActivatedApp = "Unknown"
     @Published var logError = ""
     @Published var approval: ApprovalRequest?
-
     enum Pending {
         case initialize, models, thread, mcpStatus, turn, interrupt
 
@@ -52,6 +51,8 @@ final class AppServerClient: ObservableObject {
     var spaceCountAtTurnStart: Int?
     var focusTargetBundleID: String?
     var browserDocsURL: URL?
+    var browserFormURL: URL?
+    var browserFormQuery: String?
     var finderReportURL: URL?
     var activatedBundleIDsThisTurn: Set<String> = []
     var activeCommandID: String?
@@ -210,6 +211,8 @@ final class AppServerClient: ObservableObject {
 
     private func configureCommandRouting(_ phrase: String) {
         browserDocsURL = nil
+        browserFormURL = nil
+        browserFormQuery = nil
         finderReportURL = nil
         expectedToolDirection = SpaceToolRequest.direction(for: phrase)
         requestedToolDirection = expectedToolDirection
@@ -294,5 +297,4 @@ final class AppServerClient: ObservableObject {
             process?.terminate()
         }
     }
-
 }

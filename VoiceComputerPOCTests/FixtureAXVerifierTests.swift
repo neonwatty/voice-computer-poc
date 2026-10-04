@@ -46,6 +46,13 @@ final class FixtureAXVerifierTests: XCTestCase {
                 [.init(selectedRowURLs: [[report]], visibleURLs: [report])], reportURL: report))
     }
 
+    func testFormVerificationRejectsQueryThatDoesNotMatchRun() throws {
+        let docs = try XCTUnwrap(URL(string: "http://127.0.0.1:61732/docs?run_id=fixture-1234"))
+        let observation = FixtureAXVerifier.verifyBrowserForm(docsURL: docs, query: "test-other")
+        XCTAssertFalse(observation.verified)
+        XCTAssertEqual(observation.reason, "invalid_target")
+    }
+
     func testAppCannotVerifyFixtureFromAgentSentenceWithoutCompletedTool() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
