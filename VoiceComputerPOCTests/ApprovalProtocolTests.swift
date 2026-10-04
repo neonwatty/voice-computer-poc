@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import XCTest
 
@@ -6,7 +7,7 @@ import XCTest
 final class ApprovalProtocolTests: XCTestCase {
     private let requestID = 42
 
-    func testOnlyComputerUseEmptyFormIsPresented() {
+    func testOnlyComputerUseEmptyFormIsPresented() throws {
         let valid = makeRequest(sessionGrant: true)
         let parsed = ApprovalRequest.parse(
             method: "mcpServer/elicitation/request",
@@ -18,7 +19,7 @@ final class ApprovalProtocolTests: XCTestCase {
         XCTAssertTrue(parsed?.supportsSessionGrant == true)
 
         var otherConnector = valid
-        var metadata = otherConnector["_meta"] as! [String: Any]
+        var metadata = try XCTUnwrap(otherConnector["_meta"] as? [String: Any])
         metadata["connector_id"] = "some-other-connector"
         otherConnector["_meta"] = metadata
         XCTAssertNil(
@@ -32,6 +33,22 @@ final class ApprovalProtocolTests: XCTestCase {
             ApprovalRequest.parse(
                 method: "mcpServer/elicitation/request", id: requestID, params: formWithFields
             ))
+
+        var unrelatedServer = valid
+        unrelatedServer["serverName"] = "other"
+        XCTAssertNil(
+            ApprovalRequest.parse(
+                method: "mcpServer/elicitation/request", id: requestID, params: unrelatedServer))
+        var urlMode = valid
+        urlMode["mode"] = "url"
+        XCTAssertNil(
+            ApprovalRequest.parse(
+                method: "mcpServer/elicitation/request", id: requestID, params: urlMode))
+        var unknownMode = valid
+        unknownMode["mode"] = "future"
+        XCTAssertNil(
+            ApprovalRequest.parse(
+                method: "mcpServer/elicitation/request", id: requestID, params: unknownMode))
     }
 
     func testSessionGrantIsSentOnlyWhenAdvertised() throws {
@@ -43,6 +60,9 @@ final class ApprovalProtocolTests: XCTestCase {
         let accepted = try result(of: supported.response(allow: true, forSession: true))
         XCTAssertEqual(accepted["action"] as? String, "accept")
         XCTAssertEqual((accepted["_meta"] as? [String: String])?["persist"], "session")
+        let once = try result(of: supported.response(allow: true, forSession: false))
+        XCTAssertEqual(once["action"] as? String, "accept")
+        XCTAssertNil(once["_meta"])
 
         let unsupported = try XCTUnwrap(
             ApprovalRequest.parse(
@@ -68,21 +88,207 @@ final class ApprovalProtocolTests: XCTestCase {
         XCTAssertTrue(JSONSerialization.isValidJSONObject(wire))
     }
 
+    func testSpaceToolApprovalUsesExistingVisibleFlow() throws {
+        let request: [String: Any] = [
+            "serverName": "desktop_tool", "mode": "form",
+            "message": "Allow desktop_tool to call switch_space?",
+            "requestedSchema": ["properties": [String: Any]()],
+            "_meta": [
+                "codex_approval_kind": "mcp_tool_call",
+                "tool_params": ["direction": "right"],
+                "persist": ["session"],
+            ],
+        ]
+        let parsed = try XCTUnwrap(
+            ApprovalRequest.parse(
+                method: "mcpServer/elicitation/request", id: requestID, params: request))
+        XCTAssertEqual(parsed.detail, "Space tool · switch_space · right")
+        XCTAssertFalse(parsed.supportsSessionGrant)
+        XCTAssertEqual(parsed.spaceDirection, .right)
+        XCTAssertEqual(
+            try result(of: parsed.response(allow: false, forSession: false))["action"] as? String,
+            "decline")
+        var wrong = request
+        wrong["serverName"] = "other"
+        XCTAssertNil(
+            ApprovalRequest.parse(
+                method: "mcpServer/elicitation/request", id: requestID, params: wrong))
+    }
+
+    func testRealShapeWaitsForVisibleChoiceAndSendsOneTimeResponse() throws {
+        let client = AppServerClient()
+        let pipe = Pipe()
+        client.input = pipe
+        client.isWorking = true
+        client.handleServerRequest(
+            method: "mcpServer/elicitation/request", id: requestID,
+            params: makeRequest(sessionGrant: true))
+        XCTAssertEqual(client.approval?.detail, "Computer Use · Calculator · get_app_state")
+        XCTAssertNil(client.diagnosticEntries.last { $0.event == "approval_requested" }?.details["detail"])
+        var descriptor = pollfd(
+            fd: pipe.fileHandleForReading.fileDescriptor, events: Int16(POLLIN), revents: 0)
+        XCTAssertEqual(poll(&descriptor, 1, 0), 0)
+        client.decideApproval(allow: true)
+        let data = pipe.fileHandleForReading.availableData
+        let wire = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(wire["id"] as? Int, requestID)
+        XCTAssertEqual(try result(of: wire)["action"] as? String, "accept")
+        XCTAssertNil(try result(of: wire)["_meta"])
+        XCTAssertNil(client.approval)
+    }
+
+    func testAppOwnedFailureStatusesOverrideAgentClaims() {
+        let unsupported = AppServerClient()
+        unsupported.isWorking = true
+        var credential = makeRequest(sessionGrant: true)
+        credential["requestedSchema"] = ["properties": ["password": ["type": "string"]]]
+        unsupported.handleServerRequest(
+            method: "mcpServer/elicitation/request", id: 1, params: credential)
+        unsupported.handleItemCompleted([
+            "type": "agentMessage", "text": "Access was declined and action succeeded.",
+        ])
+        unsupported.handleTurnCompleted(["status": "completed"])
+        XCTAssertEqual(unsupported.status, "approval_unavailable")
+        XCTAssertTrue(unsupported.result.contains("No access decision was made"))
+
+        let declined = AppServerClient()
+        declined.isWorking = true
+        declined.approval = ApprovalRequest.parse(
+            method: "mcpServer/elicitation/request", id: 2,
+            params: makeRequest(sessionGrant: true))
+        declined.decideApproval(allow: false, forSession: true)
+        declined.handleToolCompleted([
+            "server": "cua_repl", "tool": "js", "status": "failed",
+            "result": ["content": [["text": "Not approved"]]],
+        ])
+        declined.handleTurnCompleted(["status": "completed"])
+        XCTAssertEqual(declined.status, "access_declined")
+        XCTAssertTrue(declined.result.contains("declined in the app"))
+
+        let failed = AppServerClient()
+        failed.isWorking = true
+        failed.approval = ApprovalRequest.parse(
+            method: "mcpServer/elicitation/request", id: 3,
+            params: makeRequest(sessionGrant: false))
+        failed.decideApproval(allow: true)
+        failed.handleToolCompleted([
+            "server": "cua_repl", "tool": "js", "status": "failed",
+            "result": ["content": [["text": "Tool crashed"]]],
+        ])
+        failed.handleItemCompleted(["type": "agentMessage", "text": "Calculator is open."])
+        failed.handleTurnCompleted(["status": "completed"])
+        XCTAssertEqual(failed.status, "tool_failed")
+        XCTAssertTrue(failed.result.contains("not verified"))
+    }
+
+    func testSpaceApprovalBindsOneItemTurnAndDirection() throws {
+        let client = spaceClient()
+        let right = try XCTUnwrap(spaceRequest(direction: "right"))
+        let left = try XCTUnwrap(spaceRequest(direction: "left"))
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        XCTAssertFalse(client.stageSpaceApproval(left))
+        XCTAssertTrue(client.stageSpaceApproval(right))
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.approval = right
+        client.input = Pipe()
+        client.decideApproval(allow: true)
+        XCTAssertTrue(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.activeMCPToolItemID = "other-item"
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.activeMCPToolItemID = "item-one"
+        client.turnID = "stale-turn"
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.turnID = "turn-one"
+        client.requestedToolDirection = .left
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.requestedToolDirection = .right
+        client.consumeSpaceApproval()
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.activeMCPToolItemID = "item-two"
+        client.activeMCPToolTurnID = "turn-two"
+        client.turnID = "turn-two"
+        client.requestedToolDirection = .left
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-two"))
+    }
+
+    func testSpaceApprovalDeclineSessionAttemptAndFailureRevoke() throws {
+        let client = spaceClient()
+        let right = try XCTUnwrap(spaceRequest(direction: "right"))
+        XCTAssertTrue(client.stageSpaceApproval(right))
+        client.approval = right
+        client.input = Pipe()
+        client.decideApproval(allow: true, forSession: true)
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        XCTAssertNil(client.spaceToolApproval)
+        client.spaceToolApproval = nil
+        XCTAssertTrue(client.stageSpaceApproval(right))
+        client.approval = right
+        client.decideApproval(allow: false)
+        XCTAssertFalse(client.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        client.spaceToolApproval = nil
+        XCTAssertTrue(client.stageSpaceApproval(right))
+        client.approval = right
+        client.decideApproval(allow: true)
+        client.fail("test failure")
+        XCTAssertNil(client.spaceToolApproval)
+
+        let interrupted = spaceClient()
+        XCTAssertTrue(interrupted.stageSpaceApproval(right))
+        interrupted.approval = right
+        interrupted.decideApproval(allow: true)
+        XCTAssertTrue(interrupted.hasAcceptedSpaceApproval(commandID: "one", itemID: "item-one"))
+        interrupted.stop()
+        XCTAssertNil(interrupted.spaceToolApproval)
+    }
+
+    private func spaceClient() -> AppServerClient {
+        let client = AppServerClient()
+        client.isWorking = true
+        client.activeCommandID = "one"
+        client.turnID = "turn-one"
+        client.requestedToolDirection = .right
+        client.expectedToolDirection = .right
+        client.handleItemStarted(
+            [
+                "type": "mcpToolCall", "id": "item-one", "server": "desktop_tool",
+                "tool": "switch_space", "arguments": ["direction": "right"],
+            ], eventTurnID: "turn-one")
+        return client
+    }
+
+    private func spaceRequest(direction: String) -> ApprovalRequest? {
+        ApprovalRequest.parse(
+            method: "mcpServer/elicitation/request", id: requestID,
+            params: [
+                "serverName": "desktop_tool", "mode": "form",
+                "requestedSchema": ["properties": [String: Any]()],
+                "_meta": [
+                    "codex_approval_kind": "mcp_tool_call",
+                    "tool_params": ["direction": direction], "persist": ["session"],
+                ],
+            ])
+    }
+
     private func result(of response: [String: Any]) throws -> [String: Any] {
         try XCTUnwrap(response["result"] as? [String: Any])
     }
 
     private func makeRequest(sessionGrant: Bool) -> [String: Any] {
         [
+            "serverName": "cua_repl",
             "mode": "form",
             "message": "Allow Computer Use to use Calculator?",
             "requestedSchema": ["properties": [String: Any]()],
             "_meta": [
+                "codex_approval_kind": "mcp_tool_call",
                 "connector_id": "computer-use",
                 "connector_name": "Computer Use",
+                "riskLevel": "low",
                 "tool_name": "get_app_state",
+                "tool_params": ["app": "Calculator"],
                 "tool_params_display": [["value": "Calculator"]],
                 "persist": sessionGrant ? ["session"] : [],
+                "x-codex-turn-metadata": [String: Any](),
             ],
         ]
     }
