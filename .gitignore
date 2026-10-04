@@ -6,3 +6,5 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 .swiftpm/
+/DesktopToolServer/.build/
+*.profraw

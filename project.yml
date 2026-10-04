@@ -8,6 +8,16 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - VoiceComputerPOC
+      - path: evals/router-instruction.txt
+        buildPhase: resources
+      - path: evals/router-cli-args.json
+        buildPhase: resources
+      - path: evals/router-output.schema.json
+        buildPhase: resources
+    postBuildScripts:
+      - name: Package pinned DesktopToolServer
+        script: '"$SRCROOT/scripts/package-desktop-tool.sh"'
+        basedOnDependencyAnalysis: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.neonwatty.VoiceComputerPOC
@@ -17,6 +27,7 @@ targets:
         CODE_SIGNING_ALLOWED: NO
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Voice Computer POC
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Voice Computer POC records a spoken command for local transcription."
   VoiceComputerPOCTests:
     type: bundle.unit-test
     platform: macOS

@@ -2,7 +2,9 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var client: AppServerClient
+    @ObservedObject private var voice: LocalVoiceInput
     @State private var phrase = ""
+    @State private var originalTranscript: String?
     @State private var activityTab: ActivityTab = .activity
 
     private enum ActivityTab: String, CaseIterable {
@@ -19,13 +21,18 @@ struct ContentView: View {
         "Switch one desktop Space right and then back left",
     ]
 
+    init(client: AppServerClient) {
+        self.client = client
+        voice = client.voiceInput
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Voice Computer")
                         .font(.largeTitle.bold())
-                    Text("Text commands through Codex and native macOS actions")
+                    Text("Voice and text commands through Codex and native macOS actions")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -39,21 +46,49 @@ struct ContentView: View {
                 HStack {
                     TextField("What should the computer do?", text: $phrase)
                         .textFieldStyle(.roundedBorder)
-                        .onSubmit(run)
+                        .disabled(voice.state != .idle)
+                        .onSubmit { run() }
                         .accessibilityIdentifier("commandField")
+                    if voice.state == .recording {
+                        Button("Stop Recording") {
+                            voice.stop {
+                                originalTranscript = $0
+                                phrase = $0
+                            }
+                        }
+                        .accessibilityIdentifier("stopRecordingButton")
+                    } else if voice.state == .transcribing {
+                        Button("Cancel Transcription") { voice.cancel() }
+                            .accessibilityIdentifier("cancelTranscriptionButton")
+                    } else {
+                        Button("Record") {
+                            originalTranscript = nil
+                            client.prepareVoiceCapture()
+                            voice.start()
+                        }
+                        .disabled(client.isWorking || voice.state != .idle)
+                        .accessibilityIdentifier("recordButton")
+                    }
                     Button("Run", action: run)
                         .keyboardShortcut(.return, modifiers: .command)
-                        .disabled(
-                            client.isWorking || phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        )
+                        .disabled(!canRun)
                         .accessibilityIdentifier("runButton")
                     Button("Stop") { client.stop() }
                         .disabled(!client.canStop)
+                }
+                Text(voice.statusMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if !voice.errorMessage.isEmpty {
+                    Text(voice.errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
             }
 
             HStack(spacing: 16) {
                 Text("Space changes observed: \(client.spaceChangeCount)")
+                Text("Live Space ID: \(SpaceNavigator.liveSpaceID().map(String.init) ?? "unknown")")
                 Text("Last activated app: \(client.lastActivatedApp)")
             }
             .font(.caption)
@@ -63,9 +98,12 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Try a phrase").font(.headline)
                     ForEach(samples, id: \.self) { sample in
-                        Button(sample) { phrase = sample }
-                            .buttonStyle(.borderless)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button(sample) {
+                            phrase = sample
+                            originalTranscript = nil
+                        }
+                        .buttonStyle(.borderless)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
@@ -164,6 +202,11 @@ struct ContentView: View {
                 Text(approval.detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Text(
+                    "Live Space ID: \(SpaceNavigator.liveSpaceID().map(String.init) ?? "unknown") · Notifications: \(client.spaceChangeCount)"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
                 HStack {
                     Spacer()
                     Button("Decline") { client.decideApproval(allow: false) }
@@ -181,7 +224,19 @@ struct ContentView: View {
         }
     }
 
-    private func run() { client.run(phrase) }
+    private var canRun: Bool {
+        !client.isWorking && voice.state == .idle
+            && !phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func run() {
+        guard canRun else { return }
+        let transcript = originalTranscript
+        client.run(
+            phrase, source: transcript == nil ? .typed : .reviewedVoice,
+            transcriptEdited: transcript.map { $0 != phrase } ?? false)
+        originalTranscript = nil
+    }
 }
 
 private struct DiagnosticRow: View {
