@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import tempfile
 import threading
+import time
 import unittest
 from urllib.error import HTTPError
 from urllib.request import urlopen
@@ -10,6 +11,36 @@ from browser_fixture import make_server
 
 
 class BrowserFixtureTests(unittest.TestCase):
+    def test_held_home_serves_docs_link_only_after_release(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "requests.jsonl"
+            requested, release = threading.Event(), threading.Event()
+            server = make_server("fixture-1234", log, "hold-home", requested, release)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            page = {}
+            def fetch():
+                with urlopen(f"http://127.0.0.1:{server.server_port}/home?run_id=fixture-1234",
+                             timeout=5) as response:
+                    page["body"] = response.read().decode()
+            request = threading.Thread(target=fetch)
+            request.start()
+            try:
+                self.assertTrue(requested.wait(timeout=2))
+                time.sleep(0.1)
+                self.assertTrue(request.is_alive())
+                self.assertEqual([json.loads(line)["path"] for line in log.read_text().splitlines()],
+                                 ["/home"])
+                release.set()
+                request.join(timeout=3)
+                self.assertFalse(request.is_alive())
+                self.assertIn('href="/docs?run_id=fixture-1234"', page["body"])
+            finally:
+                release.set()
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=3)
+
     def request(self, mode, path):
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / "requests.jsonl"

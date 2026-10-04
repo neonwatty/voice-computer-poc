@@ -414,6 +414,82 @@ def verify_browser_receipt(rows, run_id, port, fixture_rows, observations,
             "before": before, "after": after}
 
 
+def verify_browser_interruption_receipt(rows, run_id, fixture_rows, before, after,
+                                        prior_command_ids=()):
+    """Require a Stop during the held Home response and no subsequent Docs request."""
+    starts = [row for row in rows if row.get("event") == "command_started"
+              and row.get("details", {}).get("user_action") == "run"]
+    if len(starts) != 1:
+        raise ValueError("Missing or ambiguous Browser command start")
+    command_id = starts[0].get("details", {}).get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("Browser command ID missing or stale")
+    command_rows = [row for row in rows
+                    if row.get("details", {}).get("command_id") == command_id]
+    def indices(name):
+        return [i for i, row in enumerate(command_rows) if row.get("event") == name]
+    def details(name):
+        return [command_rows[i].get("details", {}) for i in indices(name)]
+    route, turn, stop, ax, completed, finished = (
+        details(name) for name in ("router_decided", "turn_requested", "stop_requested",
+                                   "fixture_ax_verification", "turn_completed", "command_finished"))
+    if len(route) != 1 or route[0].get("route") != "browser" \
+            or route[0].get("action") != "follow_docs" \
+            or route[0].get("target") != "loopback_fixture" or len(turn) != 1 \
+            or turn[0].get("route") != "browser":
+        raise ValueError("Interrupted Browser route or acting turn missing")
+    tools = details("tool_started")
+    if not tools or any(tool.get("server") != "cua_repl" for tool in tools):
+        raise ValueError("Interrupted Browser action did not use only Computer Use")
+    if len(stop) != 1 or len(ax) != 1 or len(completed) != 1 or len(finished) != 1:
+        raise ValueError("Interrupted Browser lifecycle is incomplete")
+    if not indices("turn_requested")[0] < indices("stop_requested")[0] \
+            < indices("turn_completed")[0] < indices("command_finished")[0]:
+        raise ValueError("Browser Stop did not precede turn completion")
+    if ax[0].get("target") != "browser" or ax[0].get("verified") != "false" \
+            or ax[0].get("reason") != "turn_incomplete" \
+            or completed[0].get("status") == "completed" \
+            or completed[0].get("verification") != "unverified" \
+            or finished[0].get("verification") != "unverified":
+        raise ValueError("Interrupted Browser command reported a successful result")
+    if [(row.get("method"), row.get("path"), row.get("run_id"))
+            for row in fixture_rows] != [("GET", "/home", [run_id])]:
+        raise ValueError("Browser requested Docs or an unexpected fixture path after Stop")
+    if any(row.get("event") in ("native_space_requested", "mcp_action_requested",
+                                    "space_changed") for row in command_rows):
+        raise ValueError("Interrupted Browser command invoked a desktop action")
+    if before is None or after != before:
+        raise ValueError("Interrupted Browser command changed desktop Space")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "scenario": "stop-before-docs",
+            "home_requests": 1, "docs_requests": 0, "before": before, "after": after}
+
+
+def stop_browser_when_home(requested, release, app_pid, session_log, log_offset,
+                           started_at, outcome):
+    """Press the exact app's Stop button while the fixture holds Home's response."""
+    try:
+        if not requested.wait(timeout=80):
+            raise TimeoutError("Safari did not request the held Home page")
+        helper = Path(__file__).with_name("press_voice_stop.swift")
+        pressed = subprocess.run(["swift", str(helper), str(app_pid)],
+                                 capture_output=True, text=True, timeout=20, check=False)
+        if pressed.returncode != 0 or pressed.stdout.strip() != "pressed_stop":
+            raise RuntimeError("Exact-app Stop button could not be pressed")
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            if any(row.get("event") == "stop_requested" for row in
+                   app_log_rows(session_log, started_at, log_offset)):
+                outcome["pressed"] = True
+                return
+            time.sleep(0.05)
+        raise TimeoutError("Stop was pressed but the app did not record it")
+    except (OSError, RuntimeError, TimeoutError, subprocess.SubprocessError) as error:
+        outcome["error"] = str(error)
+    finally:
+        release.set()
+
+
 def verify_finder_receipt(rows, report, observations, before, after,
                           prior_command_ids=()):
     """Require one exact selected fixture file in Finder and no desktop move."""
@@ -856,7 +932,8 @@ def main():
     parser.add_argument("--mission-control-gate", action="store_true",
                         help="Require read-only Mission Control case 13 before --suite acts")
     parser.add_argument("--browser-mode", default="normal",
-                        choices=("normal", "missing-link", "home-404", "redirect"),
+                        choices=("normal", "missing-link", "home-404", "redirect",
+                                 "stop-before-docs"),
                         help="Fixture scenario for a focused --case 17 run")
     parser.add_argument("--finder-mode", default="normal",
                         choices=("normal", "missing-file", "symlink-escape", "decoy-target"),
@@ -929,14 +1006,19 @@ def main():
         for index in selected:
             phrase = COMMANDS[index - 1]
             fixture = None
+            home_requested = home_release = None
             if index == 17:
                 run_id = uuid.uuid4().hex
                 temporary = tempfile.TemporaryDirectory(prefix="voice-browser-smoke-")
                 fixture_log = Path(temporary.name) / "requests.jsonl"
-                server = make_server(run_id, fixture_log, args.browser_mode)
+                if args.browser_mode == "stop-before-docs":
+                    home_requested, home_release = threading.Event(), threading.Event()
+                fixture_mode = "hold-home" if home_requested else args.browser_mode
+                server = make_server(run_id, fixture_log, fixture_mode,
+                                     home_requested=home_requested, home_release=home_release)
                 fixture_thread = threading.Thread(target=server.serve_forever, daemon=True)
                 fixture_thread.start()
-                fixtures.append((server, fixture_thread, temporary))
+                fixtures.append((server, fixture_thread, temporary, home_release))
                 fixture = (run_id, server.server_port, fixture_log)
                 url = f"http://127.0.0.1:{server.server_port}/home?run_id={run_id}"
                 phrase = (f'In the exact Voice Computer POC app, enter "Open {url} '
@@ -1022,6 +1104,14 @@ def main():
             driver.record("command_started",
                           space_before=space_before, expected_space=expected_space)
             started = time.monotonic()
+            stop_outcome = {}
+            stop_thread = None
+            if home_requested:
+                stop_thread = threading.Thread(
+                    target=stop_browser_when_home,
+                    args=(home_requested, home_release, app_pid, session_log, log_offset,
+                          app_since, stop_outcome), daemon=True)
+                stop_thread.start()
             instruction = INSTRUCTION
             if index == 13:
                 instruction = (
@@ -1063,6 +1153,18 @@ def main():
                     "Codex or ChatGPT host app; any approval is inside Voice Computer POC. "
                     "User request: "
                 )
+                if home_requested:
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. Bind with cua.getApp to this exact "
+                        "full app path: " + str(app_path) + ". Enter the exact quoted command "
+                        "and submit once with Return. Approve only Safari Computer Use through "
+                        "the visible Allow for session button. The Home page may pause loading; "
+                        "wait for the app's own Stop action to interrupt the run. Do not click "
+                        "Stop yourself, follow Docs, or navigate Safari. After Voice Computer "
+                        "finishes, report its visible stopped result and inspect Safari only to "
+                        "close the new fixture tab. Never inspect the Codex or ChatGPT host app. "
+                        "User request: "
+                    )
             elif index == 18:
                 instruction = (
                     "Use only mcp__cua_repl.js for UI. Start with this sole Computer Use call: "
@@ -1093,6 +1195,13 @@ def main():
                 "threadId": thread, "input": [{"type": "text", "text": instruction + phrase}],
             }))
             turn = driver.wait_turn()
+            if stop_thread:
+                stop_thread.join(timeout=85)
+                if stop_thread.is_alive() or not stop_outcome.get("pressed"):
+                    raise RuntimeError("Browser Stop watchdog failed: %s" %
+                                       stop_outcome.get("error", "watchdog still running"))
+                # Give any late in-flight browser request a bounded chance to reach the fixture.
+                time.sleep(1)
             space_after = None
             if expected_space is not None:
                 for _ in range(10):
@@ -1138,10 +1247,15 @@ def main():
                     elif index == 17:
                         run_id, port, fixture_log = fixture
                         fixture_rows = [json.loads(line) for line in fixture_log.read_text().splitlines()]
-                        exact_receipt = verify_browser_receipt(
-                            rows, run_id, port, fixture_rows, driver.browser_observations,
-                            space_before["current"], after_id, prior_ids,
-                            mode=args.browser_mode)
+                        if home_requested:
+                            exact_receipt = verify_browser_interruption_receipt(
+                                rows, run_id, fixture_rows, space_before["current"],
+                                after_id, prior_ids)
+                        else:
+                            exact_receipt = verify_browser_receipt(
+                                rows, run_id, port, fixture_rows, driver.browser_observations,
+                                space_before["current"], after_id, prior_ids,
+                                mode=args.browser_mode)
                         driver.record("browser_receipt_verified", **exact_receipt)
                     elif index == 18:
                         if args.finder_mode == "normal":
@@ -1209,7 +1323,9 @@ def main():
         driver.record("driver_interrupted")
         print("Smoke test interrupted", file=sys.stderr)
     finally:
-        for server, thread, temporary in fixtures:
+        for server, thread, temporary, release in fixtures:
+            if release:
+                release.set()
             server.shutdown()
             server.server_close()
             thread.join(timeout=3)

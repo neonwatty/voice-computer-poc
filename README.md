@@ -339,6 +339,11 @@ Focused Browser negatives use `--case 17 --browser-mode missing-link`,
 `home-404`, or `redirect`. The runner requires the exact local request sequence
 and rendered final page for each scenario, plus an app-owned `unverified` result.
 An observed wrong origin fails.
+Run `--case 17 --browser-mode stop-before-docs` to test interruption. The local
+fixture holds its Home response while the runner presses the exact app's Stop
+button through Accessibility. The receipt requires the app's interrupted,
+unverified result, one Home request, zero Docs requests, and an unchanged Space.
+The runner releases the held response and removes the fixture on exit.
 Focused Finder negatives use `--case 18 --finder-mode missing-file`,
 `symlink-escape`, or `decoy-target`. Each requires a fresh app command that
 finishes with `no_action`, without starting a Finder acting turn or changing

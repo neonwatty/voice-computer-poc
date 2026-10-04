@@ -3,7 +3,8 @@
 Status: October 4, 2026. The narrow Safari and Finder slices are implemented;
 three isolated Safari runs and multiple Safari→Finder sequences passed, as did
 repeated Finder runs. The default suite passed on the final app build, and all
-three focused Browser negatives and three Finder rejection cases passed. The
+three focused Browser negatives, the Stop-before-Docs case, and three Finder
+rejection cases passed. The
 optional Mission Control gate is intermittent. The Codex host task
 status route is deferred because a separate app-server process cannot read the
 host's live state. Speech transcription and Foil integration remain deferred.
@@ -121,6 +122,10 @@ The starting desktop Space remains unchanged.
 fixtures each passed a focused exact-app run. The runner verified the local
 request sequence and rendered Safari URL and heading. The app recorded
 `unverified` for each because the exact Docs URL and heading were absent.
+The timed interruption case held the Home response, pressed the exact app's
+Stop button through Accessibility, and passed on the October 4 exact build:
+one Home request, zero Docs requests, an interrupted and unverified app result,
+and unchanged live Space ID 5. The fixture was released and removed afterward.
 
 ## Work package 3: Finder vertical slice
 

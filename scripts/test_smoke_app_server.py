@@ -18,6 +18,7 @@ from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path
                               validate_exact_space_state,
                               validate_mcp_cases, verify_mcp_receipt,
                               verify_read_only_receipt, verify_browser_receipt,
+                              verify_browser_interruption_receipt,
                               verify_finder_receipt,
                               verify_finder_rejection_receipt)  # noqa: E402
 
@@ -235,6 +236,34 @@ class ExactAppBindingTests(unittest.TestCase):
 
 
 class BrowserReceiptTests(unittest.TestCase):
+    def test_interruption_requires_stop_and_no_docs_request(self):
+        run_id = "fixture-1234"
+        rows = [
+            row("command_started", user_action="run"),
+            row("router_decided", route="browser", action="follow_docs", target="loopback_fixture"),
+            row("turn_requested", route="browser"),
+            row("tool_started", server="cua_repl", tool="js"),
+            row("stop_requested"),
+            row("fixture_ax_verification", target="browser", verified="false",
+                reason="turn_incomplete"),
+            row("turn_completed", status="interrupted", verification="unverified"),
+            row("command_finished", status="interrupted", verification="unverified"),
+        ]
+        requests = [{"method": "GET", "path": "/home", "run_id": [run_id]}]
+        receipt = verify_browser_interruption_receipt(rows, run_id, requests, 5, 5)
+        self.assertEqual(receipt["docs_requests"], 0)
+        with self.assertRaisesRegex(ValueError, "requested Docs"):
+            verify_browser_interruption_receipt(rows, run_id, requests + [
+                {"method": "GET", "path": "/docs", "run_id": [run_id]}], 5, 5)
+        with self.assertRaisesRegex(ValueError, "lifecycle"):
+            verify_browser_interruption_receipt(
+                [entry for entry in rows if entry["event"] != "stop_requested"],
+                run_id, requests, 5, 5)
+        premature = copy.deepcopy(rows)
+        premature[6]["details"]["status"] = "completed"
+        with self.assertRaisesRegex(ValueError, "successful"):
+            verify_browser_interruption_receipt(premature, run_id, requests, 5, 5)
+
     def test_browser_receipt_requires_correlated_render_and_requests(self):
         run_id = "fixture-1234"
         port = 49328
