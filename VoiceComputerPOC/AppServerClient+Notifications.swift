@@ -31,6 +31,7 @@ extension AppServerClient {
         let server = item["server"] as? String ?? "tool"
         let tool = item["tool"] as? String ?? "call"
         let direction = SpaceToolRequest.direction(fromArguments: item["arguments"])
+        observeFixtureToolStarted(item, eventTurnID: eventTurnID)
         if server == "desktop_tool" && tool == "switch_space",
             direction == requestedToolDirection, isWorking, activeCommandID != nil,
             let turnID, let eventTurnID, eventTurnID == turnID,
@@ -56,11 +57,12 @@ extension AppServerClient {
     }
 
     func handleItemCompleted(_ item: [String: Any]) {
-        if item["type"] as? String == "agentMessage", let text = item["text"] as? String,
-            !text.isEmpty
+        if isWorking, item["type"] as? String == "agentMessage",
+            let text = item["text"] as? String, !text.isEmpty
         {
             result = text
         } else if item["type"] as? String == "mcpToolCall" {
+            observeFixtureToolCompleted(item)
             handleToolCompleted(item)
         }
     }
@@ -135,6 +137,7 @@ extension AppServerClient {
                 details: ["turn_id": turn["id"] as? String ?? "unknown"])
             return
         }
+        if rejectMismatchedFixtureTurn(turn) { return }
         if requestCalculatorFocusAfterTool(turn) { return }
         finishTurnCompleted(turn)
     }
@@ -148,7 +151,13 @@ extension AppServerClient {
             result = message
         }
         var verification = verifyTurnOutcome(outcome, frontmostBundleID: frontmostBundleID)
+        let fixture = fixtureTurnResult(outcome: outcome)
+        if let fixture {
+            verification = fixture.verification
+            recordFixtureTurnResult(fixture)
+        }
         verification = applyTurnResult(outcome, verification: verification)
+        if let fixture { displayFixtureTurnResult(fixture, outcome: outcome) }
         record(
             "turn_completed",
             details: [

@@ -1,14 +1,15 @@
 # Next desktop capabilities: Browser, Finder, and Codex
 
-Status: October 3, 2026. The narrow Safari and Finder slices are implemented;
+Status: October 4, 2026. The narrow Safari and Finder slices are implemented;
 three isolated Safari runs and multiple Safari→Finder sequences passed, as did
 repeated Finder runs. The default suite passed on the final app build, and all
 three focused Browser negatives and three Finder rejection cases passed. The
 optional Mission Control gate is intermittent. The Codex host task
 status route is deferred because a separate app-server process cannot read the
 host's live state. Speech transcription and Foil integration remain deferred.
-The [capability inventory](tool-capability-inventory.md) records the measured
-boundary.
+The app now verifies exact Safari and Finder fixture results with bounded native
+Accessibility reads. The [capability inventory](tool-capability-inventory.md)
+records the measured boundary.
 
 ## Goal and scope
 
@@ -78,9 +79,9 @@ starting an actor:
 
 The app logs route, action, target category, actor, approval, start and finish
 IDs, elapsed time, and verification status. Normal logs omit raw page content,
-file contents, screenshots, and full command text. The app's acting turn still
-uses `model_report_only` for Browser and Finder; the outer smoke runner supplies
-independent UI verification. App-owned verification remains a follow-on task.
+file contents, screenshots, and full command text. Browser and Finder fixture
+turns require an exact app-owned Accessibility match before reporting `verified`;
+the outer smoke runner also checks the target UI independently.
 
 **Gate:** No corpus example for an unsupported or ambiguous request starts an
 actor. Unit tests cover parser rejection and command ID continuity.
@@ -118,9 +119,8 @@ The starting desktop Space remains unchanged.
 
 **Measured negatives:** The missing-link, Home 404, and local redirect-to-error
 fixtures each passed a focused exact-app run. The runner verified the local
-request sequence and rendered Safari URL and heading. The app still reports
-these acting turns as `model_report_only`, so app-owned typed outcomes remain
-open work.
+request sequence and rendered Safari URL and heading. The app recorded
+`unverified` for each because the exact Docs URL and heading were absent.
 
 ## Work package 3: Finder vertical slice
 

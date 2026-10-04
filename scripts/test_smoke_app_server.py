@@ -246,7 +246,10 @@ class BrowserReceiptTests(unittest.TestCase):
             row("tool_started", server="cua_repl", tool="js"),
             row("approval_decided", server_name="cua_repl", decision="Allowed once"),
             row("tool_completed", server="cua_repl", tool="js", status="completed"),
-            row("command_finished", status="completed", verification="model_report_only"),
+            row("fixture_ax_verification", target="browser", verified="true",
+                reason="exact_url_and_heading"),
+            row("turn_completed", status="completed", verification="verified"),
+            row("command_finished", status="completed", verification="verified"),
         ]
         requests = [
             {"method": "GET", "path": "/home", "run_id": [run_id]},
@@ -280,6 +283,9 @@ class BrowserReceiptTests(unittest.TestCase):
         unsafe[3]["details"]["server"] = "desktop_tool"
         with self.assertRaisesRegex(ValueError, "only Computer Use"):
             verify_browser_receipt(unsafe, run_id, port, requests, observations, 5, 5)
+        missing_ax = [entry for entry in rows if entry["event"] != "fixture_ax_verification"]
+        with self.assertRaisesRegex(ValueError, "app-owned"):
+            verify_browser_receipt(missing_ax, run_id, port, requests, observations, 5, 5)
 
     def test_negative_browser_modes_require_exact_local_result(self):
         run_id = "fixture-1234"
@@ -290,7 +296,10 @@ class BrowserReceiptTests(unittest.TestCase):
             row("turn_requested", route="browser"),
             row("tool_started", server="cua_repl", tool="js"),
             row("approval_decided", server_name="cua_repl", decision="Allowed once"),
-            row("command_finished", status="completed"),
+            row("fixture_ax_verification", target="browser", verified="false",
+                reason="url_or_heading_mismatch"),
+            row("turn_completed", status="completed", verification="unverified"),
+            row("command_finished", status="completed", verification="unverified"),
         ]
         for mode, paths, final_path, heading in [
             ("missing-link", ["/home"], "/home", f"Voice Computer Home {run_id}"),
@@ -364,7 +373,10 @@ class FinderReceiptTests(unittest.TestCase):
                 row("tool_started", server="cua_repl", tool="js"),
                 row("approval_decided", server_name="cua_repl", decision="Allowed once"),
                 row("tool_completed", server="cua_repl", tool="js", status="completed"),
-                row("command_finished", status="completed", verification="model_report_only"),
+                row("fixture_ax_verification", target="finder", verified="true",
+                    reason="exact_selected_file"),
+                row("turn_completed", status="completed", verification="verified"),
+                row("command_finished", status="completed", verification="verified"),
             ]
             selected = ("Window: fixture, App: Finder\n"
                         f"10 row\n11 text field URL: {decoy.as_uri()}\n"

@@ -372,6 +372,17 @@ def verify_browser_receipt(rows, run_id, port, fixture_rows, observations,
         raise ValueError("Browser Computer Use approval was unexpected or declined")
     if len(finishes) != 1 or finishes[0].get("status") != "completed":
         raise ValueError("Browser app command did not complete")
+    expected_verified = mode == "normal"
+    expected_status = "verified" if expected_verified else "unverified"
+    ax, app_turns = events("fixture_ax_verification"), events("turn_completed")
+    if len(ax) != 1 or ax[0].get("target") != "browser" \
+            or ax[0].get("verified") != str(expected_verified).lower() \
+            or ax[0].get("reason") != ("exact_url_and_heading" if expected_verified
+                                            else "url_or_heading_mismatch") \
+            or len(app_turns) != 1 \
+            or app_turns[0].get("verification") != expected_status \
+            or finishes[0].get("verification") != expected_status:
+        raise ValueError("Browser app-owned Accessibility verification mismatch")
     if any(row.get("event") in ("native_space_requested", "mcp_action_requested",
                                     "space_changed") for row in command_rows):
         raise ValueError("Browser command invoked an unexpected desktop action")
@@ -432,6 +443,14 @@ def verify_finder_receipt(rows, report, observations, before, after,
         raise ValueError("Finder Computer Use approval was unexpected or declined")
     if len(finishes) != 1 or finishes[0].get("status") != "completed":
         raise ValueError("Finder app command did not complete")
+    ax, app_turns = events("fixture_ax_verification"), events("turn_completed")
+    if len(ax) != 1 or ax[0].get("target") != "finder" \
+            or ax[0].get("verified") != "true" \
+            or ax[0].get("reason") != "exact_selected_file" \
+            or len(app_turns) != 1 \
+            or app_turns[0].get("verification") != "verified" \
+            or finishes[0].get("verification") != "verified":
+        raise ValueError("Finder app-owned Accessibility verification mismatch")
     if any(row.get("event") in ("native_space_requested", "mcp_action_requested",
                                     "space_changed") for row in command_rows):
         raise ValueError("Finder command invoked an unexpected desktop action")
@@ -474,7 +493,8 @@ def verify_finder_rejection_receipt(rows, report, before, after,
                     if row.get("details", {}).get("command_id") == command_id]
     if any(row.get("event") in (
             "turn_requested", "tool_started", "approval_decided", "native_space_requested",
-            "mcp_action_requested", "space_changed") for row in command_rows):
+            "mcp_action_requested", "space_changed", "fixture_ax_verification")
+            for row in command_rows):
         raise ValueError("Rejected Finder target started an action")
     routes = [row for row in command_rows if row.get("event") == "router_decided"]
     if any(row.get("details", {}).get("route") != "clarification" for row in routes):

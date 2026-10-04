@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0233268CC94C9A26838D022C /* DiagnosticLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F9746E05DAF2F18E2164AE0 /* DiagnosticLog.swift */; };
+		04C47D3FA66A1B5677B5375B /* FixtureAXVerifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 135FE916EA2229230A66BEA1 /* FixtureAXVerifierTests.swift */; };
 		0A5EEDD1B1A4032FCBA313DC /* SpaceToolBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB2CE7E2613EEBFB29969E02 /* SpaceToolBridge.swift */; };
 		0E6B219B0F072ED018D3065B /* VoiceComputerPOCApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03E832F80A1C092C60825323 /* VoiceComputerPOCApp.swift */; };
 		0EF5A8F7A156B5D7DA21AB23 /* SpaceToolContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D890B71ED4ECE57D20290F2 /* SpaceToolContract.swift */; };
@@ -22,6 +23,7 @@
 		469F4D49DCCEDEC5032649B8 /* NativeSpaceAXExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6428F055CAE5F977ECD76618 /* NativeSpaceAXExecution.swift */; };
 		46A0B1E7E64FAA6B4DAF7B21 /* AppServerClientNotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D197EA13232A8EC0DF17BCA1 /* AppServerClientNotificationTests.swift */; };
 		46B4B0D406445B2F5DA025D6 /* AppServerClient+Spaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C996441AC1A3E32F91757B /* AppServerClient+Spaces.swift */; };
+		4B75BA142D677494C7DB4484 /* FixtureAXVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 437F4703D8FF94A3D866FA6A /* FixtureAXVerifier.swift */; };
 		4B783A83A2C9EC4A3D90A251 /* SpaceNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4892574811141080E9E93FE /* SpaceNavigator.swift */; };
 		4C89AD07C7FD92FE012B26E3 /* NativeSpaceAXExecutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAF6FC2A95408A77DEB5287E /* NativeSpaceAXExecutionTests.swift */; };
 		51C8F021EEB3C28AF14AA781 /* RouterAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54D737F47D4FB6002490D93 /* RouterAgent.swift */; };
@@ -31,6 +33,7 @@
 		8C8E6085BEBB050DAC7DE0EB /* AppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5685373ED6C8075DD282EA /* AppServerClient.swift */; };
 		956571D06FD82926DEBD3B4D /* SpaceToolContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7EBF26FA90A2A71786A1435 /* SpaceToolContractTests.swift */; };
 		99965E951BC65D2FC6AE76D9 /* WindowManagerAXProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5D25FC23DE94B511E999EB7 /* WindowManagerAXProbe.swift */; };
+		9E495468E25A3000878BC3B8 /* AppServerClient+FixtureVerification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872783EC2FBD66E63D00C835 /* AppServerClient+FixtureVerification.swift */; };
 		A8852D260D8504D5024ABB58 /* AppServerClient+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DA61CCE4D3F6CC8236658A /* AppServerClient+Lifecycle.swift */; };
 		AA621174BB334EDF6B44707F /* SpaceToolBridgePythonPeerSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17C96BB825E16BE3B775FD87 /* SpaceToolBridgePythonPeerSupport.swift */; };
 		B00819EC5F0AB40C9AEDB658 /* LocalVoiceInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */; };
@@ -64,11 +67,13 @@
 		03E832F80A1C092C60825323 /* VoiceComputerPOCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceComputerPOCApp.swift; sourceTree = "<group>"; };
 		0462EAA1EC591D98B59A5113 /* AppServerClient+FocusActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+FocusActivation.swift"; sourceTree = "<group>"; };
 		0F9746E05DAF2F18E2164AE0 /* DiagnosticLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLog.swift; sourceTree = "<group>"; };
+		135FE916EA2229230A66BEA1 /* FixtureAXVerifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureAXVerifierTests.swift; sourceTree = "<group>"; };
 		1553759D35311E1698534226 /* AppServerClient+Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Connection.swift"; sourceTree = "<group>"; };
 		17C96BB825E16BE3B775FD87 /* SpaceToolBridgePythonPeerSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolBridgePythonPeerSupport.swift; sourceTree = "<group>"; };
 		17DD4353727E45891FEF5DAB /* SpaceNavigatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceNavigatorTests.swift; sourceTree = "<group>"; };
 		34C996441AC1A3E32F91757B /* AppServerClient+Spaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Spaces.swift"; sourceTree = "<group>"; };
 		3E5685373ED6C8075DD282EA /* AppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClient.swift; sourceTree = "<group>"; };
+		437F4703D8FF94A3D866FA6A /* FixtureAXVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureAXVerifier.swift; sourceTree = "<group>"; };
 		4DF54FE5EDD2D827D67E8AF4 /* ApprovalProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalProtocol.swift; sourceTree = "<group>"; };
 		5C9F9324497C1AD7B0B64440 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		6428F055CAE5F977ECD76618 /* NativeSpaceAXExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSpaceAXExecution.swift; sourceTree = "<group>"; };
@@ -79,6 +84,7 @@
 		77A1C0131F46AF8B11A108D1 /* SpaceToolBridgeSecurityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolBridgeSecurityTests.swift; sourceTree = "<group>"; };
 		7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalVoiceInput.swift; sourceTree = "<group>"; };
 		7BDB7479844A824CE79FA957 /* DiagnosticLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogTests.swift; sourceTree = "<group>"; };
+		872783EC2FBD66E63D00C835 /* AppServerClient+FixtureVerification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+FixtureVerification.swift"; sourceTree = "<group>"; };
 		8B74AD102A7A7BE23EB6619A /* CommandRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandRoute.swift; sourceTree = "<group>"; };
 		8D890B71ED4ECE57D20290F2 /* SpaceToolContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolContract.swift; sourceTree = "<group>"; };
 		94DE2CF9444DF65BD537012E /* VoiceComputerPOC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VoiceComputerPOC.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -122,6 +128,7 @@
 				6B71C5871C819570F0B56DC8 /* AppServerClientRoutingTests.swift */,
 				D632B99140C3882305A8768D /* CommandRouteTests.swift */,
 				7BDB7479844A824CE79FA957 /* DiagnosticLogTests.swift */,
+				135FE916EA2229230A66BEA1 /* FixtureAXVerifierTests.swift */,
 				FAF6FC2A95408A77DEB5287E /* NativeSpaceAXExecutionTests.swift */,
 				D9EB4AB5FB13BC8D4FE6427F /* NativeSpaceCancellationTests.swift */,
 				17DD4353727E45891FEF5DAB /* SpaceNavigatorTests.swift */,
@@ -159,6 +166,7 @@
 				4DF54FE5EDD2D827D67E8AF4 /* ApprovalProtocol.swift */,
 				3E5685373ED6C8075DD282EA /* AppServerClient.swift */,
 				1553759D35311E1698534226 /* AppServerClient+Connection.swift */,
+				872783EC2FBD66E63D00C835 /* AppServerClient+FixtureVerification.swift */,
 				0462EAA1EC591D98B59A5113 /* AppServerClient+FocusActivation.swift */,
 				E1DA61CCE4D3F6CC8236658A /* AppServerClient+Lifecycle.swift */,
 				FA818DA41010F13056BC0096 /* AppServerClient+Notifications.swift */,
@@ -171,6 +179,7 @@
 				8B74AD102A7A7BE23EB6619A /* CommandRoute.swift */,
 				5C9F9324497C1AD7B0B64440 /* ContentView.swift */,
 				0F9746E05DAF2F18E2164AE0 /* DiagnosticLog.swift */,
+				437F4703D8FF94A3D866FA6A /* FixtureAXVerifier.swift */,
 				7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */,
 				9FBF783BA4090E303FF1E695 /* MissionControlAXDiscovery.swift */,
 				6428F055CAE5F977ECD76618 /* NativeSpaceAXExecution.swift */,
@@ -301,6 +310,7 @@
 				8832F6771617F802E160B22F /* ApprovalProtocolTests.swift in Sources */,
 				815AE3BC1BD46EA6E2F4BF79 /* CommandRouteTests.swift in Sources */,
 				BC4753D6EC07F923ED6AE722 /* DiagnosticLogTests.swift in Sources */,
+				04C47D3FA66A1B5677B5375B /* FixtureAXVerifierTests.swift in Sources */,
 				4C89AD07C7FD92FE012B26E3 /* NativeSpaceAXExecutionTests.swift in Sources */,
 				F8ED3CAF55A6B34F67BE9856 /* NativeSpaceCancellationTests.swift in Sources */,
 				45B59E7EEC152F2A6831E556 /* SpaceNavigatorTests.swift in Sources */,
@@ -316,6 +326,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2FC0AEA630182A4F6C177E93 /* AppServerClient+Connection.swift in Sources */,
+				9E495468E25A3000878BC3B8 /* AppServerClient+FixtureVerification.swift in Sources */,
 				FB9DF7EBC9313DD2DDF7F5A5 /* AppServerClient+FocusActivation.swift in Sources */,
 				A8852D260D8504D5024ABB58 /* AppServerClient+Lifecycle.swift in Sources */,
 				F4C66D788160D488340A7AAF /* AppServerClient+Notifications.swift in Sources */,
@@ -330,6 +341,7 @@
 				39ED284ACB1970972009A7AE /* CommandRoute.swift in Sources */,
 				E807A0BA7ED80F13CE2784C6 /* ContentView.swift in Sources */,
 				0233268CC94C9A26838D022C /* DiagnosticLog.swift in Sources */,
+				4B75BA142D677494C7DB4484 /* FixtureAXVerifier.swift in Sources */,
 				B00819EC5F0AB40C9AEDB658 /* LocalVoiceInput.swift in Sources */,
 				B1977B752C4EF9097128F4DF /* MissionControlAXDiscovery.swift in Sources */,
 				469F4D49DCCEDEC5032649B8 /* NativeSpaceAXExecution.swift in Sources */,

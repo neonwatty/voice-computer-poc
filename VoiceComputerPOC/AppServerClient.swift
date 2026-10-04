@@ -78,6 +78,8 @@ final class AppServerClient: ObservableObject {
     var toolResult: SpaceToolResult?
     var generalTurnFailure: GeneralTurnFailure?
     var generalToolObserved = false
+    var fixtureCUAToolStartedIDs: Set<String> = []
+    var fixtureCUAToolCompletedIDs: Set<String> = []
     var remainingRoutedDirections: [SpaceDirection] = []
     var routedOriginalPhrase: String?
     #if DEBUG
@@ -222,6 +224,8 @@ final class AppServerClient: ObservableObject {
         toolResult = nil
         generalTurnFailure = nil
         generalToolObserved = false
+        fixtureCUAToolStartedIDs.removeAll()
+        fixtureCUAToolCompletedIDs.removeAll()
         remainingRoutedDirections = []
         routedOriginalPhrase = nil
         spaceCountAtTurnStart =

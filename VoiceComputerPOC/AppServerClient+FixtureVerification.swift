@@ -1,0 +1,95 @@
+import Foundation
+
+struct FixtureTurnResult {
+    let kind: String
+    let observation: FixtureAXObservation
+
+    var verification: String { observation.verified ? "verified" : "unverified" }
+}
+
+extension AppServerClient {
+    func observeFixtureToolStarted(_ item: [String: Any], eventTurnID: String?) {
+        guard browserDocsURL != nil || finderReportURL != nil,
+            item["server"] as? String == "cua_repl",
+            let turnID, eventTurnID == turnID,
+            let itemID = item["id"] as? String, !itemID.isEmpty
+        else { return }
+        fixtureCUAToolStartedIDs.insert(itemID)
+    }
+
+    func observeFixtureToolCompleted(_ item: [String: Any]) {
+        let status = item["status"] as? String ?? "unknown"
+        let directError = (item["error"] as? [String: Any])?["message"] as? String
+        let result = item["result"] as? [String: Any]
+        observeFixtureToolCompleted(
+            item, status: status, failed: directError != nil || result?["isError"] as? Bool == true)
+    }
+
+    func observeFixtureToolCompleted(_ item: [String: Any], status: String, failed: Bool) {
+        guard item["server"] as? String == "cua_repl",
+            let itemID = item["id"] as? String,
+            fixtureCUAToolStartedIDs.contains(itemID), status == "completed", !failed
+        else { return }
+        fixtureCUAToolCompletedIDs.insert(itemID)
+    }
+
+    func rejectMismatchedFixtureTurn(_ turn: [String: Any]) -> Bool {
+        guard browserDocsURL != nil || finderReportURL != nil else { return false }
+        guard let turnID, turn["id"] as? String == turnID else {
+            record("fixture_turn_mismatch")
+            fail("The acting turn did not match this fixture command.")
+            return true
+        }
+        return false
+    }
+
+    func fixtureTurnResult(outcome: String) -> FixtureTurnResult? {
+        let kind = browserDocsURL != nil ? "browser" : finderReportURL != nil ? "finder" : nil
+        guard let kind else { return nil }
+        let observation: FixtureAXObservation
+        if outcome != "completed" {
+            observation = .reject("turn_incomplete")
+        } else if generalTurnFailure != nil {
+            observation = .reject("tool_failure")
+        } else if fixtureCUAToolStartedIDs.isEmpty
+            || fixtureCUAToolStartedIDs != fixtureCUAToolCompletedIDs
+        {
+            observation = .reject("tool_not_completed")
+        } else if let browserDocsURL {
+            observation = FixtureAXVerifier.verifyBrowser(homeURL: browserDocsURL)
+        } else if let finderReportURL {
+            observation = FixtureAXVerifier.verifyFinder(reportURL: finderReportURL)
+        } else {
+            observation = .reject("missing_target")
+        }
+        return FixtureTurnResult(kind: kind, observation: observation)
+    }
+
+    func recordFixtureTurnResult(_ fixture: FixtureTurnResult) {
+        record(
+            "fixture_ax_verification",
+            details: [
+                "target": fixture.kind,
+                "verified": String(fixture.observation.verified),
+                "reason": fixture.observation.reason,
+                "visited": String(fixture.observation.visited),
+            ])
+    }
+
+    func displayFixtureTurnResult(_ fixture: FixtureTurnResult, outcome: String) {
+        guard outcome == "completed", generalTurnFailure == nil else { return }
+        if fixture.observation.verified {
+            result =
+                fixture.kind == "browser"
+                ? "Verified: Safari displays the exact Docs URL and heading."
+                : "Verified: Finder selected the exact test report."
+        } else {
+            status = "Unverified"
+            result =
+                fixture.kind == "browser"
+                ? "Safari did not expose the expected Docs URL and heading."
+                : "Finder did not expose the exact selected test report."
+        }
+        append(result)
+    }
+}

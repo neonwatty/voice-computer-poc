@@ -310,10 +310,9 @@ failed there, while the native Accessibility round trip passed; results are in
 Case 17 routes an exact loopback Home → Docs request through Safari Computer
 Use. Case 18 routes an exact disposable report path through Finder Computer
 Use. The runner creates unique fixtures, checks the app's command ID and route,
-reads the rendered Safari page or selected Finder row independently, verifies
-the live desktop Space did not change, and removes fixture data. The app still
-labels these Computer Use turns `model_report_only`; the runner's separate
-observation supplies the acceptance evidence.
+requires the app's bounded native Accessibility check to verify the exact Docs
+URL and heading or selected report URL, then reads Safari or Finder independently.
+It also checks that the live desktop Space did not change and removes fixture data.
 
 Use `--suite` to run Browser and Finder in order. Add `--codex-thread-id` with
 an existing exact task ID to include the read-only Codex status feasibility
@@ -338,7 +337,8 @@ task status route remains disabled pending a host-aware read-only interface.
 
 Focused Browser negatives use `--case 17 --browser-mode missing-link`,
 `home-404`, or `redirect`. The runner requires the exact local request sequence
-and rendered final page for each scenario; an observed wrong origin fails.
+and rendered final page for each scenario, plus an app-owned `unverified` result.
+An observed wrong origin fails.
 Focused Finder negatives use `--case 18 --finder-mode missing-file`,
 `symlink-escape`, or `decoy-target`. Each requires a fresh app command that
 finishes with `no_action`, without starting a Finder acting turn or changing
