@@ -2,6 +2,12 @@ import AppKit
 import Foundation
 
 extension AppServerClient {
+    func shouldRetryDesktopStateDiscovery(outcome: String) -> Bool {
+        requestedDesktopState && !desktopStateReadRetried && outcome == "completed"
+            && activeStateToolItemID == nil && stateToolResult == nil
+            && desktopStateApproval == nil && approval == nil
+    }
+
     func handleDesktopStateRequest(
         _ request: DesktopStateToolRequest, peer: SpaceToolBridge.PeerIdentity,
         reply: @escaping (DesktopStateToolResult) -> Void

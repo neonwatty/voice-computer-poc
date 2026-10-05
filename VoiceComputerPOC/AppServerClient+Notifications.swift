@@ -196,12 +196,6 @@ extension AppServerClient {
         finishTurnCompleted(turn)
     }
 
-    func shouldRetryDesktopStateDiscovery(outcome: String) -> Bool {
-        requestedDesktopState && !desktopStateReadRetried && outcome == "completed"
-            && activeStateToolItemID == nil && stateToolResult == nil
-            && desktopStateApproval == nil && approval == nil
-    }
-
     func finishTurnCompleted(_ turn: [String: Any]) {
         let outcome = turn["status"] as? String ?? "completed"
         let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
