@@ -38,7 +38,7 @@ jobs:
           "$binary" lint --strict --no-cache
       - name: Validate smoke driver
         run: |
-          python3 -m py_compile scripts/smoke_app_server.py scripts/test_smoke_app_server.py scripts/browser_fixture.py scripts/test_browser_fixture.py scripts/probe_codex_status.py scripts/test_probe_codex_status.py scripts/eval-router.py scripts/check-swift-file-length.py scripts/run_desktop_suite.py scripts/test_run_desktop_suite.py
+          python3 -m py_compile scripts/smoke_app_server.py scripts/test_smoke_app_server.py scripts/browser_fixture.py scripts/test_browser_fixture.py scripts/probe_codex_status.py scripts/test_probe_codex_status.py scripts/eval-router.py scripts/check-swift-file-length.py scripts/run_desktop_suite.py scripts/test_run_desktop_suite.py scripts/run_reviewed_desktop_suite.py scripts/test_run_reviewed_desktop_suite.py
           python3 -m unittest discover -s scripts -p 'test_*.py'
           swiftc -typecheck scripts/observe_safari_windows.swift
           swiftc -typecheck scripts/observe_finder_windows.swift

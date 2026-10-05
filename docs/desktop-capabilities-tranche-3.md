@@ -78,7 +78,7 @@ unchanged Main Space. One redirect attempt stopped at a repeated nested
 Safari approval; the stale approval was declined and the app command stopped.
 The runner now directs the acting test to grant Safari for that test session,
 and the focused redirect rerun passed. Case 21 is included in the ordered
-suite; the exact-head suite receipt is still pending.
+suite. The exact-head suite passed three times on commit `555a100`.
 
 ## Work package 2: Finder selection in an already-open window
 
@@ -117,7 +117,7 @@ Finder's numeric window ID across preparation and selection, app-owned and
 independent Accessibility observations, the exact selected report URL, and
 unchanged Main Space. Two simultaneous similar test-owned Finder windows and
 an injected CUA failure remain to test. Case 22 is included in the ordered
-suite; the exact-head suite receipt is pending.
+suite. The exact-head suite passed three times on commit `555a100`.
 
 ## Work package 3: routine exact-build Mac testing
 
@@ -167,8 +167,16 @@ ordered machine suite once. It writes owner-only step logs, `machine.jsonl`,
 and a redacted `summary.json` under Application Support. It stops its own app
 process after the run; an unknown Safari or Finder window is left for targeted
 cleanup rather than closed by guess. This local wrapper and its receipt parser
-have static tests; a live end-to-end wrapper run, trusted trigger, and
-three-run gate are pending.
+have static tests. Three unattended full runs passed on clean commit
+`555a1007376b7e236e0c21e9fb35641da5abacad`, each with all nine ordered
+cases, matching final Space and Safari/Finder window inventories, and a private
+summary. `scripts/run_reviewed_desktop_suite.py` is a local trusted entry
+point: it requires an open, non-draft same-repository PR targeting `main`,
+an approval on the exact head SHA, green CI and CodeQL check runs, and the
+same clean local HEAD. It runs the wrapper on this Mac and posts only a
+pending/success/failure commit status with a short redacted description.
+This trigger has unit coverage for rejected PR and check states; a live
+approved-PR dispatch remains pending. It is not yet a required merge check.
 
 ## Work package 4: Codex desktop feasibility
 
@@ -189,6 +197,10 @@ outside this tranche.
 
 **Gate:** reproducible host-aware read agrees on exact ID and state, or the
 capability remains deferred. Probe-local `notLoaded` is never host status.
+
+The [feasibility report](codex-host-status-feasibility.md) records a fresh
+exact-ID probe against a host-active task and an unknown-ID probe. No
+supported host-aware path was established, so the route remains disabled.
 
 ## MCP decision gate
 
