@@ -1153,6 +1153,7 @@ class Driver:
                     "tool_completed", item_id=item.get("id"), tool=item.get("tool"),
                     status=item.get("status"), is_error=bool(result.get("isError")),
                     error_present=bool(error),
+                    error_excerpt=str(error)[:300] if error else None,
                 )
         elif method == "turn/completed":
             turn = params.get("turn") or {}
@@ -1512,8 +1513,10 @@ def main():
                     "Use only mcp__cua_repl.js for UI. Start with this sole Computer Use call: "
                     "var vcFinderApp = await cua.getApp('" + str(app_path) + "'); Use this "
                     "fresh variable rather than an app variable from a prior case. First click "
-                    "Diagnostic Log then Show File "
-                    "to open a Finder window; do not inspect the log contents. Return to Voice "
+                    "Diagnostic Log, refresh a full AX state, and click the Show File button "
+                    "by its current index to open a Finder window. Do not parse an index from "
+                    "a stale or diff-only tree; if Show File is absent, stop. Do not inspect "
+                    "the log contents. Return to Voice "
                     "Computer POC. Enter the exact quoted command and submit "
                     "once with Return. Approve only Computer Use for Finder via the visible "
                     "Allow for session button; never approve a shell or another app. Wait for the app "
