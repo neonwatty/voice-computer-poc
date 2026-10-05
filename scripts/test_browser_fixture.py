@@ -71,6 +71,13 @@ class BrowserFixtureTests(unittest.TestCase):
         self.assertTrue(final_url.endswith("/docs?run_id=fixture-1234"))
         self.assertIn("Voice Computer Docs fixture-1234", body)
 
+    def test_sentinel_has_run_specific_title_and_heading(self):
+        status, body, _, rows = self.request("normal", "/sentinel?run_id=fixture-1234")
+        self.assertEqual(status, 200)
+        self.assertIn("<title>Sentinel fixture-1234</title>", body)
+        self.assertIn("<h1>Voice Computer Sentinel fixture-1234</h1>", body)
+        self.assertEqual([row["path"] for row in rows], ["/sentinel"])
+
     def test_negative_pages_stay_on_loopback(self):
         status, body, _, _ = self.request("missing-link", "/home?run_id=fixture-1234")
         self.assertEqual(status, 200)

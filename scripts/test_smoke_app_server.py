@@ -24,7 +24,8 @@ from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path
                               verify_composed_receipt,
                               verify_composed_failure_receipt,
                               verify_composed_rejection_receipt,
-                              verify_desktop_state_receipt)  # noqa: E402
+                              verify_desktop_state_receipt,
+                              verify_safari_context_receipt)  # noqa: E402
 
 
 COMMAND_ID = "A1B2C3D4"
@@ -38,8 +39,8 @@ def row(event, **details):
 
 class SuiteSelectionTests(unittest.TestCase):
     def test_mission_control_is_explicit_for_browser_finder_suite(self):
-        self.assertEqual(selected_cases(True, None, False), [20, 17, 18, 19, 15, 16, 20])
-        self.assertEqual(selected_cases(True, None, True), [13, 20, 17, 18, 19, 15, 16, 20])
+        self.assertEqual(selected_cases(True, None, False), [20, 17, 18, 21, 19, 15, 16, 20])
+        self.assertEqual(selected_cases(True, None, True), [13, 20, 17, 18, 21, 19, 15, 16, 20])
         with self.assertRaisesRegex(ValueError, "requires --suite"):
             selected_cases(False, [17], True)
         with self.assertRaisesRegex(ValueError, "cannot be combined"):
@@ -240,6 +241,45 @@ class ExactAppBindingTests(unittest.TestCase):
 
 
 class BrowserReceiptTests(unittest.TestCase):
+    def test_safari_context_requires_same_owned_window_and_tab_cleanup(self):
+        run_id, port = "fixture-1234", 49328
+        uuid = "A1B2C3D4-1111-2222-3333-444455556666"
+        other = "B1B2C3D4-1111-2222-3333-444455556666"
+        prefix = (f'Window: "Fixture", App: Safari.\n0 standard window Fixture, '
+                  f'ID: SafariWindow?IsSecure=false&UUID={uuid}\n')
+        sentinel = (prefix + f'5 HTML content URL: 127.0.0.1:{port}/sentinel?run_id={run_id}\n'
+                    f'6 heading Voice Computer Sentinel {run_id}\n')
+        acted = (prefix + f'5 HTML content URL: 127.0.0.1:{port}/docs?run_id={run_id}\n'
+                 f'6 heading Voice Computer Docs {run_id}\n'
+                 f'24 tab group Description: Tab bar, 2 tabs\n'
+                 f'25 tab Sentinel {run_id}, Value: off\n')
+        rows = [row("command_started", user_action="run"),
+                row("router_decided", route="browser", action="follow_docs",
+                    target="loopback_fixture"),
+                row("turn_requested", route="browser"),
+                row("tool_started", server="cua_repl", tool="js"),
+                row("fixture_ax_verification", target="browser", verified="true",
+                    reason="exact_url_and_heading"),
+                row("turn_completed", status="completed", verification="verified"),
+                row("command_finished", status="completed", verification="verified")]
+        requests = [{"method": "GET", "path": path, "run_id": [run_id]}
+                    for path in ("/sentinel", "/home", "/docs")]
+        before = {other}
+        observations = [sentinel, acted, sentinel]
+        receipt = verify_safari_context_receipt(
+            rows, run_id, port, requests, observations, before, before, 5, 5)
+        self.assertEqual(receipt["context_window_id"], uuid)
+        with self.assertRaisesRegex(ValueError, "inventory"):
+            verify_safari_context_receipt(rows, run_id, port, requests,
+                                          observations, before, before | {uuid}, 5, 5)
+        with self.assertRaisesRegex(ValueError, "did not correlate"):
+            verify_safari_context_receipt(rows, run_id, port, requests,
+                                          [sentinel, acted], before, before, 5, 5)
+        with self.assertRaisesRegex(ValueError, "did not correlate"):
+            verify_safari_context_receipt(rows, run_id, port, requests,
+                                          [sentinel.replace(uuid, other), acted, sentinel],
+                                          before, before, 5, 5)
+
     def test_form_receipt_requires_exact_query_and_rendered_result(self):
         run_id, port = "fixture-1234", 49328
         rows = [

@@ -50,10 +50,11 @@ COMMANDS = [
     None,  # Case 18 receives its unique Finder fixture path at runtime.
     None,  # Case 19 submits one composed Browser -> Finder command.
     None,  # Case 20 reads the desktop state through MCP.
+    None,  # Case 21 preserves a test-owned Safari sentinel tab.
 ]
-CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Mission Control", "Finder", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC"]
+CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Mission Control", "Finder", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC"]
 MCP_CASES = {15: "right", 16: "left"}
-EXACT_APP_CASES = {13, 17, 18, 19, 20, *MCP_CASES}
+EXACT_APP_CASES = {13, 17, 18, 19, 20, 21, *MCP_CASES}
 APP_LOG_DIRECTORY = Path.home() / "Library/Application Support/VoiceComputerPOC/Logs"
 
 
@@ -74,6 +75,7 @@ EXPECTED_EVIDENCE = [
     None,
     re.compile(r"mission_control_ax_summary"),
     re.compile(r"native_space_step_verified"),
+    None,
     None,
     None,
     None,
@@ -154,6 +156,20 @@ def frontmost_bundle_id():
         return result.stdout.strip() or None
     except (OSError, subprocess.SubprocessError):
         return None
+
+
+def safari_window_ids():
+    """Independently observe Safari window UUIDs without reading page content."""
+    helper = Path(__file__).with_name("observe_safari_windows.swift")
+    result = subprocess.run(["swift", str(helper)], capture_output=True,
+                            text=True, check=True, timeout=20)
+    ids = json.loads(result.stdout)["window_ids"]
+    if not isinstance(ids, list) or len(ids) != len(set(ids)) or any(
+            not isinstance(item, str) or not re.fullmatch(
+                r"[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}", item)
+            for item in ids):
+        raise ValueError("Safari window observer returned invalid IDs")
+    return set(ids)
 
 
 def validate_exact_space_state(state, case):
@@ -457,6 +473,65 @@ def verify_browser_receipt(rows, run_id, port, fixture_rows, observations,
     return {"command_id": command_id, "scenario": mode, "url": expected_url,
             "heading": heading, "approval_state": "prompted" if approvals else "no_new_prompt",
             "before": before, "after": after}
+
+
+def safari_snapshot(text):
+    """Extract a bounded identity from one full native Safari Accessibility state."""
+    window = re.search(
+        r'(?m)^0 standard window [^\n]*ID: SafariWindow\?[^\n]*UUID='
+        r'([0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12})', text)
+    if not window or "App: Safari" not in text:
+        return None
+    return {"window_id": window.group(1).upper(), "state": text}
+
+
+def verify_safari_context_receipt(rows, run_id, port, fixture_rows,
+                                  observations, windows_before, windows_after,
+                                  space_before, space_after, prior_command_ids=(),
+                                  mode="normal"):
+    """Prove a run-owned Safari window kept its sentinel through tab cleanup."""
+    sentinel_request = {"method": "GET", "path": "/sentinel", "run_id": [run_id]}
+    if not fixture_rows or fixture_rows[0] != sentinel_request:
+        raise ValueError("Safari sentinel request missing or duplicated")
+    browser = verify_browser_receipt(
+        rows, run_id, port, fixture_rows[1:], observations,
+        space_before, space_after, prior_command_ids, mode=mode)
+    if windows_after != windows_before:
+        raise ValueError("Safari window inventory did not return to baseline")
+    snapshots = [snapshot for text in observations
+                 if (snapshot := safari_snapshot(text)) is not None]
+    sentinel_url = f"127.0.0.1:{port}/sentinel?run_id={run_id}"
+    final_path, final_heading = {
+        "normal": ("docs", f"Voice Computer Docs {run_id}"),
+        "missing-link": ("home", f"Voice Computer Home {run_id}"),
+        "home-404": ("home", "Fixture page not found"),
+        "redirect": ("error", "Fixture page not found"),
+    }[mode]
+    final_url = f"127.0.0.1:{port}/{final_path}?run_id={run_id}"
+    sentinel_heading = f"heading Voice Computer Sentinel {run_id}"
+    acted_heading = f"heading {final_heading}"
+    for before_index, before in enumerate(snapshots):
+        context_id = before["window_id"]
+        if context_id in windows_before or sentinel_url not in before["state"] \
+                or sentinel_heading not in before["state"] \
+                or final_url in before["state"]:
+            continue
+        for after_index in range(before_index + 1, len(snapshots)):
+            acted = snapshots[after_index]
+            if acted["window_id"] != context_id or final_url not in acted["state"] \
+                    or acted_heading not in acted["state"] \
+                    or f"tab Sentinel {run_id}" not in acted["state"] \
+                    or "Description: Tab bar, 2 tabs" not in acted["state"]:
+                continue
+            if any(cleaned["window_id"] == context_id
+                   and sentinel_url in cleaned["state"]
+                   and sentinel_heading in cleaned["state"]
+                   and final_url not in cleaned["state"]
+                   and "Description: Tab bar, 2 tabs" not in cleaned["state"]
+                   for cleaned in snapshots[after_index + 1:]):
+                return {**browser, "context_window_id": context_id,
+                        "sentinel_preserved": True, "window_cleanup_verified": True}
+    raise ValueError("Safari sentinel, acted tab, and cleanup states did not correlate")
 
 
 def verify_browser_interruption_receipt(rows, run_id, fixture_rows, before, after,
@@ -1073,7 +1148,7 @@ class Driver:
                         if self.command_index == 19 else
                         {CASE_APP[self.command_index - 1], str(self.app_path),
                          "Safari", "com.apple.Safari"}
-                        if self.command_index == 17 else
+                        if self.command_index in (17, 21) else
                         {CASE_APP[self.command_index - 1], str(self.app_path),
                          "Finder", "com.apple.finder"}
                         if self.command_index == 18 and self.finder_mode == "normal" else
@@ -1108,7 +1183,8 @@ class Driver:
                     self.cua_binding_observed = True
                     self.record("cua_exact_path_requested")
             self.tool_calls += 1
-            limit = 36 if self.command_index == 19 else \
+            limit = 44 if self.command_index == 21 else \
+                36 if self.command_index == 19 else \
                 24 if self.command_index in (6, 9, 10, 14, 15, 16, 17, 18) else 12
             if self.tool_calls > limit:
                 raise RuntimeError("Command exceeded %s Computer Use calls" % limit)
@@ -1123,7 +1199,7 @@ class Driver:
                 result = item.get("result") or {}
                 error = (item.get("error") or {}).get("message")
                 content = result.get("content") or []
-                if self.command_index in (17, 19) and item.get("server") == "cua_repl":
+                if self.command_index in (17, 19, 21) and item.get("server") == "cua_repl":
                     self.browser_observations.extend(
                         part.get("text") or "" for part in content
                         if part.get("type") == "text" and "Window:" in (part.get("text") or "")
@@ -1198,7 +1274,7 @@ def selected_cases(suite, cases, mission_control_gate):
     if suite and cases:
         raise ValueError("--suite cannot be combined with --case")
     if suite:
-        return ([13] if mission_control_gate else []) + [20, 17, 18, 19, 15, 16, 20]
+        return ([13] if mission_control_gate else []) + [20, 17, 18, 21, 19, 15, 16, 20]
     return cases or list(range(1, 7))
 
 
@@ -1217,7 +1293,7 @@ def main():
     parser.add_argument("--browser-mode", default="normal",
                         choices=("normal", "missing-link", "home-404", "redirect",
                                  "stop-before-docs", "form-submit"),
-                        help="Fixture scenario for a focused --case 17 or 19 run")
+                        help="Fixture scenario for a focused --case 17, 19, or 21 run")
     parser.add_argument("--finder-mode", default="normal",
                         choices=("normal", "missing-file", "symlink-escape", "decoy-target"),
                         help="Fixture scenario for a focused --case 18 or 19 run")
@@ -1232,8 +1308,10 @@ def main():
         selected = selected_cases(args.suite, args.case, args.mission_control_gate)
     except ValueError as error:
         parser.error(str(error))
-    if args.browser_mode != "normal" and selected not in ([17], [19]):
-        parser.error("--browser-mode requires a focused --case 17 or 19 run")
+    if args.browser_mode != "normal" and selected not in ([17], [19], [21]):
+        parser.error("--browser-mode requires a focused --case 17, 19, or 21 run")
+    if selected == [21] and args.browser_mode in ("stop-before-docs", "form-submit"):
+        parser.error("--case 21 supports normal, missing-link, home-404, or redirect")
     if args.finder_mode != "normal" and selected not in ([18], [19]):
         parser.error("--finder-mode requires a focused --case 18 or 19 run")
     if selected == [19] and args.browser_mode == "form-submit":
@@ -1301,8 +1379,10 @@ def main():
         for index in selected:
             phrase = COMMANDS[index - 1]
             fixture = None
+            sentinel_url = None
+            safari_windows_before = None
             home_requested = home_release = None
-            if index in (17, 19):
+            if index in (17, 19, 21):
                 run_id = uuid.uuid4().hex
                 temporary = tempfile.TemporaryDirectory(prefix="voice-browser-smoke-")
                 fixture_log = Path(temporary.name) / "requests.jsonl"
@@ -1326,6 +1406,16 @@ def main():
                               'Wait for the app result, then independently inspect the Safari '
                               'window and report its exact URL and visible heading. Do not navigate Safari '
                               'yourself or submit a second app command.')
+                if index == 21:
+                    sentinel_url = (f"http://127.0.0.1:{server.server_port}/sentinel"
+                                    f"?run_id={run_id}")
+                    safari_windows_before = safari_window_ids()
+                    phrase = (f'Create one new Safari window and load only {sentinel_url} '
+                              'as its sentinel tab. Then, in the exact Voice Computer POC app, '
+                              f'enter "Open {url} and follow the Docs link." once. '
+                              'After the app finishes, inspect the same Safari window, close '
+                              'only the new run-specific fixture tab, verify the sentinel remains, '
+                              'then close only the test-created Safari window.')
             if index == 19:
                 fixture_root = support / "TestFixtures" / run_id
                 fixture_root.mkdir(parents=True, mode=0o700)
@@ -1392,7 +1482,7 @@ def main():
                           'desktop_tool.get_desktop_state read with Allow once. Wait for the '
                           'typed app result and report its Main Space ID, ordered IDs, '
                           'foreground bundle ID, and observation time. Do not switch Spaces.')
-            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20) else None
+            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21) else None
             expected_space = None
             if index in EXACT_APP_CASES:
                 validate_exact_space_state(space_before, index)
@@ -1600,10 +1690,42 @@ def main():
                     "switch Spaces yourself, inspect unrelated apps, or use a shell fallback. "
                     "User request: "
                 )
+            elif index == 21:
+                final_path, final_heading = {
+                    "normal": ("docs", f"Voice Computer Docs {fixture[0]}"),
+                    "missing-link": ("home", f"Voice Computer Home {fixture[0]}"),
+                    "home-404": ("home", "Fixture page not found"),
+                    "redirect": ("error", "Fixture page not found"),
+                }[args.browser_mode]
+                expected_page = (f"127.0.0.1:{fixture[1]}/{final_path}"
+                                 f"?run_id={fixture[0]}")
+                instruction = (
+                    "Use only mcp__cua_repl.js for UI. Your first Computer Use call must be "
+                    "var vcContextApp = await cua.getApp('" + str(app_path) + "'); "
+                    "then use var vcContextSafari = await cua.getApp('com.apple.Safari'). "
+                    "In Safari, use the visible File menu's New Window item; do not reuse or "
+                    "navigate an existing window. Read the new window's SafariWindow UUID, "
+                    "enter the exact sentinel URL in its smart search field, and capture a "
+                    "full getAXState({disableDiffing:true}) showing its URL and heading. "
+                    "Return to vcContextApp and submit the quoted Voice Computer command once. "
+                    "For Safari Computer Use inside that app, choose Allow for session; "
+                    "decline any other target. Wait until the app result is no longer working. "
+                    "Do not navigate Safari "
+                    "yourself after submission. Once the app finishes, get a full Safari AX "
+                    "state. Require the same window UUID, exact final URL " + expected_page +
+                    " and heading " + final_heading + ", a two-tab "
+                    "bar, and the Sentinel tab before closing anything. Close only the active "
+                    "run-specific tab using its exposed close tab secondary action, then get a full "
+                    "state showing the sentinel URL and heading in the same UUID. Close only "
+                    "that test-created window through its visible close button; do not close "
+                    "any unrelated Safari tab or window. If identity is ambiguous, stop and "
+                    "report it without closing uncertain content. Never inspect or control the "
+                    "Codex or ChatGPT host app. User request: "
+                )
             response = driver.wait_rpc(driver.rpc("turn/start", {
                 "threadId": thread, "input": [{"type": "text", "text": instruction + phrase}],
             }))
-            turn = driver.wait_turn(seconds=300 if index == 19 else 180)
+            turn = driver.wait_turn(seconds=300 if index in (19, 21) else 180)
             if stop_thread:
                 stop_thread.join(timeout=85)
                 if stop_thread.is_alive() or not stop_outcome.get("pressed"):
@@ -1618,7 +1740,7 @@ def main():
                     if space_after and space_after["current"] == expected_space:
                         break
                     time.sleep(0.5)
-            elif index in (13, 17, 18, 19, 20):
+            elif index in (13, 17, 18, 19, 20, 21):
                 space_after = space_state()
             negative_result = re.search(
                 r"couldn.t|cannot|can.t|declined|unverified|failed|unable to",
@@ -1700,6 +1822,18 @@ def main():
                             rows, space_before, space_after, independent_frontmost,
                             prior_ids)
                         driver.record("desktop_state_receipt_verified", **exact_receipt)
+                    elif index == 21:
+                        run_id, port, fixture_log = fixture
+                        fixture_rows = [json.loads(line) for line in fixture_log.read_text().splitlines()]
+                        driver.record("safari_context_requests_observed",
+                                      paths=[entry.get("path") for entry in fixture_rows])
+                        safari_windows_after = safari_window_ids()
+                        exact_receipt = verify_safari_context_receipt(
+                            rows, run_id, port, fixture_rows,
+                            driver.browser_observations, safari_windows_before,
+                            safari_windows_after, space_before["current"], after_id,
+                            prior_ids, mode=args.browser_mode)
+                        driver.record("safari_context_receipt_verified", **exact_receipt)
                     else:
                         exact_receipt = verify_mcp_receipt(
                             rows, mcp_case_phrase(index), MCP_CASES[index],
@@ -1709,7 +1843,7 @@ def main():
                     driver.record("exact_app_receipt_rejected", reason=str(error))
                     verified = False
                 else:
-                    verified = exact_receipt is not None and (verified or index in (13, 17, 18, 19, 20))
+                    verified = exact_receipt is not None and (verified or index in (13, 17, 18, 19, 20, 21))
             recovered_stale_ui = (
                 index == 13 and exact_receipt is not None
                 and driver.tool_failures == ["stale_ui_state"])
@@ -1718,7 +1852,7 @@ def main():
             success = (turn.get("status") == "completed" and verified
                        and (not driver.tool_failures or recovered_stale_ui)
                        and all(a["allowed"] for a in driver.approvals)
-                       and (expected_space is not None or index in (17, 18, 19, 20) or not negative_result))
+                       and (expected_space is not None or index in (17, 18, 19, 20, 21) or not negative_result))
             driver.record("command_finished", success=success,
                           elapsed_ms=round((time.monotonic() - started) * 1000),
                           tool_failures=driver.tool_failures, approvals=driver.approvals,

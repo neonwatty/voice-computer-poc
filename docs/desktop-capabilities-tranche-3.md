@@ -69,6 +69,17 @@ stable identity, record the gap and retain the current isolated route.
 background run. All negative variants fail at the expected step. Passing runs
 leave no fixture tab and preserve other windows and tabs.
 
+**Measured so far (October 5):** Three focused positive runs passed on the
+same Debug app build, along with missing-link, Home 404, and local redirect
+variants. The runner correlated the app-owned Browser result with the fixture
+requests, full Safari Accessibility states for the sentinel and acted tabs,
+one Safari window UUID, an independent before/after window inventory, and
+unchanged Main Space. One redirect attempt stopped at a repeated nested
+Safari approval; the stale approval was declined and the app command stopped.
+The runner now directs the acting test to grant Safari for that test session,
+and the focused redirect rerun passed. Case 21 is included in the ordered
+suite; the exact-head suite receipt is still pending.
+
 ## Work package 2: Finder selection in an already-open window
 
 Keep the canonical fixture-root-only report route and its missing-file,
