@@ -92,25 +92,27 @@ final class DesktopStateToolTests: XCTestCase {
         XCTAssertFalse(client.shouldRetryDesktopStateDiscovery(outcome: "completed"))
     }
 
-    func testMissingReadToolRestartsOneTurnWithinSameCommand() {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let client = AppServerClient(logDirectory: directory)
-        client.isWorking = true
-        client.activeCommandID = "read-command"
-        client.requestedDesktopState = true
-        client.turnID = "first-turn"
-        var starts = 0
-        client.actingTurnOverride = { starts += 1 }
-        client.handleTurnCompleted(["id": "first-turn", "status": "completed"])
-        XCTAssertEqual(starts, 1)
-        XCTAssertTrue(client.desktopStateReadRetried)
-        XCTAssertTrue(client.isWorking)
-        XCTAssertEqual(client.queuedPhrase, "agent get desktop state")
-        XCTAssertEqual(
-            client.diagnosticEntries.filter { $0.event == "mcp_state_discovery_retry" }.count, 1)
-        client.handleTurnCompleted(["id": "second-turn", "status": "completed"])
-        XCTAssertEqual(starts, 1)
-        XCTAssertFalse(client.isWorking)
-    }
+    #if DEBUG
+        func testMissingReadToolRestartsOneTurnWithinSameCommand() {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let client = AppServerClient(logDirectory: directory)
+            client.isWorking = true
+            client.activeCommandID = "read-command"
+            client.requestedDesktopState = true
+            client.turnID = "first-turn"
+            var starts = 0
+            client.actingTurnOverride = { starts += 1 }
+            client.handleTurnCompleted(["id": "first-turn", "status": "completed"])
+            XCTAssertEqual(starts, 1)
+            XCTAssertTrue(client.desktopStateReadRetried)
+            XCTAssertTrue(client.isWorking)
+            XCTAssertEqual(client.queuedPhrase, "agent get desktop state")
+            XCTAssertEqual(
+                client.diagnosticEntries.filter { $0.event == "mcp_state_discovery_retry" }.count, 1)
+            client.handleTurnCompleted(["id": "second-turn", "status": "completed"])
+            XCTAssertEqual(starts, 1)
+            XCTAssertFalse(client.isWorking)
+        }
+    #endif
 }
