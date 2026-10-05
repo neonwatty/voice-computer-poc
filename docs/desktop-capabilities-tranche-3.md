@@ -79,6 +79,11 @@ Safari approval; the stale approval was declined and the app command stopped.
 The runner now directs the acting test to grant Safari for that test session,
 and the focused redirect rerun passed. Case 21 is included in the ordered
 suite. The exact-head suite passed three times on commit `555a100`.
+An additional focused two-window run passed with different Safari window UUIDs,
+one acted Docs tab in the intended window, and an unchanged decoy sentinel.
+The held-Home Stop variant also passed with one Home request, no Docs request,
+an interrupted app result, preserved sentinel, and closed test window. An
+injected inner CUA failure remains untested.
 
 ## Work package 2: Finder selection in an already-open window
 
@@ -115,9 +120,13 @@ each rejected the app request without an inner Finder turn, kept the prepared
 window and selection unchanged, and cleaned up. The outer test correlated
 Finder's numeric window ID across preparation and selection, app-owned and
 independent Accessibility observations, the exact selected report URL, and
-unchanged Main Space. Two simultaneous similar test-owned Finder windows and
-an injected CUA failure remain to test. Case 22 is included in the ordered
-suite. The exact-head suite passed three times on commit `555a100`.
+unchanged Main Space. A focused two-window run then passed with separate
+numeric IDs, exact selection only in the target,
+an unchanged decoy, and both windows cleaned up. An earlier attempt produced
+outer CUA stale-handle errors and correctly failed despite an otherwise valid
+app and window receipt. Case 22 is included in the ordered suite. The
+exact-head suite passed three times on commit `555a100`. An injected inner
+CUA failure remains untested.
 
 ## Work package 3: routine exact-build Mac testing
 

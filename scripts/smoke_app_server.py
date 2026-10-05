@@ -507,13 +507,13 @@ def safari_snapshot(text):
 def verify_safari_context_receipt(rows, run_id, port, fixture_rows,
                                   observations, windows_before, windows_after,
                                   space_before, space_after, prior_command_ids=(),
-                                  mode="normal"):
+                                  mode="normal", sentinel_count=1):
     """Prove a run-owned Safari window kept its sentinel through tab cleanup."""
     sentinel_request = {"method": "GET", "path": "/sentinel", "run_id": [run_id]}
-    if not fixture_rows or fixture_rows[0] != sentinel_request:
+    if sentinel_count not in (1, 2) or fixture_rows[:sentinel_count] != [sentinel_request] * sentinel_count:
         raise ValueError("Safari sentinel request missing or duplicated")
     browser = verify_browser_receipt(
-        rows, run_id, port, fixture_rows[1:], observations,
+        rows, run_id, port, fixture_rows[sentinel_count:], observations,
         space_before, space_after, prior_command_ids, mode=mode)
     if windows_after != windows_before:
         raise ValueError("Safari window inventory did not return to baseline")
@@ -548,9 +548,64 @@ def verify_safari_context_receipt(rows, run_id, port, fixture_rows,
                    and final_url not in cleaned["state"]
                    and "Description: Tab bar, 2 tabs" not in cleaned["state"]
                    for cleaned in snapshots[after_index + 1:]):
+                decoy_id = None
+                if sentinel_count == 2:
+                    candidates = {snapshot["window_id"] for snapshot in snapshots[:before_index]
+                                  if snapshot["window_id"] not in windows_before
+                                  and snapshot["window_id"] != context_id
+                                  and sentinel_url in snapshot["state"]
+                                  and sentinel_heading in snapshot["state"]}
+                    preserved = {snapshot["window_id"] for snapshot in snapshots[after_index + 1:]
+                                 if snapshot["window_id"] in candidates
+                                 and sentinel_url in snapshot["state"]
+                                 and sentinel_heading in snapshot["state"]
+                                 and final_url not in snapshot["state"]
+                                 and "Description: Tab bar, 2 tabs" not in snapshot["state"]}
+                    if len(preserved) != 1:
+                        continue
+                    decoy_id = next(iter(preserved))
                 return {**browser, "context_window_id": context_id,
+                        "decoy_window_id": decoy_id,
                         "sentinel_preserved": True, "window_cleanup_verified": True}
     raise ValueError("Safari sentinel, acted tab, and cleanup states did not correlate")
+
+
+def verify_safari_context_interruption_receipt(rows, run_id, port, fixture_rows,
+                                               observations, windows_before, windows_after,
+                                               space_before, space_after,
+                                               prior_command_ids=()):
+    """A stopped Browser command must preserve its owned Safari sentinel."""
+    sentinel_request = {"method": "GET", "path": "/sentinel", "run_id": [run_id]}
+    if not fixture_rows or fixture_rows[0] != sentinel_request:
+        raise ValueError("Safari sentinel request missing or duplicated")
+    browser = verify_browser_interruption_receipt(
+        rows, run_id, fixture_rows[1:], space_before, space_after, prior_command_ids)
+    if windows_after != windows_before:
+        raise ValueError("Stopped Safari window inventory did not return to baseline")
+    snapshots = [snapshot for text in observations
+                 if (snapshot := safari_snapshot(text)) is not None]
+    sentinel_url = f"127.0.0.1:{port}/sentinel?run_id={run_id}"
+    sentinel_heading = f"heading Voice Computer Sentinel {run_id}"
+    home_url = f"127.0.0.1:{port}/home?run_id={run_id}"
+    for before_index, prepared in enumerate(snapshots):
+        context_id = prepared["window_id"]
+        if context_id in windows_before or sentinel_url not in prepared["state"] \
+                or sentinel_heading not in prepared["state"]:
+            continue
+        for acted_index in range(before_index + 1, len(snapshots)):
+            acted = snapshots[acted_index]
+            if acted["window_id"] != context_id or home_url not in acted["state"] \
+                    or "Description: Tab bar, 2 tabs" not in acted["state"]:
+                continue
+            if any(cleaned["window_id"] == context_id
+                   and sentinel_url in cleaned["state"]
+                   and sentinel_heading in cleaned["state"]
+                   and home_url not in cleaned["state"]
+                   and "Description: Tab bar, 2 tabs" not in cleaned["state"]
+                   for cleaned in snapshots[acted_index + 1:]):
+                return {**browser, "context_window_id": context_id,
+                        "sentinel_preserved": True, "window_cleanup_verified": True}
+    raise ValueError("Stopped Safari tab and sentinel cleanup did not correlate")
 
 
 def verify_browser_interruption_receipt(rows, run_id, fixture_rows, before, after,
@@ -688,7 +743,8 @@ def verify_finder_receipt(rows, report, observations, before, after,
 
 def verify_finder_context_receipt(rows, report, observations,
                                   windows_before, windows_after,
-                                  space_before, space_after, prior_command_ids=()):
+                                  space_before, space_after, prior_command_ids=(),
+                                  decoy_report=None):
     """Require report selection in the same prepared Finder window."""
     finder = verify_finder_receipt(
         rows, report, [entry["state"] for entry in observations],
@@ -706,7 +762,25 @@ def verify_finder_context_receipt(rows, report, observations,
         for acted in observations[before_index + 1:]:
             if acted["window_id"] == window_id \
                     and set(selected.findall(acted["state"])) == {report.as_uri()}:
+                decoy_window_id = None
+                if decoy_report is not None:
+                    decoy_sentinel = decoy_report.with_name("sentinel.txt").as_uri()
+                    candidates = {entry["window_id"] for entry in observations[:before_index]
+                                  if entry["window_id"] is not None
+                                  and entry["window_id"] not in windows_before
+                                  and entry["window_id"] != window_id
+                                  and decoy_sentinel in entry["state"]
+                                  and not selected.findall(entry["state"])}
+                    preserved = {entry["window_id"] for entry in observations[before_index + 1:]
+                                 if entry["window_id"] in candidates
+                                 and decoy_sentinel in entry["state"]
+                                 and not selected.findall(entry["state"])
+                                 and report.as_uri() not in entry["state"]}
+                    if len(preserved) != 1:
+                        continue
+                    decoy_window_id = next(iter(preserved))
                 return {**finder, "context_window_id": window_id,
+                        "decoy_window_id": decoy_window_id,
                         "existing_window_reused": True,
                         "window_cleanup_verified": True}
     raise ValueError("Finder prepared window and selected report did not correlate")
@@ -1131,6 +1205,7 @@ class Driver:
         self.finder_observations = []
         self.finder_context_observations = []
         self.finder_run_id = None
+        self.finder_decoy_run_id = None
         self.process = subprocess.Popen(
             [executable, "app-server"],
             stdin=subprocess.PIPE,
@@ -1286,12 +1361,17 @@ class Driver:
                 if self.command_index == 22 and item.get("server") == "cua_repl":
                     for part in content:
                         state = part.get("text") or ""
-                        if f'Window: "{self.finder_run_id}"' not in state \
-                                or "App: Finder" not in state:
+                        if "App: Finder" not in state:
+                            continue
+                        matched_run_id = next(
+                            (candidate for candidate in
+                             (self.finder_run_id, self.finder_decoy_run_id)
+                             if candidate and f'Window: "{candidate}"' in state), None)
+                        if matched_run_id is None:
                             continue
                         try:
                             matches = finder_window_inventory(
-                                self.finder_run_id)["matching_window_ids"]
+                                matched_run_id)["matching_window_ids"]
                         except (OSError, subprocess.SubprocessError, ValueError, KeyError) as error:
                             self.record("finder_context_observer_unavailable",
                                         error_type=type(error).__name__)
@@ -1388,6 +1468,10 @@ def main():
     parser.add_argument("--finder-mode", default="normal",
                         choices=("normal", "missing-file", "symlink-escape", "decoy-target"),
                         help="Fixture scenario for a focused --case 18, 19, or 22 run")
+    parser.add_argument("--safari-context-windows", type=int, choices=(1, 2), default=1,
+                        help="Number of test-owned sentinel windows for focused --case 21")
+    parser.add_argument("--finder-context-windows", type=int, choices=(1, 2), default=1,
+                        help="Number of test-owned fixture windows for focused --case 22")
     parser.add_argument("--codex-thread-id",
                         help="Optional exact existing Codex task UUID for --suite's read-only status probe")
     parser.add_argument("--app-path", type=Path,
@@ -1401,8 +1485,12 @@ def main():
         parser.error(str(error))
     if args.browser_mode != "normal" and selected not in ([17], [19], [21]):
         parser.error("--browser-mode requires a focused --case 17, 19, or 21 run")
-    if selected == [21] and args.browser_mode in ("stop-before-docs", "form-submit"):
-        parser.error("--case 21 supports normal, missing-link, home-404, or redirect")
+    if selected == [21] and args.browser_mode == "form-submit":
+        parser.error("--case 21 does not support form-submit")
+    if args.safari_context_windows != 1 and (selected != [21] or args.browser_mode != "normal"):
+        parser.error("Two Safari context windows require normal focused --case 21")
+    if args.finder_context_windows != 1 and (selected != [22] or args.finder_mode != "normal"):
+        parser.error("Two Finder context windows require normal focused --case 22")
     if args.finder_mode != "normal" and selected not in ([18], [19], [22]):
         parser.error("--finder-mode requires a focused --case 18, 19, or 22 run")
     if selected == [19] and args.browser_mode == "form-submit":
@@ -1474,6 +1562,8 @@ def main():
             safari_windows_before = None
             finder_windows_before = None
             finder_run_id = None
+            finder_decoy_run_id = None
+            finder_decoy_report = None
             home_requested = home_release = None
             if index in (17, 19, 21):
                 run_id = uuid.uuid4().hex
@@ -1503,12 +1593,14 @@ def main():
                     sentinel_url = (f"http://127.0.0.1:{server.server_port}/sentinel"
                                     f"?run_id={run_id}")
                     safari_windows_before = safari_window_ids()
-                    phrase = (f'Create one new Safari window and load only {sentinel_url} '
-                              'as its sentinel tab. Then, in the exact Voice Computer POC app, '
+                    windows = ("two new Safari windows, each" if args.safari_context_windows == 2
+                               else "one new Safari window")
+                    phrase = (f'Create {windows} with {sentinel_url} as its sentinel tab. '
+                              'Then, in the exact Voice Computer POC app, '
                               f'enter "Open {url} and follow the Docs link." once. '
-                              'After the app finishes, inspect the same Safari window, close '
-                              'only the new run-specific fixture tab, verify the sentinel remains, '
-                              'then close only the test-created Safari window.')
+                              'After the app finishes, inspect the acted Safari window, close '
+                              'only the new run-specific fixture tab, verify its sentinel remains, '
+                              'then close only the test-created Safari window or windows.')
             if index == 19:
                 fixture_root = support / "TestFixtures" / run_id
                 fixture_root.mkdir(parents=True, mode=0o700)
@@ -1561,6 +1653,15 @@ def main():
                 if index == 22:
                     (fixture_root / "sentinel.txt").write_text("Finder window sentinel\n")
                     finder_windows_before = finder_window_inventory()["window_ids"]
+                    if args.finder_context_windows == 2:
+                        decoy_root = support / "TestFixtures" / f"{finder_run_id}-decoy"
+                        decoy_root.mkdir(parents=True, mode=0o700)
+                        finder_fixtures.append(decoy_root)
+                        finder_decoy_run_id = decoy_root.name
+                        finder_decoy_report = decoy_root / "report.txt"
+                        finder_decoy_report.write_text("Decoy window report\n")
+                        (decoy_root / "report-copy.txt").write_text("Decoy copy\n")
+                        (decoy_root / "sentinel.txt").write_text("Decoy window sentinel\n")
                 if args.finder_mode == "decoy-target":
                     report = fixture_root / "report-copy.txt"
                 finder_instruction = (
@@ -1580,6 +1681,15 @@ def main():
                               f'test report at {report} in Finder." once. After the app finishes, '
                               'inspect the exact report selection in that same Finder window '
                               'and close only the test-created window.')
+                    if args.finder_context_windows == 2:
+                        phrase = (f'Create one Finder window showing decoy folder '
+                                  f'{finder_decoy_report.parent} in list view, then a second '
+                                  f'Finder window showing intended folder {fixture_root} '
+                                  'in list view. Do not select a file in either. In the exact '
+                                  'Voice Computer POC app, enter "Reveal the test report at '
+                                  f'{report} in Finder." once. Verify the report is selected '
+                                  'only in the second window, the decoy remains unchanged, '
+                                  'then close only these two test-created windows.')
                     if args.finder_mode != "normal":
                         phrase = (f'Create one new Finder window and show the test folder '
                                   f'{fixture_root} in list view, preserving its sentinel.txt file. '
@@ -1643,6 +1753,7 @@ def main():
             driver.finder_observations = []
             driver.finder_context_observations = []
             driver.finder_run_id = finder_run_id
+            driver.finder_decoy_run_id = finder_decoy_run_id
             driver.record("command_started",
                           space_before=space_before, expected_space=expected_space)
             started = time.monotonic()
@@ -1809,6 +1920,7 @@ def main():
                     "missing-link": ("home", f"Voice Computer Home {fixture[0]}"),
                     "home-404": ("home", "Fixture page not found"),
                     "redirect": ("error", "Fixture page not found"),
+                    "stop-before-docs": ("home", ""),
                 }[args.browser_mode]
                 expected_page = (f"127.0.0.1:{fixture[1]}/{final_path}"
                                  f"?run_id={fixture[0]}")
@@ -1855,6 +1967,47 @@ def main():
                     "without closing unrelated windows. Never inspect or control the Codex "
                     "or ChatGPT host app. User request: "
                 )
+                if home_requested:
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. First bind the exact app with "
+                        "var vcContextApp = await cua.getApp('" + str(app_path) +
+                        "'); then bind Safari with var vcContextSafari = await "
+                        "cua.getApp('com.apple.Safari'). Create one new Safari window using "
+                        "the visible File menu, load the exact sentinel URL, and capture a "
+                        "full AX state with its SafariWindow UUID. Return to vcContextApp "
+                        "and submit the quoted command once. Grant Safari Computer Use "
+                        "through Allow for session. Home may pause loading; wait for the "
+                        "app's own Stop action. Do not press Stop yourself, follow Docs, or "
+                        "navigate Safari. Once the app finishes, capture a full Safari AX "
+                        "state. Close the new fixture tab only if its URL contains the exact "
+                        "run ID and it belongs to the prepared window UUID. Capture a full "
+                        "state proving the sentinel remains, then close only the prepared "
+                        "window. If identity is ambiguous, leave it open and report that. "
+                        "Never inspect the Codex or ChatGPT host app. User request: "
+                    )
+                if args.safari_context_windows == 2:
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. First bind the exact app with "
+                        "var vcContextApp = await cua.getApp('" + str(app_path) +
+                        "'); then bind Safari with var vcContextSafari = await "
+                        "cua.getApp('com.apple.Safari'). Use Safari's visible File menu to "
+                        "create a first test-owned window, load the exact sentinel URL, "
+                        "and capture a full AX state with its SafariWindow UUID. Create a "
+                        "second new window using the same File menu, load the same sentinel "
+                        "URL, and capture its different UUID. The second window is the "
+                        "intended one. Return to vcContextApp, submit the quoted command "
+                        "once, and choose Allow for session only for Safari Computer Use. "
+                        "After the app finishes, capture a full Safari AX state requiring "
+                        "the second UUID, exact Docs URL and heading, two tabs, and its "
+                        "sentinel. Close only that new run-specific Docs tab by its exposed "
+                        "close tab action, then capture its restored sentinel state. Close "
+                        "only the second test-created window. Inspect the first window with "
+                        "a full AX state, require its original UUID and unchanged sentinel "
+                        "without Docs, then close only that first test-created window. "
+                        "If either window identity is ambiguous, leave it open. Do not "
+                        "navigate Safari after submitting the app command or inspect the "
+                        "Codex or ChatGPT host app. User request: "
+                    )
                 if args.finder_mode != "normal":
                     instruction = (
                         "Use only mcp__cua_repl.js for UI. First bind the exact Voice Computer "
@@ -1871,6 +2024,28 @@ def main():
                         "Finder window and its unchanged selection. Close only the test-created "
                         "window. Never inspect or control the Codex or ChatGPT host app. "
                         "User request: "
+                    )
+                if args.finder_context_windows == 2:
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. First bind the exact app with "
+                        "var vcFinderContextApp = await cua.getApp('" + str(app_path) +
+                        "'); then bind Finder with var vcFinderContext = await "
+                        "cua.getApp('com.apple.finder'). Create a first test-owned Finder "
+                        "window with File > New Finder Window. Use Go > Go to Folder to "
+                        "show the decoy folder from the request in list view. Capture a "
+                        "full AX state showing its title, sentinel.txt, and no selected "
+                        "report. Create a second new Finder window, show the intended test "
+                        "folder from the request in list view, and capture its different "
+                        "title, sentinel.txt, report.txt, and no selected report. Return "
+                        "to vcFinderContextApp and submit the quoted command once. Choose "
+                        "Allow for session only for Finder Computer Use. After the app "
+                        "finishes, capture a full Finder AX state requiring the second "
+                        "window and exact selected report URL. Do not select it yourself. "
+                        "Close only the second test-created window, then inspect the first "
+                        "window with a full AX state showing its unchanged sentinel and "
+                        "selection. Close only that first test-created window. If either "
+                        "identity is ambiguous, leave it open. Never inspect the Codex "
+                        "or ChatGPT host app. User request: "
                     )
             response = driver.wait_rpc(driver.rpc("turn/start", {
                 "threadId": thread, "input": [{"type": "text", "text": instruction + phrase}],
@@ -1978,11 +2153,19 @@ def main():
                         driver.record("safari_context_requests_observed",
                                       paths=[entry.get("path") for entry in fixture_rows])
                         safari_windows_after = safari_window_ids()
-                        exact_receipt = verify_safari_context_receipt(
-                            rows, run_id, port, fixture_rows,
-                            driver.browser_observations, safari_windows_before,
-                            safari_windows_after, space_before["current"], after_id,
-                            prior_ids, mode=args.browser_mode)
+                        if home_requested:
+                            exact_receipt = verify_safari_context_interruption_receipt(
+                                rows, run_id, port, fixture_rows,
+                                driver.browser_observations, safari_windows_before,
+                                safari_windows_after, space_before["current"], after_id,
+                                prior_ids)
+                        else:
+                            exact_receipt = verify_safari_context_receipt(
+                                rows, run_id, port, fixture_rows,
+                                driver.browser_observations, safari_windows_before,
+                                safari_windows_after, space_before["current"], after_id,
+                                prior_ids, mode=args.browser_mode,
+                                sentinel_count=args.safari_context_windows)
                         driver.record("safari_context_receipt_verified", **exact_receipt)
                     elif index == 22:
                         finder_windows_after = finder_window_inventory()["window_ids"]
@@ -1990,7 +2173,8 @@ def main():
                             exact_receipt = verify_finder_context_receipt(
                                 rows, report, driver.finder_context_observations,
                                 finder_windows_before, finder_windows_after,
-                                space_before["current"], after_id, prior_ids)
+                                space_before["current"], after_id, prior_ids,
+                                decoy_report=finder_decoy_report)
                         else:
                             exact_receipt = verify_finder_context_rejection_receipt(
                                 rows, report, driver.finder_context_observations,
