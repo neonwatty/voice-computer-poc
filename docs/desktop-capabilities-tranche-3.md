@@ -159,6 +159,17 @@ complete receipt, no unhandled prompts or unexplained process rotation, and
 the same final Space and test-owned UI inventory as at start. A deliberately
 broken fixture produces a failed run and no green commit result.
 
+**Local entry point:** `scripts/run_desktop_suite.py --sha <40-hex-head> --derived-data-path /private/tmp/voice-tranche3-dd` requires a clean checkout,
+unlocked console, readable Main Space, and no other Voice Computer process.
+It runs Python and Swift package tests, strict Swift formatting, both Xcode
+test configurations, then launches the exact Debug app and executes the
+ordered machine suite once. It writes owner-only step logs, `machine.jsonl`,
+and a redacted `summary.json` under Application Support. It stops its own app
+process after the run; an unknown Safari or Finder window is left for targeted
+cleanup rather than closed by guess. This local wrapper and its receipt parser
+have static tests; a live end-to-end wrapper run, trusted trigger, and
+three-run gate are pending.
+
 ## Work package 4: Codex desktop feasibility
 
 Treat host-task status as a separate read-only investigation. The existing
