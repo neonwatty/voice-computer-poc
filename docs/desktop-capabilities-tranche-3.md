@@ -109,6 +109,16 @@ result and assess a separate UI workflow; a new window does not pass this case.
 background run, plus rejection and failure variants. Sentinels remain and no
 fixture files or windows remain after passing runs.
 
+**Measured so far (October 5):** Three focused positive runs passed on the
+same Debug app build. Missing-file, symlink-escape, and decoy-target variants
+each rejected the app request without an inner Finder turn, kept the prepared
+window and selection unchanged, and cleaned up. The outer test correlated
+Finder's numeric window ID across preparation and selection, app-owned and
+independent Accessibility observations, the exact selected report URL, and
+unchanged Main Space. Two simultaneous similar test-owned Finder windows and
+an injected CUA failure remain to test. Case 22 is included in the ordered
+suite; the exact-head suite receipt is pending.
+
 ## Work package 3: routine exact-build Mac testing
 
 Add a local orchestration entry point around `smoke_app_server.py`; preserve

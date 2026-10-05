@@ -51,10 +51,11 @@ COMMANDS = [
     None,  # Case 19 submits one composed Browser -> Finder command.
     None,  # Case 20 reads the desktop state through MCP.
     None,  # Case 21 preserves a test-owned Safari sentinel tab.
+    None,  # Case 22 selects a report in an already-open Finder window.
 ]
-CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Mission Control", "Finder", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC"]
+CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC"]
 MCP_CASES = {15: "right", 16: "left"}
-EXACT_APP_CASES = {13, 17, 18, 19, 20, 21, *MCP_CASES}
+EXACT_APP_CASES = {13, 17, 18, 19, 20, 21, 22, *MCP_CASES}
 APP_LOG_DIRECTORY = Path.home() / "Library/Application Support/VoiceComputerPOC/Logs"
 
 
@@ -75,6 +76,7 @@ EXPECTED_EVIDENCE = [
     None,
     re.compile(r"mission_control_ax_summary"),
     re.compile(r"native_space_step_verified"),
+    None,
     None,
     None,
     None,
@@ -170,6 +172,23 @@ def safari_window_ids():
             for item in ids):
         raise ValueError("Safari window observer returned invalid IDs")
     return set(ids)
+
+
+def finder_window_inventory(title=None):
+    """Observe Finder's named window IDs without emitting unrelated titles."""
+    helper = Path(__file__).with_name("observe_finder_windows.swift")
+    command = ["swift", str(helper)] + ([title] if title else [])
+    result = subprocess.run(command, capture_output=True, text=True,
+                            check=True, timeout=20)
+    inventory = json.loads(result.stdout)
+    ids = inventory["window_ids"]
+    matches = inventory["matching_window_ids"]
+    if not isinstance(ids, list) or not isinstance(matches, list) \
+            or len(ids) != len(set(ids)) or any(type(item) is not int or item <= 0
+                                              for item in ids + matches) \
+            or not set(matches).issubset(ids):
+        raise ValueError("Finder window observer returned invalid IDs")
+    return {"window_ids": set(ids), "matching_window_ids": set(matches)}
 
 
 def validate_exact_space_state(state, case):
@@ -667,6 +686,58 @@ def verify_finder_receipt(rows, report, observations, before, after,
             "before": before, "after": after}
 
 
+def verify_finder_context_receipt(rows, report, observations,
+                                  windows_before, windows_after,
+                                  space_before, space_after, prior_command_ids=()):
+    """Require report selection in the same prepared Finder window."""
+    finder = verify_finder_receipt(
+        rows, report, [entry["state"] for entry in observations],
+        space_before, space_after, prior_command_ids)
+    if windows_after != windows_before:
+        raise ValueError("Finder window inventory did not return to baseline")
+    selected = re.compile(r"^\s*\d+ row \(selected\)(?:(?!^\s*\d+ row ).)*?URL: (file://\S+)",
+                          re.MULTILINE | re.DOTALL)
+    for before_index, prepared in enumerate(observations):
+        window_id = prepared["window_id"]
+        if window_id is None or window_id in windows_before \
+                or report.as_uri() in selected.findall(prepared["state"]) \
+                or report.with_name("sentinel.txt").as_uri() not in prepared["state"]:
+            continue
+        for acted in observations[before_index + 1:]:
+            if acted["window_id"] == window_id \
+                    and set(selected.findall(acted["state"])) == {report.as_uri()}:
+                return {**finder, "context_window_id": window_id,
+                        "existing_window_reused": True,
+                        "window_cleanup_verified": True}
+    raise ValueError("Finder prepared window and selected report did not correlate")
+
+
+def verify_finder_context_rejection_receipt(rows, report, observations,
+                                            windows_before, windows_after,
+                                            space_before, space_after,
+                                            prior_command_ids=(), mode="missing-file"):
+    """Rejected file requests must leave a prepared Finder window untouched."""
+    finder = verify_finder_rejection_receipt(
+        rows, report, space_before, space_after, prior_command_ids, mode=mode)
+    if windows_after != windows_before:
+        raise ValueError("Finder window inventory did not return to baseline")
+    selected = re.compile(r"^\s*\d+ row \(selected\)(?:(?!^\s*\d+ row ).)*?URL: (file://\S+)",
+                          re.MULTILINE | re.DOTALL)
+    sentinel_url = report.with_name("sentinel.txt").as_uri()
+    for before_index, prepared in enumerate(observations):
+        window_id = prepared["window_id"]
+        if window_id is None or window_id in windows_before \
+                or sentinel_url not in prepared["state"]:
+            continue
+        for after in observations[before_index + 1:]:
+            if after["window_id"] == window_id \
+                    and sentinel_url in after["state"] \
+                    and selected.findall(after["state"]) == selected.findall(prepared["state"]):
+                return {**finder, "context_window_id": window_id,
+                        "window_unchanged": True, "window_cleanup_verified": True}
+    raise ValueError("Rejected Finder request changed its prepared window")
+
+
 def verify_composed_receipt(rows, run_id, port, fixture_rows, report,
                             browser_observations, finder_observations,
                             before, after, prior_command_ids=()):
@@ -1058,6 +1129,8 @@ class Driver:
         self.browser_observations = []
         self.browser_run_id = None
         self.finder_observations = []
+        self.finder_context_observations = []
+        self.finder_run_id = None
         self.process = subprocess.Popen(
             [executable, "app-server"],
             stdin=subprocess.PIPE,
@@ -1151,7 +1224,8 @@ class Driver:
                         if self.command_index in (17, 21) else
                         {CASE_APP[self.command_index - 1], str(self.app_path),
                          "Finder", "com.apple.finder"}
-                        if self.command_index == 18 and self.finder_mode == "normal" else
+                        if self.command_index == 22 or \
+                        (self.command_index == 18 and self.finder_mode == "normal") else
                         {CASE_APP[self.command_index - 1], str(self.app_path)}
                         if self.command_index in EXACT_APP_CASES else
                         {CASE_APP[self.command_index - 1]})
@@ -1183,7 +1257,7 @@ class Driver:
                     self.cua_binding_observed = True
                     self.record("cua_exact_path_requested")
             self.tool_calls += 1
-            limit = 44 if self.command_index == 21 else \
+            limit = 44 if self.command_index in (21, 22) else \
                 36 if self.command_index == 19 else \
                 24 if self.command_index in (6, 9, 10, 14, 15, 16, 17, 18) else 12
             if self.tool_calls > limit:
@@ -1204,11 +1278,28 @@ class Driver:
                         part.get("text") or "" for part in content
                         if part.get("type") == "text" and "Window:" in (part.get("text") or "")
                         and "Safari" in (part.get("text") or ""))
-                if self.command_index in (18, 19) and item.get("server") == "cua_repl":
+                if self.command_index in (18, 19, 22) and item.get("server") == "cua_repl":
                     self.finder_observations.extend(
                         part.get("text") or "" for part in content
                         if part.get("type") == "text" and "Window:" in (part.get("text") or "")
                         and "Finder" in (part.get("text") or ""))
+                if self.command_index == 22 and item.get("server") == "cua_repl":
+                    for part in content:
+                        state = part.get("text") or ""
+                        if f'Window: "{self.finder_run_id}"' not in state \
+                                or "App: Finder" not in state:
+                            continue
+                        try:
+                            matches = finder_window_inventory(
+                                self.finder_run_id)["matching_window_ids"]
+                        except (OSError, subprocess.SubprocessError, ValueError, KeyError) as error:
+                            self.record("finder_context_observer_unavailable",
+                                        error_type=type(error).__name__)
+                            matches = set()
+                        self.finder_context_observations.append({
+                            "state": state,
+                            "window_id": next(iter(matches)) if len(matches) == 1 else None,
+                        })
                 if self.trace_tool_output:
                     self.record("tool_output_trace", item_id=item.get("id"),
                                 excerpt="\n".join(str(part.get("text") or "") for part in content)[:3000])
@@ -1274,7 +1365,7 @@ def selected_cases(suite, cases, mission_control_gate):
     if suite and cases:
         raise ValueError("--suite cannot be combined with --case")
     if suite:
-        return ([13] if mission_control_gate else []) + [20, 17, 18, 21, 19, 15, 16, 20]
+        return ([13] if mission_control_gate else []) + [20, 17, 18, 21, 22, 19, 15, 16, 20]
     return cases or list(range(1, 7))
 
 
@@ -1296,7 +1387,7 @@ def main():
                         help="Fixture scenario for a focused --case 17, 19, or 21 run")
     parser.add_argument("--finder-mode", default="normal",
                         choices=("normal", "missing-file", "symlink-escape", "decoy-target"),
-                        help="Fixture scenario for a focused --case 18 or 19 run")
+                        help="Fixture scenario for a focused --case 18, 19, or 22 run")
     parser.add_argument("--codex-thread-id",
                         help="Optional exact existing Codex task UUID for --suite's read-only status probe")
     parser.add_argument("--app-path", type=Path,
@@ -1312,8 +1403,8 @@ def main():
         parser.error("--browser-mode requires a focused --case 17, 19, or 21 run")
     if selected == [21] and args.browser_mode in ("stop-before-docs", "form-submit"):
         parser.error("--case 21 supports normal, missing-link, home-404, or redirect")
-    if args.finder_mode != "normal" and selected not in ([18], [19]):
-        parser.error("--finder-mode requires a focused --case 18 or 19 run")
+    if args.finder_mode != "normal" and selected not in ([18], [19], [22]):
+        parser.error("--finder-mode requires a focused --case 18, 19, or 22 run")
     if selected == [19] and args.browser_mode == "form-submit":
         parser.error("--case 19 does not accept form-submit")
     if selected == [19] and args.browser_mode != "normal" and args.finder_mode != "normal":
@@ -1381,6 +1472,8 @@ def main():
             fixture = None
             sentinel_url = None
             safari_windows_before = None
+            finder_windows_before = None
+            finder_run_id = None
             home_requested = home_release = None
             if index in (17, 19, 21):
                 run_id = uuid.uuid4().hex
@@ -1450,10 +1543,11 @@ def main():
                               'in Finder." once. Approve only Safari Computer Use if prompted. '
                               'Wait for the failed or stopped Browser result. Inspect and close '
                               'only the fixture Safari tab; do not bind or inspect Finder.')
-            if index == 18:
+            if index in (18, 22):
                 fixture_root = support / "TestFixtures" / uuid.uuid4().hex
                 fixture_root.mkdir(parents=True, mode=0o700)
                 finder_fixtures.append(fixture_root)
+                finder_run_id = fixture_root.name
                 report = fixture_root / "report.txt"
                 if args.finder_mode in ("normal", "decoy-target"):
                     report.write_text("Voice Computer Finder fixture\n")
@@ -1464,6 +1558,9 @@ def main():
                     outside_report.write_text("Outside Finder fixture\n")
                     report.symlink_to(outside_report)
                 (fixture_root / "report-copy.txt").write_text("Decoy\n")
+                if index == 22:
+                    (fixture_root / "sentinel.txt").write_text("Finder window sentinel\n")
+                    finder_windows_before = finder_window_inventory()["window_ids"]
                 if args.finder_mode == "decoy-target":
                     report = fixture_root / "report-copy.txt"
                 finder_instruction = (
@@ -1476,13 +1573,27 @@ def main():
                 phrase = (f'In the exact Voice Computer POC app, enter "Reveal the test report '
                           f'at {report} in Finder." in the command field and press Return once. '
                           + finder_instruction)
+                if index == 22:
+                    phrase = (f'Create one new Finder window and show the test folder '
+                              f'{fixture_root} in list view, preserving its sentinel.txt file. '
+                              f'Then, in the exact Voice Computer POC app, enter "Reveal the '
+                              f'test report at {report} in Finder." once. After the app finishes, '
+                              'inspect the exact report selection in that same Finder window '
+                              'and close only the test-created window.')
+                    if args.finder_mode != "normal":
+                        phrase = (f'Create one new Finder window and show the test folder '
+                                  f'{fixture_root} in list view, preserving its sentinel.txt file. '
+                                  f'Then, in the exact Voice Computer POC app, enter "Reveal the '
+                                  f'test report at {report} in Finder." once. Wait for the unsafe '
+                                  'target rejection, verify the prepared Finder window did not '
+                                  'change, and close only that test-created window.')
             if index == 20:
                 phrase = ('In the exact Voice Computer POC app, enter "agent get desktop state" '
                           'in the command field and press Return once. Approve only the visible '
                           'desktop_tool.get_desktop_state read with Allow once. Wait for the '
                           'typed app result and report its Main Space ID, ordered IDs, '
                           'foreground bundle ID, and observation time. Do not switch Spaces.')
-            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21) else None
+            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22) else None
             expected_space = None
             if index in EXACT_APP_CASES:
                 validate_exact_space_state(space_before, index)
@@ -1530,6 +1641,8 @@ def main():
             driver.browser_observations = []
             driver.browser_run_id = fixture[0] if fixture else None
             driver.finder_observations = []
+            driver.finder_context_observations = []
+            driver.finder_run_id = finder_run_id
             driver.record("command_started",
                           space_before=space_before, expected_space=expected_space)
             started = time.monotonic()
@@ -1722,10 +1835,47 @@ def main():
                     "report it without closing uncertain content. Never inspect or control the "
                     "Codex or ChatGPT host app. User request: "
                 )
+            elif index == 22:
+                instruction = (
+                    "Use only mcp__cua_repl.js for UI. Your first Computer Use call must be "
+                    "var vcFinderContextApp = await cua.getApp('" + str(app_path) + "'); "
+                    "then use var vcFinderContext = await cua.getApp('com.apple.finder'). "
+                    "In Finder, use the visible File menu's New Finder Window item. In that "
+                    "new window use the visible Go menu's Go to Folder item to enter the "
+                    "test folder path from the request, then switch to list view. Capture a "
+                    "full getAXState({disableDiffing:true}) showing that folder's window "
+                    "title, sentinel.txt, report.txt, and report-copy.txt without selecting "
+                    "the report. Return to vcFinderContextApp and submit the quoted Voice "
+                    "Computer command once. Choose Allow for session only for Finder Computer "
+                    "Use inside the app; decline any other target. Wait until the app result "
+                    "is no longer working. Then inspect Finder with a full AX state. Require "
+                    "the same test folder window and exact selected report file URL. Do not "
+                    "select the report yourself. Close only that test-created Finder window "
+                    "using its visible close button. If window identity is ambiguous, stop "
+                    "without closing unrelated windows. Never inspect or control the Codex "
+                    "or ChatGPT host app. User request: "
+                )
+                if args.finder_mode != "normal":
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. First bind the exact Voice Computer "
+                        "app with var vcFinderContextApp = await cua.getApp('" + str(app_path) +
+                        "'); then bind Finder with var vcFinderContext = await "
+                        "cua.getApp('com.apple.finder'). Use Finder's File menu to create one "
+                        "new window. Use its Go menu's Go to Folder to show the test folder "
+                        "from the request, switch to list view, and capture a full AX state "
+                        "showing its window title and sentinel.txt. Do not select a file. "
+                        "Return to vcFinderContextApp and submit the quoted command once. "
+                        "The target is intentionally unsafe; the app must reject it before "
+                        "any Finder acting turn. Do not approve Finder Computer Use inside the "
+                        "app. After rejection, capture a full AX state of the same prepared "
+                        "Finder window and its unchanged selection. Close only the test-created "
+                        "window. Never inspect or control the Codex or ChatGPT host app. "
+                        "User request: "
+                    )
             response = driver.wait_rpc(driver.rpc("turn/start", {
                 "threadId": thread, "input": [{"type": "text", "text": instruction + phrase}],
             }))
-            turn = driver.wait_turn(seconds=300 if index in (19, 21) else 180)
+            turn = driver.wait_turn(seconds=300 if index in (19, 21, 22) else 180)
             if stop_thread:
                 stop_thread.join(timeout=85)
                 if stop_thread.is_alive() or not stop_outcome.get("pressed"):
@@ -1740,7 +1890,7 @@ def main():
                     if space_after and space_after["current"] == expected_space:
                         break
                     time.sleep(0.5)
-            elif index in (13, 17, 18, 19, 20, 21):
+            elif index in (13, 17, 18, 19, 20, 21, 22):
                 space_after = space_state()
             negative_result = re.search(
                 r"couldn.t|cannot|can.t|declined|unverified|failed|unable to",
@@ -1834,6 +1984,20 @@ def main():
                             safari_windows_after, space_before["current"], after_id,
                             prior_ids, mode=args.browser_mode)
                         driver.record("safari_context_receipt_verified", **exact_receipt)
+                    elif index == 22:
+                        finder_windows_after = finder_window_inventory()["window_ids"]
+                        if args.finder_mode == "normal":
+                            exact_receipt = verify_finder_context_receipt(
+                                rows, report, driver.finder_context_observations,
+                                finder_windows_before, finder_windows_after,
+                                space_before["current"], after_id, prior_ids)
+                        else:
+                            exact_receipt = verify_finder_context_rejection_receipt(
+                                rows, report, driver.finder_context_observations,
+                                finder_windows_before, finder_windows_after,
+                                space_before["current"], after_id, prior_ids,
+                                mode=args.finder_mode)
+                        driver.record("finder_context_receipt_verified", **exact_receipt)
                     else:
                         exact_receipt = verify_mcp_receipt(
                             rows, mcp_case_phrase(index), MCP_CASES[index],
@@ -1843,7 +2007,7 @@ def main():
                     driver.record("exact_app_receipt_rejected", reason=str(error))
                     verified = False
                 else:
-                    verified = exact_receipt is not None and (verified or index in (13, 17, 18, 19, 20, 21))
+                    verified = exact_receipt is not None and (verified or index in (13, 17, 18, 19, 20, 21, 22))
             recovered_stale_ui = (
                 index == 13 and exact_receipt is not None
                 and driver.tool_failures == ["stale_ui_state"])
@@ -1852,7 +2016,7 @@ def main():
             success = (turn.get("status") == "completed" and verified
                        and (not driver.tool_failures or recovered_stale_ui)
                        and all(a["allowed"] for a in driver.approvals)
-                       and (expected_space is not None or index in (17, 18, 19, 20, 21) or not negative_result))
+                       and (expected_space is not None or index in (17, 18, 19, 20, 21, 22) or not negative_result))
             driver.record("command_finished", success=success,
                           elapsed_ms=round((time.monotonic() - started) * 1000),
                           tool_failures=driver.tool_failures, approvals=driver.approvals,

@@ -20,6 +20,8 @@ from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path
                               verify_read_only_receipt, verify_browser_receipt,
                               verify_browser_interruption_receipt,
                               verify_finder_receipt,
+                              verify_finder_context_receipt,
+                              verify_finder_context_rejection_receipt,
                               verify_finder_rejection_receipt,
                               verify_composed_receipt,
                               verify_composed_failure_receipt,
@@ -39,8 +41,8 @@ def row(event, **details):
 
 class SuiteSelectionTests(unittest.TestCase):
     def test_mission_control_is_explicit_for_browser_finder_suite(self):
-        self.assertEqual(selected_cases(True, None, False), [20, 17, 18, 21, 19, 15, 16, 20])
-        self.assertEqual(selected_cases(True, None, True), [13, 20, 17, 18, 21, 19, 15, 16, 20])
+        self.assertEqual(selected_cases(True, None, False), [20, 17, 18, 21, 22, 19, 15, 16, 20])
+        self.assertEqual(selected_cases(True, None, True), [13, 20, 17, 18, 21, 22, 19, 15, 16, 20])
         with self.assertRaisesRegex(ValueError, "requires --suite"):
             selected_cases(False, [17], True)
         with self.assertRaisesRegex(ValueError, "cannot be combined"):
@@ -449,6 +451,17 @@ class FinderReceiptTests(unittest.TestCase):
                 verify_finder_rejection_receipt(rows, report, 5, 6)
             with self.assertRaisesRegex(ValueError, "stale"):
                 verify_finder_rejection_receipt(rows, report, 5, 5, {COMMAND_ID})
+            sentinel = root / "sentinel.txt"
+            sentinel.write_text("sentinel")
+            context = [{"state": f"Window: fixture, App: Finder\n"
+                                 f"10 row\n11 text field URL: {sentinel.as_uri()}\n",
+                        "window_id": 101}]
+            self.assertTrue(verify_finder_context_rejection_receipt(
+                rows, report, context * 2, {99}, {99}, 5, 5)["window_unchanged"])
+            with self.assertRaisesRegex(ValueError, "changed its prepared window"):
+                verify_finder_context_rejection_receipt(
+                    rows, report, [context[0], {**context[0], "window_id": 102}],
+                    {99}, {99}, 5, 5)
             outside = root / "outside.txt"
             outside.write_text("outside")
             report.symlink_to(outside)
@@ -508,6 +521,23 @@ class FinderReceiptTests(unittest.TestCase):
                 verify_finder_receipt(rows, report, [selected], 5, 5, {COMMAND_ID})
             with self.assertRaisesRegex(ValueError, "changed desktop"):
                 verify_finder_receipt(rows, report, [selected], 5, 6)
+            sentinel = root / "sentinel.txt"
+            sentinel.write_text("sentinel")
+            prepared = ("Window: fixture, App: Finder\n"
+                        f"10 row\n11 text field URL: {sentinel.as_uri()}\n"
+                        f"12 row\n13 text field URL: {report.as_uri()}\n")
+            context = [{"state": prepared, "window_id": 101},
+                       {"state": selected, "window_id": 101}]
+            receipt = verify_finder_context_receipt(
+                rows, report, context, {99}, {99}, 5, 5)
+            self.assertEqual(receipt["context_window_id"], 101)
+            with self.assertRaisesRegex(ValueError, "inventory"):
+                verify_finder_context_receipt(rows, report, context,
+                                              {99}, {99, 101}, 5, 5)
+            with self.assertRaisesRegex(ValueError, "did not correlate"):
+                verify_finder_context_receipt(rows, report,
+                                              [context[0], {**context[1], "window_id": 102}],
+                                              {99}, {99}, 5, 5)
 
 
 class MCPReceiptTests(unittest.TestCase):
