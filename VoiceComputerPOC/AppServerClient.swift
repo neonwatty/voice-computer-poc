@@ -45,6 +45,7 @@ final class AppServerClient: ObservableObject {
     var selectedModel: String?
     var turnID: String?
     var queuedPhrase: String?
+    var routerOutputRetried = false
     var queuedApprovals: [ApprovalRequest] = []
     var spaceObserver: NSObjectProtocol?
     var activationObserver: NSObjectProtocol?
@@ -173,6 +174,7 @@ final class AppServerClient: ObservableObject {
         guard !phrase.isEmpty, !isWorking else { return }
         result = ""
         desktopStateReadRetried = false
+        routerOutputRetried = false
         isWorking = true
         activeCommandID =
             source == .reviewedVoice ? (voiceCaptureCommandID ?? UUID().uuidString) : UUID().uuidString

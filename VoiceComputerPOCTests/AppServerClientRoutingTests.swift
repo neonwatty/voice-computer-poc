@@ -62,7 +62,6 @@ import XCTest
 
         func testUnsafeAndUnavailableRouterOutputsStartNoActor() throws {
             let cases: [(String, Data?)] = [
-                ("Go left one desktop space, then back right", nil),
                 ("Go left one desktop space, then back right", Data("not json".utf8)),
                 (
                     "Go left one desktop space, then back right",

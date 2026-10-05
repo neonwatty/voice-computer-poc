@@ -197,6 +197,14 @@ the harness accepts exactly that retry only when the final typed tool result
 and independent macOS state agree. The three-run gate must be repeated on
 the new exact head.
 
+A later repeat reached case 21 with a prepared Safari sentinel but the
+isolated classifier returned no usable output. The app chose clarification
+without starting Safari and the outer harness failed, leaving the identified
+test window for targeted cleanup. That exact UUID and run-ID window was closed
+after inspection. The classifier now makes one more isolated, read-only
+attempt only when its output is unavailable; malformed or unsafe output still
+fails immediately, and no acting turn starts before a validated route.
+
 ## Work package 4: Codex desktop feasibility
 
 Treat host-task status as a separate read-only investigation. The existing

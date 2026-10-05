@@ -259,6 +259,7 @@ extension AppServerClient {
         let finishedStateTool = requestedDesktopState
         requestedDesktopState = false
         desktopStateReadRetried = false
+        routerOutputRetried = false
         activeStateToolItemID = nil
         activeStateToolTurnID = nil
         stateToolResult = nil

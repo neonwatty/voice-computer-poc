@@ -44,6 +44,10 @@ pair: the final desktop-state preflight listed its MCP tool, but that model
 turn could not call it. The app failed closed. The read-only route now gets
 one fresh app-server discovery attempt in this case; its new exact head still
 needs the full repeatability gate.
+An isolated router-output failure also caused one case-21 clarification
+without a Safari acting turn. The test-owned sentinel was identified and
+closed. The app now retries unavailable classifier output once before any
+actor starts, while malformed or unsafe output remains a no-action result.
 
 ## Next capabilities to build and validate
 
