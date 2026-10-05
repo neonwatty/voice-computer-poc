@@ -48,6 +48,10 @@ An isolated router-output failure also caused one case-21 clarification
 without a Safari acting turn. The test-owned sentinel was identified and
 closed. The app now retries unavailable classifier output once before any
 actor starts, while malformed or unsafe output remains a no-action result.
+The standalone Codex CLI must expose a supported ChatGPT-sign-in model. An
+outdated CLI catalog offered retired models and produced an immediate failed
+nested turn; updating to 0.160.1 restored the current catalog. The app and
+harness now reject stale catalogs before starting an acting turn.
 
 ## Next capabilities to build and validate
 

@@ -1463,6 +1463,16 @@ def selected_cases(suite, cases, mission_control_gate):
     return cases or list(range(1, 7))
 
 
+def preferred_available_model(available):
+    """Use a supported ChatGPT-sign-in model; stale CLI catalogs fail closed."""
+    preferred = ("gpt-5.6-sol", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna",
+                 "gpt-5.6-terra", "gpt-5.6-luna", "gpt-6-astra")
+    for model in preferred:
+        if model in available:
+            return model
+    raise ValueError("Codex CLI model catalog is outdated; update the standalone Codex CLI")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--codex", default=default_codex())
@@ -1562,7 +1572,7 @@ def main():
         driver.send({"method": "initialized", "params": {}})
         models = driver.wait_rpc(driver.rpc("model/list", {})).get("data") or []
         available = [item["id"] for item in models if "id" in item]
-        model = "gpt-5.6-sol" if "gpt-5.6-sol" in available else available[0]
+        model = preferred_available_model(available)
         driver.record("model_selected", model=model)
         support = Path.home() / "Library/Application Support/VoiceComputerPOC"
         support.mkdir(parents=True, exist_ok=True)

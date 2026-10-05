@@ -205,6 +205,14 @@ after inspection. The classifier now makes one more isolated, read-only
 attempt only when its output is unavailable; malformed or unsafe output still
 fails immediately, and no acting turn starts before a validated route.
 
+The next exact-head attempt failed before its first CUA call because the
+standalone Codex CLI (0.142.5) exposed only retired model IDs and the harness
+fell back to `gpt-5.4`; the ChatGPT account rejected it. The built-in CLI
+updater installed 0.160.1, which listed supported models and completed a
+read-only diagnostic turn. The app and harness now select only known supported
+model IDs and give an update error for an outdated catalog. This dependency
+failure does not count as a desktop suite pass.
+
 ## Work package 4: Codex desktop feasibility
 
 Treat host-task status as a separate read-only investigation. The existing

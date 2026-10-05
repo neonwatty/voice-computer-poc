@@ -4,6 +4,12 @@ import XCTest
 @testable import VoiceComputerPOC
 
 final class DesktopStateToolTests: XCTestCase {
+    func testSupportedModelSelectionRejectsStaleCatalog() {
+        XCTAssertEqual(
+            AppServerClient.preferredAvailableModel(["gpt-5.4", "gpt-6.1-sol"]), "gpt-6.1-sol")
+        XCTAssertNil(AppServerClient.preferredAvailableModel(["gpt-5.4", "gpt-5.3-codex"]))
+    }
+
     func testExactReadPhraseAndCoherentObservation() {
         XCTAssertTrue(DesktopStateToolRequest.matches("agent get desktop state"))
         XCTAssertFalse(DesktopStateToolRequest.matches("agent get desktop state and switch right"))

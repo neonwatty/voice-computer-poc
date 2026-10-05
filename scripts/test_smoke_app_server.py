@@ -14,7 +14,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).parent))
 from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path,
                               cua_exact_path_call, mcp_case_phrase, parse_open_session_log,
-                              running_app_pids, screen_is_locked, selected_cases,
+                              preferred_available_model, running_app_pids, screen_is_locked,
+                              selected_cases,
                               validate_exact_space_state,
                               validate_mcp_cases, verify_mcp_receipt,
                               verify_read_only_receipt, verify_browser_receipt,
@@ -41,6 +42,12 @@ def row(event, **details):
 
 
 class SuiteSelectionTests(unittest.TestCase):
+    def test_model_selection_rejects_stale_cli_catalog(self):
+        self.assertEqual(preferred_available_model(["gpt-5.4", "gpt-6.1-sol"]),
+                         "gpt-6.1-sol")
+        with self.assertRaisesRegex(ValueError, "update the standalone Codex CLI"):
+            preferred_available_model(["gpt-5.4", "gpt-5.3-codex"])
+
     def test_mission_control_is_explicit_for_browser_finder_suite(self):
         self.assertEqual(selected_cases(True, None, False), [20, 17, 18, 21, 22, 19, 15, 16, 20])
         self.assertEqual(selected_cases(True, None, True), [13, 20, 17, 18, 21, 22, 19, 15, 16, 20])
