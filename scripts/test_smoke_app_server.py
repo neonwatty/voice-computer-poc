@@ -854,6 +854,14 @@ class DesktopStateReceiptTests(unittest.TestCase):
         def check(current=rows, after=state, frontmost="com.neonwatty.VoiceComputerPOC"):
             return verify_desktop_state_receipt(current, state, after, frontmost)
         self.assertEqual(check()["space_id"], 5)
+        retried = (rows[:3] + [row("mcp_state_discovery_retry", reason="no_tool_call"),
+                               row("mcp_state_requested"),
+                               row("turn_requested", route="desktop_state")]
+                   + rows[3:])
+        self.assertEqual(check(current=retried)["read_attempts"], 2)
+        bad_retry = rows[:4] + retried[3:6] + rows[4:]
+        with self.assertRaisesRegex(ValueError, "followed a tool"):
+            check(current=bad_retry)
         with self.assertRaisesRegex(ValueError, "Independent desktop Space"):
             check(after={"current": 6, "ordered": [5, 6]})
         with self.assertRaisesRegex(ValueError, "foreground app"):

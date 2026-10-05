@@ -72,6 +72,7 @@ final class AppServerClient: ObservableObject {
     var expectedToolDirection: SpaceDirection?
     var requestedToolDirection: SpaceDirection?
     var requestedDesktopState = false
+    var desktopStateReadRetried = false
     var activeStateToolItemID: String?
     var activeStateToolTurnID: String?
     var stateToolResult: DesktopStateToolResult?
@@ -171,6 +172,7 @@ final class AppServerClient: ObservableObject {
         let phrase = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !phrase.isEmpty, !isWorking else { return }
         result = ""
+        desktopStateReadRetried = false
         isWorking = true
         activeCommandID =
             source == .reviewedVoice ? (voiceCaptureCommandID ?? UUID().uuidString) : UUID().uuidString

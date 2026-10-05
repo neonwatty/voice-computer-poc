@@ -995,10 +995,23 @@ def verify_desktop_state_receipt(rows, before, after, independent_frontmost,
                                              ("mcp_state_helper_bound", "mcp_state_observed",
                                               "mcp_state_result_correlated", "tool_completed"))
     turn_end, finish = events("turn_completed"), events("command_finished")
-    if len(requests) != 1 or len(turns) != 1 or turns[0].get("route") != "desktop_state" \
+    retries = events("mcp_state_discovery_retry")
+    if len(retries) > 1 or any(retry.get("reason") != "no_tool_call" for retry in retries):
+        raise ValueError("Desktop-state discovery retried outside its bounded contract")
+    attempts = len(retries) + 1
+    if len(requests) != attempts or len(turns) != attempts \
+            or any(turn.get("route") != "desktop_state" for turn in turns) \
             or len(tools) != 1 or tools[0].get("server") != "desktop_tool" \
             or tools[0].get("tool") != "get_desktop_state":
         raise ValueError("Desktop-state read route or exact tool missing")
+    if retries:
+        retry_index = next(i for i, row in enumerate(command_rows)
+                           if row.get("event") == "mcp_state_discovery_retry")
+        if any(row.get("event") in ("tool_started", "approval_decided", "mcp_state_observed")
+               for row in command_rows[:retry_index]) \
+                or sum(row.get("event") == "turn_requested"
+                       for row in command_rows[:retry_index]) != 1:
+            raise ValueError("Desktop-state discovery retry followed a tool or approval")
     if len(approvals) != 1 or approvals[0].get("server_name") != "desktop_tool" \
             or approvals[0].get("decision") != "Allowed once":
         raise ValueError("Desktop-state read did not have one Allow once approval")
@@ -1036,6 +1049,7 @@ def verify_desktop_state_receipt(rows, before, after, independent_frontmost,
         raise ValueError("Desktop-state read performed an action")
     assert_log_privacy(rows)
     return {"command_id": command_id, "item_id": tools[0]["item_id"],
+            "read_attempts": attempts,
             "space_id": before["current"], "frontmost_bundle_id": independent_frontmost,
             "before": before, "after": after}
 

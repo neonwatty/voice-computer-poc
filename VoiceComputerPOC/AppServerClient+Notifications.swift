@@ -181,7 +181,25 @@ extension AppServerClient {
         }
         if rejectMismatchedFixtureTurn(turn) { return }
         if requestCalculatorFocusAfterTool(turn) { return }
+        let outcome = turn["status"] as? String ?? "completed"
+        if shouldRetryDesktopStateDiscovery(outcome: outcome) {
+            desktopStateReadRetried = true
+            record(
+                "mcp_state_discovery_retry",
+                details: ["reason": "no_tool_call", "previous_turn_id": turnID ?? "unknown"])
+            queuedPhrase = "agent get desktop state"
+            result = ""
+            rotateServerAfterCommand()
+            beginActingTurn()
+            return
+        }
         finishTurnCompleted(turn)
+    }
+
+    func shouldRetryDesktopStateDiscovery(outcome: String) -> Bool {
+        requestedDesktopState && !desktopStateReadRetried && outcome == "completed"
+            && activeStateToolItemID == nil && stateToolResult == nil
+            && desktopStateApproval == nil && approval == nil
     }
 
     func finishTurnCompleted(_ turn: [String: Any]) {
@@ -246,6 +264,7 @@ extension AppServerClient {
         composedOriginSpace = nil
         let finishedStateTool = requestedDesktopState
         requestedDesktopState = false
+        desktopStateReadRetried = false
         activeStateToolItemID = nil
         activeStateToolTurnID = nil
         stateToolResult = nil

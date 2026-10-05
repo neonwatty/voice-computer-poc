@@ -187,6 +187,16 @@ pending/success/failure commit status with a short redacted description.
 This trigger has unit coverage for rejected PR and check states; a live
 approved-PR dispatch remains pending. It is not yet a required merge check.
 
+On a later head, one repeat run passed the full suite and another reached the
+final desktop-state read after all acting cases passed. That final read failed:
+the app-server status preflight listed `get_desktop_state`, but the nested
+model turn did not receive that tool and made no MCP call. The app correctly
+reported the read as unverified. A bounded app change now restarts the
+app-server and retries this read-only discovery once under the same command;
+the harness accepts exactly that retry only when the final typed tool result
+and independent macOS state agree. The three-run gate must be repeated on
+the new exact head.
+
 ## Work package 4: Codex desktop feasibility
 
 Treat host-task status as a separate read-only investigation. The existing

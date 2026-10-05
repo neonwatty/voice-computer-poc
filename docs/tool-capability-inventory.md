@@ -39,6 +39,11 @@ The exact-SHA Mac runner passed its ordered nine-case suite three times on
 now checks the exact approved head and green CI/CodeQL before using this
 Accessibility-enabled Mac, then attaches a redacted commit status. Its live
 dispatch has not yet been exercised against an approved PR.
+One later full run exposed intermittent nested tool discovery after the Space
+pair: the final desktop-state preflight listed its MCP tool, but that model
+turn could not call it. The app failed closed. The read-only route now gets
+one fresh app-server discovery attempt in this case; its new exact head still
+needs the full repeatability gate.
 
 ## Next capabilities to build and validate
 
