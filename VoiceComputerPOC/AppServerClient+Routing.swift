@@ -65,6 +65,19 @@ extension AppServerClient {
             finderReportURL = url
             queuedPhrase = "Reveal the test report at \(url.path) in Finder."
             beginActingTurn()
+        case .browserThenFinder(let home, let report):
+            guard let snapshot = SpaceNavigator.snapshot() else {
+                fail("Could not read the starting desktop Space for the composed request.")
+                return
+            }
+            record(
+                "router_decided",
+                details: ["route": "browser_finder", "target": "matched_loopback_fixtures"])
+            composedReportURL = report
+            composedOriginSpace = snapshot
+            browserDocsURL = home
+            queuedPhrase = "Open \(home.absoluteString) and follow the Docs link."
+            beginActingTurn()
         }
     }
 
@@ -90,7 +103,7 @@ extension AppServerClient {
                 return
             }
         #endif
-        if expectedToolDirection != nil, process != nil {
+        if expectedToolDirection != nil || requestedDesktopState, process != nil {
             threadID = nil
             _ = send(
                 "mcpServerStatus/list", params: ["detail": "toolsAndAuthOnly"],

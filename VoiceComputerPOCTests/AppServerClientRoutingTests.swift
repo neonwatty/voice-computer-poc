@@ -142,6 +142,61 @@ import XCTest
             XCTAssertEqual(client.requestedToolDirection, .left)
         }
 
+        func testComposedRequestStartsFinderOnlyAfterVerifiedBrowserStep() {
+            let client = makeClient()
+            let report = URL(fileURLWithPath: "/tmp/fixture/report.txt")
+            client.isWorking = true
+            client.activeCommandID = "one-command"
+            client.turnID = "browser-turn"
+            client.browserDocsURL = URL(string: "http://127.0.0.1:49328/home?run_id=fixture-1234")
+            client.composedReportURL = report
+            client.fixtureCUAToolStartedIDs = ["browser-tool"]
+            client.fixtureCUAToolCompletedIDs = ["browser-tool"]
+            var starts = 0
+            let started = expectation(description: "Finder actor starts")
+            client.actingTurnOverride = {
+                starts += 1
+                started.fulfill()
+            }
+
+            XCTAssertFalse(
+                client.advanceComposedFixtureIfReady(
+                    outcome: "completed", verification: "unverified"))
+            XCTAssertEqual(starts, 0)
+            XCTAssertNil(client.finderReportURL)
+            XCTAssertTrue(
+                client.advanceComposedFixtureIfReady(
+                    outcome: "completed", verification: "verified"))
+            wait(for: [started], timeout: 2)
+            XCTAssertEqual(starts, 1)
+            XCTAssertEqual(client.activeCommandID, "one-command")
+            XCTAssertEqual(client.finderReportURL, report)
+            XCTAssertNil(client.browserDocsURL)
+            XCTAssertNil(client.turnID)
+            XCTAssertTrue(client.fixtureCUAToolStartedIDs.isEmpty)
+            XCTAssertTrue(client.fixtureCUAToolCompletedIDs.isEmpty)
+        }
+
+        func testStopBetweenComposedStepsPreventsFinderActor() {
+            let client = makeClient()
+            client.isWorking = true
+            client.activeCommandID = "one-command"
+            client.turnID = "browser-turn"
+            client.browserDocsURL = URL(string: "http://127.0.0.1:49328/home?run_id=fixture-1234")
+            client.composedReportURL = URL(fileURLWithPath: "/tmp/fixture/report.txt")
+            var starts = 0
+            client.actingTurnOverride = { starts += 1 }
+            XCTAssertTrue(
+                client.advanceComposedFixtureIfReady(
+                    outcome: "completed", verification: "verified"))
+            client.stop()
+            let settled = expectation(description: "Queued actor settles")
+            DispatchQueue.main.async { settled.fulfill() }
+            wait(for: [settled], timeout: 2)
+            XCTAssertEqual(starts, 0)
+            XCTAssertFalse(client.isWorking)
+        }
+
         private func roundTripClient() -> AppServerClient {
             let client = makeClient()
             client.isWorking = true

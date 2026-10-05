@@ -47,6 +47,58 @@ enum BridgeClient {
         return read(from: socket, direction: direction, deadline: totalDeadline, limits: limits)
     }
 
+    static func invokeState(limits: Limits = .init()) -> DesktopStateToolResult {
+        let environment = ProcessInfo.processInfo.environment
+        guard let path = environment["SPACE_BRIDGE_PATH"],
+            let sessionID = environment["SPACE_SESSION_ID"],
+            let address = socketAddress(path)
+        else { return .failure("bridge_unavailable", "Bridge configuration is missing.") }
+        let start = ProcessInfo.processInfo.systemUptime
+        let deadline = start + limits.total
+        let socket = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+        guard socket >= 0 else {
+            return .failure("bridge_unavailable", "Could not create bridge socket.")
+        }
+        defer { Darwin.close(socket) }
+        var noSignal: Int32 = 1
+        _ = setsockopt(
+            socket, SOL_SOCKET, SO_NOSIGPIPE, &noSignal,
+            socklen_t(MemoryLayout.size(ofValue: noSignal)))
+        let flags = fcntl(socket, F_GETFL)
+        guard flags >= 0, fcntl(socket, F_SETFL, flags | O_NONBLOCK) == 0,
+            connect(socket, address: address, deadline: deadline, limits: limits, start: start)
+        else { return .failure("bridge_unavailable", "Bridge connect failed.") }
+        let request = ["sessionID": sessionID, "operation": "get_desktop_state"]
+        guard var payload = try? JSONSerialization.data(withJSONObject: request) else {
+            return .failure("invalid_request", "Could not encode bridge request.")
+        }
+        payload.append(0x0A)
+        guard write(payload, to: socket, deadline: deadline, limits: limits) else {
+            return .failure("timeout", "Bridge write failed or timed out.")
+        }
+        return readState(from: socket, deadline: deadline, limits: limits)
+    }
+
+    private static func readState(
+        from socket: Int32, deadline: TimeInterval, limits: Limits
+    ) -> DesktopStateToolResult {
+        let readDeadline = min(deadline, ProcessInfo.processInfo.systemUptime + limits.read)
+        var response = Data()
+        var bytes = [UInt8](repeating: 0, count: 512)
+        while response.count < 2048 {
+            guard ready(socket, events: Int16(POLLIN), until: readDeadline) else {
+                return .failure("timeout", "Bridge reply timed out.")
+            }
+            let count = Darwin.read(socket, &bytes, bytes.count)
+            if count == 0 { break }
+            guard count > 0 else { return .failure("bridge_unavailable", "Bridge read failed.") }
+            response.append(contentsOf: bytes.prefix(count))
+        }
+        guard let result = try? JSONDecoder().decode(DesktopStateToolResult.self, from: response)
+        else { return .failure("invalid_reply", "Bridge reply was invalid.") }
+        return result
+    }
+
     private static func connect(
         _ socket: Int32, address: sockaddr_un, deadline: TimeInterval, limits: Limits,
         start: TimeInterval

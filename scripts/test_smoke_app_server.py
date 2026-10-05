@@ -20,7 +20,11 @@ from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path
                               verify_read_only_receipt, verify_browser_receipt,
                               verify_browser_interruption_receipt,
                               verify_finder_receipt,
-                              verify_finder_rejection_receipt)  # noqa: E402
+                              verify_finder_rejection_receipt,
+                              verify_composed_receipt,
+                              verify_composed_failure_receipt,
+                              verify_composed_rejection_receipt,
+                              verify_desktop_state_receipt)  # noqa: E402
 
 
 COMMAND_ID = "A1B2C3D4"
@@ -34,8 +38,8 @@ def row(event, **details):
 
 class SuiteSelectionTests(unittest.TestCase):
     def test_mission_control_is_explicit_for_browser_finder_suite(self):
-        self.assertEqual(selected_cases(True, None, False), [17, 18])
-        self.assertEqual(selected_cases(True, None, True), [13, 17, 18])
+        self.assertEqual(selected_cases(True, None, False), [20, 17, 18, 19, 15, 16, 20])
+        self.assertEqual(selected_cases(True, None, True), [13, 20, 17, 18, 19, 15, 16, 20])
         with self.assertRaisesRegex(ValueError, "requires --suite"):
             selected_cases(False, [17], True)
         with self.assertRaisesRegex(ValueError, "cannot be combined"):
@@ -604,6 +608,130 @@ class MCPReceiptTests(unittest.TestCase):
             for invalid in (alias, Path("relative.app"), Path(directory) / "missing.app"):
                 with self.subTest(path=invalid), self.assertRaises(ValueError):
                     canonical_app_path(invalid)
+
+
+class ComposedReceiptTests(unittest.TestCase):
+    def test_failed_browser_and_unsafe_file_cannot_start_next_actor(self):
+        run_id = "abcd1234abcd1234abcd1234abcd1234"
+        failed_browser = [
+            row("command_started", user_action="run"),
+            row("router_decided", route="browser_finder"),
+            row("turn_requested", route="browser"),
+            row("fixture_ax_verification", target="browser", verified="false",
+                reason="url_or_heading_mismatch"),
+            row("turn_completed", status="completed", verification="unverified"),
+            row("browser_step_failed", verification="unverified"),
+            row("command_finished", status="completed", verification="unverified"),
+        ]
+        home = [{"method": "GET", "path": "/home", "run_id": [run_id]}]
+        self.assertEqual(verify_composed_failure_receipt(
+            failed_browser, run_id, home, 5, 5)["finder_turns"], 0)
+        with self.assertRaisesRegex(ValueError, "continued"):
+            verify_composed_failure_receipt(
+                failed_browser + [row("turn_requested", route="finder")],
+                run_id, home, 5, 5)
+        rejected = [
+            row("command_started", user_action="run"),
+            row("router_decided", route="clarification"),
+            row("command_finished", status="clarification", verification="no_action"),
+        ]
+        self.assertEqual(verify_composed_rejection_receipt(
+            rejected, [], 5, 5)["browser_turns"], 0)
+        with self.assertRaisesRegex(ValueError, "started an action"):
+            verify_composed_rejection_receipt(rejected, home, 5, 5)
+
+    def test_requires_ordered_verified_browser_then_finder_under_one_command(self):
+        run_id, port = "abcd1234abcd1234abcd1234abcd1234", 49328
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "report.txt"
+            report.write_text("report")
+            report.with_name("report-copy.txt").write_text("decoy")
+            rows = [
+                row("command_started", user_action="run"),
+                row("router_decided", route="browser_finder"),
+                row("turn_requested", route="browser"),
+                row("tool_started", server="cua_repl", tool="js", item_id="browser-tool"),
+                row("tool_completed", server="cua_repl", tool="js", item_id="browser-tool",
+                    status="completed", result_is_error="false"),
+                row("fixture_ax_verification", target="browser", verified="true",
+                    reason="exact_url_and_heading"),
+                row("turn_completed", status="completed", verification="verified"),
+                row("browser_step_verified", turn_id="browser-turn"),
+                row("turn_requested", route="finder"),
+                row("tool_started", server="cua_repl", tool="js", item_id="finder-tool"),
+                row("tool_completed", server="cua_repl", tool="js", item_id="finder-tool",
+                    status="completed", result_is_error="false"),
+                row("fixture_ax_verification", target="finder", verified="true",
+                    reason="exact_selected_file"),
+                row("turn_completed", status="completed", verification="verified"),
+                row("finder_step_verified", turn_id="finder-turn"),
+                row("command_finished", status="completed", verification="verified"),
+            ]
+            requests = [{"method": "GET", "path": path, "run_id": [run_id]}
+                        for path in ("/home", "/docs")]
+            browser = [f"Window: Safari\nHTML content URL: 127.0.0.1:{port}/docs?run_id={run_id}"
+                       f"\n2 heading Voice Computer Docs {run_id}"]
+            finder = [f"Window: Finder\n1 row (selected) URL: {report.as_uri()}"
+                      f"\n2 row URL: {report.with_name('report-copy.txt').as_uri()}"]
+            def check(current):
+                return verify_composed_receipt(current, run_id, port, requests, report,
+                                               browser, finder, 5, 5)
+            self.assertEqual(check(rows)["turns"], 2)
+            moved = copy.deepcopy(rows)
+            moved.insert(7, moved.pop(8))
+            with self.assertRaisesRegex(ValueError, "Finder started before"):
+                check(moved)
+            missing = [entry for entry in rows if entry["event"] != "browser_step_verified"]
+            with self.assertRaises(ValueError):
+                check(missing)
+            with self.assertRaisesRegex(ValueError, "changed desktop Space"):
+                verify_composed_receipt(rows, run_id, port, requests, report,
+                                        browser, finder, 5, 6)
+            wrong_selection = [
+                f"Window: Finder\n1 row (selected) URL: {report.with_name('report-copy.txt').as_uri()}"
+                f"\n2 row URL: {report.as_uri()}"]
+            with self.assertRaisesRegex(ValueError, "Independent exact Finder selection missing"):
+                verify_composed_receipt(rows, run_id, port, requests, report,
+                                        browser, wrong_selection, 5, 5)
+            failed_cua = copy.deepcopy(rows)
+            failed_cua[4]["details"]["status"] = "failed"
+            with self.assertRaisesRegex(ValueError, "call failed"):
+                check(failed_cua)
+
+
+class DesktopStateReceiptTests(unittest.TestCase):
+    def test_requires_correlated_read_and_independent_state(self):
+        now = datetime.now(timezone.utc).isoformat()
+        rows = [
+            row("command_started", user_action="run"),
+            row("mcp_state_requested"),
+            row("turn_requested", route="desktop_state"),
+            row("tool_started", server="desktop_tool", tool="get_desktop_state",
+                item_id="state-item"),
+            row("approval_decided", server_name="desktop_tool", decision="Allowed once"),
+            row("mcp_state_helper_bound", path_matches_preflight="true"),
+            row("mcp_state_observed", status="observed", space_id="5",
+                ordered_space_ids="5,6", frontmost_bundle_id="com.neonwatty.VoiceComputerPOC",
+                observed_at=now),
+            row("mcp_state_result_correlated", item_id="state-item"),
+            row("tool_completed", item_id="state-item", status="completed",
+                result_is_error="false", typed_status="observed", typed_verified="true"),
+            row("turn_completed", verification="verified"),
+            row("command_finished", verification="verified"),
+        ]
+        rows[6]["timestamp"] = now
+        state = {"current": 5, "ordered": [5, 6]}
+        def check(current=rows, after=state, frontmost="com.neonwatty.VoiceComputerPOC"):
+            return verify_desktop_state_receipt(current, state, after, frontmost)
+        self.assertEqual(check()["space_id"], 5)
+        with self.assertRaisesRegex(ValueError, "Independent desktop Space"):
+            check(after={"current": 6, "ordered": [5, 6]})
+        with self.assertRaisesRegex(ValueError, "foreground app"):
+            check(frontmost="com.apple.finder")
+        changed = copy.deepcopy(rows)
+        changed[4]["details"]["decision"] = "Allowed for session"
+        with self.assertRaisesRegex(ValueError, "Allow once"):
+            check(current=changed)
 
 
 if __name__ == "__main__":

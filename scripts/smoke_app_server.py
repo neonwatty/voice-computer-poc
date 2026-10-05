@@ -8,8 +8,10 @@ app named by the selected case and writes a local JSONL diagnostic receipt.
 
 import argparse
 import ctypes
+import hashlib
 import json
 import os
+import platform
 import plistlib
 import queue
 import re
@@ -46,10 +48,12 @@ COMMANDS = [
     'In the exact Voice Computer POC app, enter "agent switch desktop space left" in the command field and press Return once. Inspect the visible desktop_tool.switch_space approval and choose Allow once only. Wait for the app result. Report the command ID and visible result; do not submit another command.',
     None,  # Case 17 receives its unique Browser fixture URL at runtime.
     None,  # Case 18 receives its unique Finder fixture path at runtime.
+    None,  # Case 19 submits one composed Browser -> Finder command.
+    None,  # Case 20 reads the desktop state through MCP.
 ]
-CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Mission Control", "Finder", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC"]
+CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Mission Control", "Finder", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC"]
 MCP_CASES = {15: "right", 16: "left"}
-EXACT_APP_CASES = {13, 17, 18, *MCP_CASES}
+EXACT_APP_CASES = {13, 17, 18, 19, 20, *MCP_CASES}
 APP_LOG_DIRECTORY = Path.home() / "Library/Application Support/VoiceComputerPOC/Logs"
 
 
@@ -70,6 +74,8 @@ EXPECTED_EVIDENCE = [
     None,
     re.compile(r"mission_control_ax_summary"),
     re.compile(r"native_space_step_verified"),
+    None,
+    None,
     None,
     None,
     None,
@@ -139,6 +145,17 @@ def space_state():
         return None
 
 
+def frontmost_bundle_id():
+    """Observe macOS foreground app outside Voice Computer's process."""
+    try:
+        result = subprocess.run(
+            ["swift", "-e", "import AppKit; print(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? \"\")"],
+            capture_output=True, text=True, check=True, timeout=15)
+        return result.stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
 def validate_exact_space_state(state, case):
     """Require two distinct live Main desktops and the case's starting edge."""
     if not isinstance(state, dict):
@@ -184,6 +201,28 @@ def canonical_app_path(value):
     if info.get("CFBundleIdentifier") != "com.neonwatty.VoiceComputerPOC":
         raise ValueError("--app-path has the wrong bundle identifier")
     return path
+
+
+def exact_build_identity(app_path):
+    """Bind a receipt to the source revision, app binary, and bundled helper."""
+    root = Path(__file__).resolve().parents[1]
+    revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root,
+                              capture_output=True, text=True, check=True, timeout=5).stdout.strip()
+    changes = subprocess.run(["git", "status", "--porcelain"], cwd=root,
+                             capture_output=True, text=True, check=True, timeout=5).stdout
+    binary = app_path / "Contents/MacOS/VoiceComputerPOC"
+    helper = app_path / "Contents/Helpers/DesktopToolServer"
+    stamp = Path(str(helper) + ".sha256")
+    if not helper.is_file() or helper.is_symlink() or not os.access(helper, os.X_OK) \
+            or not stamp.is_file() or stamp.is_symlink():
+        raise ValueError("Bundled desktop helper or checksum is unavailable")
+    helper_hash = hashlib.sha256(helper.read_bytes()).hexdigest()
+    if stamp.read_text().strip() != helper_hash:
+        raise ValueError("Bundled desktop helper checksum does not match")
+    return {"source_sha": revision, "source_clean": not changes,
+            "macos_version": platform.mac_ver()[0],
+            "app_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+            "helper_sha256": helper_hash}
 
 
 def running_app_pids(app_path):
@@ -553,6 +592,234 @@ def verify_finder_receipt(rows, report, observations, before, after,
             "before": before, "after": after}
 
 
+def verify_composed_receipt(rows, run_id, port, fixture_rows, report,
+                            browser_observations, finder_observations,
+                            before, after, prior_command_ids=()):
+    """Require two verified app turns under one command and independent UI evidence."""
+    starts = [row for row in rows if row.get("event") == "command_started"
+              and row.get("details", {}).get("user_action") == "run"]
+    if len(starts) != 1:
+        raise ValueError("Composed request did not have exactly one app command")
+    command_id = starts[0].get("details", {}).get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("Composed command ID missing or stale")
+    command_rows = [row for row in rows if row.get("details", {}).get("command_id") == command_id]
+    def details(name):
+        return [row.get("details", {}) for row in command_rows if row.get("event") == name]
+    def positions(name):
+        return [i for i, row in enumerate(command_rows) if row.get("event") == name]
+    routes, turns, completed = (details(name) for name in
+                                ("router_decided", "turn_requested", "turn_completed"))
+    ax, browser_step, finder_step = (details(name) for name in
+                                     ("fixture_ax_verification", "browser_step_verified",
+                                      "finder_step_verified"))
+    finishes, tools, approvals = (details(name) for name in
+                                  ("command_finished", "tool_started", "approval_decided"))
+    if len(routes) != 1 or routes[0].get("route") != "browser_finder" \
+            or len(turns) != 2 or [turn.get("route") for turn in turns] != ["browser", "finder"] \
+            or len(completed) != 2 or any(turn.get("status") != "completed"
+                                          or turn.get("verification") != "verified"
+                                          for turn in completed):
+        raise ValueError("Composed route or two verified turns missing")
+    if len(ax) != 2 or [item.get("target") for item in ax] != ["browser", "finder"] \
+            or [item.get("reason") for item in ax] != ["exact_url_and_heading", "exact_selected_file"] \
+            or any(item.get("verified") != "true" for item in ax) \
+            or len(browser_step) != 1 or len(finder_step) != 1:
+        raise ValueError("Composed app-owned AX verification missing")
+    if len(finishes) != 1:
+        raise ValueError("Composed command finish missing or duplicated")
+    if not positions("turn_requested")[0] < positions("browser_step_verified")[0] \
+            < positions("turn_requested")[1] < positions("finder_step_verified")[0] \
+            < positions("command_finished")[0]:
+        raise ValueError("Finder started before Browser verification")
+    if len(finishes) != 1 or finishes[0].get("status") != "completed" \
+            or finishes[0].get("verification") != "verified":
+        raise ValueError("Composed command did not finish verified")
+    if not tools or any(tool.get("server") != "cua_repl" for tool in tools):
+        raise ValueError("Composed action used a non-Computer-Use tool")
+    completions = details("tool_completed")
+    started_ids = [tool.get("item_id") for tool in tools]
+    completed_ids = [tool.get("item_id") for tool in completions]
+    if not all(started_ids) or len(set(started_ids)) != len(started_ids) \
+            or sorted(started_ids) != sorted(completed_ids) \
+            or any(item.get("server") != "cua_repl" or item.get("status") != "completed"
+                   or item.get("result_is_error") != "false" for item in completions):
+        raise ValueError("Composed Computer Use call failed or lost correlation")
+    if any(item.get("server_name") != "cua_repl"
+           or item.get("decision") not in ("Allowed once", "Allowed for session")
+           for item in approvals):
+        raise ValueError("Composed approval was declined or unexpected")
+    if any(row.get("event") in ("native_space_requested", "mcp_action_requested", "space_changed")
+           for row in command_rows) or before is None or before != after:
+        raise ValueError("Composed request changed desktop Space")
+    if [(row.get("method"), row.get("path"), row.get("run_id"))
+            for row in fixture_rows] != [("GET", "/home", [run_id]), ("GET", "/docs", [run_id])]:
+        raise ValueError("Composed fixture requests differ from Home -> Docs")
+    docs_url = f"http://127.0.0.1:{port}/docs?run_id={run_id}"
+    heading = f"Voice Computer Docs {run_id}"
+    if not any(docs_url.removeprefix("http://") in item and heading in item
+               and "heading" in item for item in browser_observations):
+        raise ValueError("Independent Safari Docs observation missing")
+    if not report.is_file() or report.is_symlink():
+        raise ValueError("Composed report is not a regular file")
+    selected = re.compile(r"^\s*\d+ row \(selected\)(?:(?!^\s*\d+ row ).)*?URL: (file://\S+)",
+                          re.MULTILINE | re.DOTALL)
+    decoy_uri = report.with_name("report-copy.txt").as_uri()
+    if not any(set(selected.findall(item)) == {report.as_uri()} and decoy_uri in item
+               for item in finder_observations):
+        raise ValueError("Independent exact Finder selection missing")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "url": docs_url, "path": str(report),
+            "turns": 2, "before": before, "after": after}
+
+
+def verify_composed_failure_receipt(rows, run_id, fixture_rows, before, after,
+                                    prior_command_ids=(), mode="missing-link"):
+    """A failed Browser step must never start Finder within the command."""
+    expected_paths = {
+        "missing-link": ["/home"], "home-404": ["/home"],
+        "redirect": ["/home", "/docs", "/error"],
+        "stop-before-docs": ["/home"],
+    }.get(mode)
+    if expected_paths is None:
+        raise ValueError("Unsupported composed Browser failure scenario")
+    starts = [row for row in rows if row.get("event") == "command_started"
+              and row.get("details", {}).get("user_action") == "run"]
+    if len(starts) != 1:
+        raise ValueError("Composed failure did not have one app command")
+    command_id = starts[0].get("details", {}).get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("Composed failure command ID missing or stale")
+    command_rows = [row for row in rows if row.get("details", {}).get("command_id") == command_id]
+    def details(name):
+        return [row.get("details", {}) for row in command_rows if row.get("event") == name]
+    route, turns, ax, completed, finished = (details(name) for name in
+                                           ("router_decided", "turn_requested",
+                                            "fixture_ax_verification", "turn_completed",
+                                            "command_finished"))
+    if len(route) != 1 or route[0].get("route") != "browser_finder" \
+            or len(turns) != 1 or turns[0].get("route") != "browser" \
+            or len(ax) != 1 or ax[0].get("target") != "browser" \
+            or ax[0].get("verified") != "false" \
+            or len(completed) != 1 or completed[0].get("verification") != "unverified" \
+            or len(finished) != 1 or finished[0].get("verification") != "unverified" \
+            or len(details("browser_step_failed")) != 1 \
+            or details("browser_step_verified") or details("finder_step_queued") \
+            or details("finder_step_verified"):
+        raise ValueError("Composed failure continued or claimed verification")
+    if mode == "stop-before-docs":
+        if len(details("stop_requested")) != 1 or completed[0].get("status") == "completed" \
+                or ax[0].get("reason") != "turn_incomplete":
+            raise ValueError("Composed Stop did not interrupt Browser")
+    elif ax[0].get("reason") != "url_or_heading_mismatch":
+        raise ValueError("Composed Browser failure reason mismatch")
+    if [(row.get("method"), row.get("path"), row.get("run_id"))
+            for row in fixture_rows] != [("GET", path, [run_id]) for path in expected_paths]:
+        raise ValueError("Composed Browser failure requested unexpected path")
+    if before is None or before != after or any(
+            row.get("event") in ("native_space_requested", "mcp_action_requested", "space_changed")
+            for row in command_rows):
+        raise ValueError("Composed Browser failure changed desktop Space")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "scenario": mode, "browser_turns": 1,
+            "finder_turns": 0, "before": before, "after": after}
+
+
+def verify_composed_rejection_receipt(rows, fixture_rows, before, after,
+                                      prior_command_ids=(), mode="missing-file"):
+    """A missing or unsafe report must be rejected before Safari opens."""
+    if mode not in ("missing-file", "symlink-escape", "decoy-target"):
+        raise ValueError("Unsupported composed target rejection scenario")
+    starts = [row for row in rows if row.get("event") == "command_started"
+              and row.get("details", {}).get("user_action") == "run"]
+    if len(starts) != 1:
+        raise ValueError("Composed rejection did not have one app command")
+    command_id = starts[0].get("details", {}).get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("Composed rejection command ID missing or stale")
+    command_rows = [row for row in rows if row.get("details", {}).get("command_id") == command_id]
+    if fixture_rows or any(row.get("event") in (
+            "turn_requested", "tool_started", "approval_decided", "fixture_ax_verification",
+            "native_space_requested", "mcp_action_requested", "space_changed")
+            for row in command_rows):
+        raise ValueError("Rejected composed target started an action")
+    routes = [row.get("details", {}) for row in command_rows if row.get("event") == "router_decided"]
+    finishes = [row.get("details", {}) for row in command_rows if row.get("event") == "command_finished"]
+    if any(route.get("route") != "clarification" for route in routes) \
+            or len(finishes) != 1 or finishes[0].get("verification") != "no_action":
+        raise ValueError("Rejected composed target did not finish with no action")
+    if before is None or before != after:
+        raise ValueError("Rejected composed target changed desktop Space")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "scenario": mode, "browser_turns": 0,
+            "finder_turns": 0, "before": before, "after": after}
+
+
+def verify_desktop_state_receipt(rows, before, after, independent_frontmost,
+                                 prior_command_ids=()):
+    """Correlate one approved read-only MCP result with independent macOS state."""
+    starts = [row for row in rows if row.get("event") == "command_started"
+              and row.get("details", {}).get("user_action") == "run"]
+    if len(starts) != 1:
+        raise ValueError("Desktop-state read did not have one app command")
+    command_id = starts[0].get("details", {}).get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("Desktop-state command ID missing or stale")
+    command_rows = [row for row in rows if row.get("details", {}).get("command_id") == command_id]
+    def events(name):
+        return [row.get("details", {}) for row in command_rows if row.get("event") == name]
+    requests, turns, tools, approvals = (events(name) for name in
+                                       ("mcp_state_requested", "turn_requested",
+                                        "tool_started", "approval_decided"))
+    bound, observed, correlated, completed = (events(name) for name in
+                                             ("mcp_state_helper_bound", "mcp_state_observed",
+                                              "mcp_state_result_correlated", "tool_completed"))
+    turn_end, finish = events("turn_completed"), events("command_finished")
+    if len(requests) != 1 or len(turns) != 1 or turns[0].get("route") != "desktop_state" \
+            or len(tools) != 1 or tools[0].get("server") != "desktop_tool" \
+            or tools[0].get("tool") != "get_desktop_state":
+        raise ValueError("Desktop-state read route or exact tool missing")
+    if len(approvals) != 1 or approvals[0].get("server_name") != "desktop_tool" \
+            or approvals[0].get("decision") != "Allowed once":
+        raise ValueError("Desktop-state read did not have one Allow once approval")
+    if len(bound) != 1 or bound[0].get("path_matches_preflight") != "true" \
+            or len(observed) != 1 or observed[0].get("status") != "observed" \
+            or len(correlated) != 1 or correlated[0].get("item_id") != tools[0].get("item_id"):
+        raise ValueError("Desktop-state helper or app observation not correlated")
+    if len(completed) != 1 or completed[0].get("item_id") != tools[0].get("item_id") \
+            or completed[0].get("status") != "completed" \
+            or completed[0].get("result_is_error") != "false" \
+            or completed[0].get("typed_status") != "observed" \
+            or completed[0].get("typed_verified") != "true" \
+            or len(turn_end) != 1 or turn_end[0].get("verification") != "verified" \
+            or len(finish) != 1 or finish[0].get("verification") != "verified":
+        raise ValueError("Desktop-state typed result or turn unverified")
+    if before is None or after != before \
+            or observed[0].get("space_id") != str(before["current"]) \
+            or observed[0].get("ordered_space_ids") != ",".join(map(str, before["ordered"])):
+        raise ValueError("Independent desktop Space observation differs")
+    if not independent_frontmost \
+            or observed[0].get("frontmost_bundle_id") != independent_frontmost:
+        raise ValueError("Independent foreground app observation differs")
+    try:
+        tool_time = datetime.fromisoformat(observed[0]["observed_at"].replace("Z", "+00:00"))
+        log_time = datetime.fromisoformat(next(row["timestamp"] for row in command_rows
+                                         if row.get("event") == "mcp_state_observed")
+                                         .replace("Z", "+00:00"))
+        if abs((tool_time - log_time).total_seconds()) > 5:
+            raise ValueError("Desktop-state observation timestamp is stale")
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError("Desktop-state observation timestamp invalid") from error
+    if any(row.get("event") in ("native_space_requested", "native_space_ax_pressed",
+                                   "mcp_action_requested", "space_changed", "fixture_ax_verification")
+           for row in command_rows):
+        raise ValueError("Desktop-state read performed an action")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "item_id": tools[0]["item_id"],
+            "space_id": before["current"], "frontmost_bundle_id": independent_frontmost,
+            "before": before, "after": after}
+
+
 def verify_finder_rejection_receipt(rows, report, before, after,
                                     prior_command_ids=(), mode="missing-file"):
     """Require the unsafe Finder target to finish without starting an actor."""
@@ -696,7 +963,7 @@ def verify_mcp_receipt(rows, phrase, direction, before, expected, after,
 
 class Driver:
     def __init__(self, executable, log_path, trace_tool_output=False, app_path=None,
-                 finder_mode="normal"):
+                 finder_mode="normal", browser_mode="normal"):
         self.log = log_path.open("x", encoding="utf-8")
         self.events = queue.Queue()
         self.next_id = 0
@@ -711,6 +978,7 @@ class Driver:
         self.trace_tool_output = trace_tool_output
         self.app_path = app_path
         self.finder_mode = finder_mode
+        self.browser_mode = browser_mode
         self.cua_binding_observed = False
         self.browser_observations = []
         self.browser_run_id = None
@@ -796,7 +1064,14 @@ class Driver:
             and meta.get("connector_id") == "computer-use"
             and not ((params.get("requestedSchema") or {}).get("properties") or {})
             and self.command_index is not None
-            and app in ({CASE_APP[self.command_index - 1], str(self.app_path),
+            and app in ({CASE_APP[self.command_index - 1], str(self.app_path)}
+                        | ({"Safari", "com.apple.Safari"}
+                           if self.finder_mode == "normal" else set())
+                        | ({"Finder", "com.apple.finder"}
+                           if self.finder_mode == "normal" and self.browser_mode == "normal"
+                           else set())
+                        if self.command_index == 19 else
+                        {CASE_APP[self.command_index - 1], str(self.app_path),
                          "Safari", "com.apple.Safari"}
                         if self.command_index == 17 else
                         {CASE_APP[self.command_index - 1], str(self.app_path),
@@ -833,7 +1108,8 @@ class Driver:
                     self.cua_binding_observed = True
                     self.record("cua_exact_path_requested")
             self.tool_calls += 1
-            limit = 24 if self.command_index in (6, 9, 10, 14, 15, 16, 17, 18) else 12
+            limit = 36 if self.command_index == 19 else \
+                24 if self.command_index in (6, 9, 10, 14, 15, 16, 17, 18) else 12
             if self.tool_calls > limit:
                 raise RuntimeError("Command exceeded %s Computer Use calls" % limit)
             self.record("tool_started", item_id=item.get("id"), tool=item.get("tool"))
@@ -847,12 +1123,12 @@ class Driver:
                 result = item.get("result") or {}
                 error = (item.get("error") or {}).get("message")
                 content = result.get("content") or []
-                if self.command_index == 17 and item.get("server") == "cua_repl":
+                if self.command_index in (17, 19) and item.get("server") == "cua_repl":
                     self.browser_observations.extend(
                         part.get("text") or "" for part in content
                         if part.get("type") == "text" and "Window:" in (part.get("text") or "")
                         and "Safari" in (part.get("text") or ""))
-                if self.command_index == 18 and item.get("server") == "cua_repl":
+                if self.command_index in (18, 19) and item.get("server") == "cua_repl":
                     self.finder_observations.extend(
                         part.get("text") or "" for part in content
                         if part.get("type") == "text" and "Window:" in (part.get("text") or "")
@@ -921,7 +1197,7 @@ def selected_cases(suite, cases, mission_control_gate):
     if suite and cases:
         raise ValueError("--suite cannot be combined with --case")
     if suite:
-        return ([13] if mission_control_gate else []) + [17, 18]
+        return ([13] if mission_control_gate else []) + [20, 17, 18, 19, 15, 16, 20]
     return cases or list(range(1, 7))
 
 
@@ -934,20 +1210,20 @@ def main():
     parser.add_argument("--case", type=int, action="append", choices=range(1, len(COMMANDS) + 1),
                         help="Run one numbered command; repeat to select multiple")
     parser.add_argument("--suite", action="store_true",
-                        help="Run Browser, Finder, and Codex status feasibility probe")
+                        help="Run isolated Browser/Finder, composed Browser-Finder, and Codex feasibility")
     parser.add_argument("--mission-control-gate", action="store_true",
                         help="Require read-only Mission Control case 13 before --suite acts")
     parser.add_argument("--browser-mode", default="normal",
                         choices=("normal", "missing-link", "home-404", "redirect",
                                  "stop-before-docs", "form-submit"),
-                        help="Fixture scenario for a focused --case 17 run")
+                        help="Fixture scenario for a focused --case 17 or 19 run")
     parser.add_argument("--finder-mode", default="normal",
                         choices=("normal", "missing-file", "symlink-escape", "decoy-target"),
-                        help="Fixture scenario for a focused --case 18 run")
+                        help="Fixture scenario for a focused --case 18 or 19 run")
     parser.add_argument("--codex-thread-id",
                         help="Optional exact existing Codex task UUID for --suite's read-only status probe")
     parser.add_argument("--app-path", type=Path,
-                        help="Canonical absolute VoiceComputerPOC.app path, required for cases 13, 15, 16, 17, and 18")
+                        help="Canonical absolute VoiceComputerPOC.app path for exact-app cases")
     parser.add_argument("--single-mcp-step", action="store_true",
                         help="Run only one rightward MCP case and stop regardless of result")
     args = parser.parse_args()
@@ -955,10 +1231,14 @@ def main():
         selected = selected_cases(args.suite, args.case, args.mission_control_gate)
     except ValueError as error:
         parser.error(str(error))
-    if args.browser_mode != "normal" and selected != [17]:
-        parser.error("--browser-mode requires a focused --case 17 run")
-    if args.finder_mode != "normal" and selected != [18]:
-        parser.error("--finder-mode requires a focused --case 18 run")
+    if args.browser_mode != "normal" and selected not in ([17], [19]):
+        parser.error("--browser-mode requires a focused --case 17 or 19 run")
+    if args.finder_mode != "normal" and selected not in ([18], [19]):
+        parser.error("--finder-mode requires a focused --case 18 or 19 run")
+    if selected == [19] and args.browser_mode == "form-submit":
+        parser.error("--case 19 does not accept form-submit")
+    if selected == [19] and args.browser_mode != "normal" and args.finder_mode != "normal":
+        parser.error("Use one failure mode at a time for --case 19")
     if args.codex_thread_id and not args.suite:
         parser.error("--codex-thread-id requires --suite")
     if args.codex_thread_id and not re.fullmatch(
@@ -972,20 +1252,23 @@ def main():
     app_path = None
     if exact_selected:
         if not args.app_path:
-            parser.error("Cases 13, 15, 16, 17, and 18 require --app-path")
+            parser.error("Exact-app cases require --app-path")
         try:
             app_path = canonical_app_path(args.app_path)
         except (OSError, ValueError) as error:
             parser.error(str(error))
     if mcp_selected:
         try:
-            validate_mcp_cases(selected, single_step=args.single_mcp_step)
+            validate_mcp_cases(
+                [case for case in selected if case in MCP_CASES],
+                single_step=args.single_mcp_step)
         except ValueError as error:
             parser.error(str(error))
     os.umask(0o077)
     args.log.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     driver = Driver(args.codex, args.log, trace_tool_output=args.trace_tool_output,
-                    app_path=app_path, finder_mode=args.finder_mode)
+                    app_path=app_path, finder_mode=args.finder_mode,
+                    browser_mode=args.browser_mode)
     failed = False
     fixtures = []
     finder_fixtures = []
@@ -996,6 +1279,11 @@ def main():
         if locked is True or (exact_selected and locked is not False):
             print("SMOKE BLOCKED: macOS desktop unlock state is not verified", file=sys.stderr)
             return 2
+        if exact_selected:
+            identity = exact_build_identity(app_path)
+            driver.record("exact_build_identity", **identity)
+            if args.suite and not identity["source_clean"]:
+                raise RuntimeError("Full suite requires a clean source commit")
         driver.wait_rpc(driver.rpc("initialize", {"clientInfo": {
             "name": "voice_computer_smoke", "title": "Voice Computer Smoke Test", "version": "0.1.0",
         }}))
@@ -1013,7 +1301,7 @@ def main():
             phrase = COMMANDS[index - 1]
             fixture = None
             home_requested = home_release = None
-            if index == 17:
+            if index in (17, 19):
                 run_id = uuid.uuid4().hex
                 temporary = tempfile.TemporaryDirectory(prefix="voice-browser-smoke-")
                 fixture_log = Path(temporary.name) / "requests.jsonl"
@@ -1026,16 +1314,51 @@ def main():
                 fixture_thread.start()
                 fixtures.append((server, fixture_thread, temporary, home_release))
                 fixture = (run_id, server.server_port, fixture_log)
-                form = args.browser_mode == "form-submit"
+                form = index == 17 and args.browser_mode == "form-submit"
                 path = "docs" if form else "home"
                 url = f"http://127.0.0.1:{server.server_port}/{path}?run_id={run_id}"
                 action = (f"submit query test-{run_id}" if form else "follow the Docs link")
+                if index == 17:
+                    phrase = (f'In the exact Voice Computer POC app, enter "Open {url} '
+                              f'and {action}." in the command field and press Return once. '
+                              'Approve only Safari if the app shows a Computer Use approval. '
+                              'Wait for the app result, then independently inspect the Safari '
+                              'window and report its exact URL and visible heading. Do not navigate Safari '
+                              'yourself or submit a second app command.')
+            if index == 19:
+                fixture_root = support / "TestFixtures" / run_id
+                fixture_root.mkdir(parents=True, mode=0o700)
+                finder_fixtures.append(fixture_root)
+                report = fixture_root / "report.txt"
+                if args.finder_mode in ("normal", "decoy-target"):
+                    report.write_text("Voice Computer composed fixture\n")
+                elif args.finder_mode == "symlink-escape":
+                    outside = tempfile.TemporaryDirectory(prefix="voice-composed-outside-")
+                    finder_outside_fixtures.append(outside)
+                    outside_report = Path(outside.name) / "report.txt"
+                    outside_report.write_text("Outside composed fixture\n")
+                    report.symlink_to(outside_report)
+                (fixture_root / "report-copy.txt").write_text("Decoy\n")
+                if args.finder_mode == "decoy-target":
+                    report = fixture_root / "report-copy.txt"
                 phrase = (f'In the exact Voice Computer POC app, enter "Open {url} '
-                          f'and {action}." in the command field and press Return once. '
-                          'Approve only Safari if the app shows a Computer Use approval. '
-                          'Wait for the app result, then independently inspect the Safari '
-                          'window and report its exact URL and visible heading. Do not navigate Safari '
-                          'yourself or submit a second app command.')
+                          f'and follow the Docs link, then reveal the test report at {report} '
+                          'in Finder." in the command field and press Return once. '
+                          'Approve only Safari and Finder Computer Use inside the app. Wait for '
+                          'the single app command to finish, then independently inspect both '
+                          'Safari Docs and Finder selected report. Do not navigate or select '
+                          'either target yourself or submit another app command.')
+                if args.finder_mode != "normal":
+                    phrase = (f'In the exact Voice Computer POC app, enter "Open {url} '
+                              f'and follow the Docs link, then reveal the test report at {report} '
+                              'in Finder." once. Wait for the preflight rejection. Do not '
+                              'inspect or control Safari or Finder.')
+                elif args.browser_mode != "normal":
+                    phrase = (f'In the exact Voice Computer POC app, enter "Open {url} '
+                              f'and follow the Docs link, then reveal the test report at {report} '
+                              'in Finder." once. Approve only Safari Computer Use if prompted. '
+                              'Wait for the failed or stopped Browser result. Inspect and close '
+                              'only the fixture Safari tab; do not bind or inspect Finder.')
             if index == 18:
                 fixture_root = support / "TestFixtures" / uuid.uuid4().hex
                 fixture_root.mkdir(parents=True, mode=0o700)
@@ -1062,7 +1385,13 @@ def main():
                 phrase = (f'In the exact Voice Computer POC app, enter "Reveal the test report '
                           f'at {report} in Finder." in the command field and press Return once. '
                           + finder_instruction)
-            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18) else None
+            if index == 20:
+                phrase = ('In the exact Voice Computer POC app, enter "agent get desktop state" '
+                          'in the command field and press Return once. Approve only the visible '
+                          'desktop_tool.get_desktop_state read with Allow once. Wait for the '
+                          'typed app result and report its Main Space ID, ordered IDs, '
+                          'foreground bundle ID, and observation time. Do not switch Spaces.')
+            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20) else None
             expected_space = None
             if index in EXACT_APP_CASES:
                 validate_exact_space_state(space_before, index)
@@ -1124,8 +1453,9 @@ def main():
             instruction = INSTRUCTION
             if index == 13:
                 instruction = (
-                    "Use only mcp__cua_repl.js for UI. Bind with cua.getApp to this exact full "
-                    "app path: " + str(app_path) + ". Verify its visible Command and Run controls. "
+                    "Use only mcp__cua_repl.js for UI. First call: var vcProbeApp = await "
+                    "cua.getApp('" + str(app_path) + "'); Reuse vcProbeApp. Verify its visible "
+                    "Command and Run controls. "
                     "Enter the quoted read-only inspection phrase and submit once using Return. "
                     "Make the Return call by itself, without getAXState in the same call. "
                     "Wait five seconds without UI calls so Mission Control can appear and the "
@@ -1136,10 +1466,12 @@ def main():
                 )
             elif index in MCP_CASES:
                 instruction = (
-                    "Use only mcp__cua_repl.js for UI. Bind with cua.getApp to this exact full app path: "
-                    + str(app_path) + ". The driver has already checked the running executable; "
+                    "Use only mcp__cua_repl.js for UI. Your first Computer Use call must be "
+                    "exactly: let vcSpaceApp = await cua.getApp('" + str(app_path) + "'); "
+                    "Reuse vcSpaceApp; never assign to an undeclared app variable. "
+                    "The driver has already checked the running executable; "
                     "do not inspect app metadata, object properties, or processes. If the first "
-                    "tool response shows only Computer Use documentation, call app.getAXState(). "
+                    "tool response shows only Computer Use documentation, call vcSpaceApp.getAXState(). "
                     "Find the visible command field in its Accessibility state, enter the exact "
                     "quoted command, and submit once using Return. "
                     "Only if a desktop_tool.switch_space approval is visibly shown with the requested "
@@ -1149,8 +1481,9 @@ def main():
                 )
             elif index == 17:
                 instruction = (
-                    "Use only mcp__cua_repl.js for UI. Bind with cua.getApp to this exact full "
-                    "app path: " + str(app_path) + ". Enter the exact quoted command and submit "
+                    "Use only mcp__cua_repl.js for UI. First call: var vcBrowserApp = await "
+                    "cua.getApp('" + str(app_path) + "'); Reuse vcBrowserApp. Enter the exact "
+                    "quoted command and submit "
                     "once with Return. Approve only Computer Use for Safari using "
                     "the visible Allow for session button; never approve a shell or other app. Wait "
                     "for the app command to finish. Only after it finishes, use cua.getApp "
@@ -1164,8 +1497,8 @@ def main():
                 )
                 if home_requested:
                     instruction = (
-                        "Use only mcp__cua_repl.js for UI. Bind with cua.getApp to this exact "
-                        "full app path: " + str(app_path) + ". Enter the exact quoted command "
+                        "Use only mcp__cua_repl.js for UI. First call: var vcBrowserApp = await "
+                        "cua.getApp('" + str(app_path) + "'); Reuse vcBrowserApp. Enter the exact quoted command "
                         "and submit once with Return. Approve only Safari Computer Use through "
                         "the visible Allow for session button. The Home page may pause loading; "
                         "wait for the app's own Stop action to interrupt the run. Do not click "
@@ -1200,10 +1533,74 @@ def main():
                         "the target is intentionally unsafe and must start no acting turn. "
                         "Never inspect or control the Codex or ChatGPT host app. User request: "
                     )
+            elif index == 19:
+                instruction = (
+                    "Use only mcp__cua_repl.js for UI. First call: var vcComposedApp = await "
+                    "cua.getApp('" + str(app_path) + "'); Reuse vcComposedApp. Enter the exact "
+                    "quoted command and submit "
+                    "it once with Return. Approve only Safari or Finder Computer Use through "
+                    "the app's visible Allow for session button; decline any other target. "
+                    "Wait for the app command to finish. Then independently inspect the Safari "
+                    "fixture tab using cua.getApp('com.apple.Safari') and a full getAXState, "
+                    "and the Finder selection using cua.getApp('com.apple.finder') and a full "
+                    "getAXState. Do not navigate Safari or select the file yourself. Record "
+                    "the exact Docs URL and heading and selected report URL. Safari is a native "
+                    "app target here; never call cua.listTabs, cua.getBrowser, or createBrowserTab. "
+                    "Close only the fixture Safari tab and Finder fixture window using their "
+                    "visible native controls after recording evidence. "
+                    "Never inspect the Codex or ChatGPT host app. User request: "
+                )
+                if args.finder_mode != "normal":
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. First call: var vcComposedApp = await "
+                        "cua.getApp('" + str(app_path) + "'); Reuse vcComposedApp. Enter the quoted command once and "
+                        "press Return. The report target is intentionally unsafe. Wait for "
+                        "Voice Computer to reject it, then report its visible result. Do not "
+                        "bind Safari or Finder or approve an acting turn. User request: "
+                    )
+                elif args.browser_mode != "normal":
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. First call: var vcComposedApp = await "
+                        "cua.getApp('" + str(app_path) + "'); Reuse vcComposedApp. Enter the quoted command once and "
+                        "press Return. Approve only Safari Computer Use through the app's "
+                        "visible Allow for session button. Wait for the Browser failure; "
+                        "do not open or inspect Finder. After Voice Computer finishes, "
+                        "inspect the Safari fixture tab with cua.getApp('com.apple.Safari') "
+                        "and getAXState without navigating it, then close only that tab using "
+                        "Safari's native UI. Never call cua.listTabs, cua.getBrowser, or "
+                        "createBrowserTab; those browser surfaces are unavailable. Never "
+                        "inspect the Codex or ChatGPT host app. "
+                        "User request: "
+                    )
+                if home_requested:
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. First call: var vcComposedApp = await "
+                        "cua.getApp('" + str(app_path) + "'); Reuse vcComposedApp. Enter the quoted command once and "
+                        "press Return. Approve only Safari Computer Use through the app's "
+                        "visible Allow for session button. The Home page may pause; wait "
+                        "for the app's Stop action and report the stopped result. Do not "
+                        "press Stop yourself, navigate Safari, bind Finder, or inspect Finder. Close only "
+                        "the fixture Safari tab afterward using cua.getApp('com.apple.Safari') "
+                        "and its native tab controls. Safari is a native app here: never call "
+                        "cua.listTabs, cua.listBrowsers, cua.getBrowser, or createBrowserTab. "
+                        "User request: "
+                    )
+            elif index == 20:
+                instruction = (
+                    "Use only mcp__cua_repl.js for UI. Your first Computer Use call must be "
+                    "exactly: let vcStateApp = await cua.getApp('" + str(app_path) + "'); "
+                    "Reuse vcStateApp for the rest of this case; do not assign to an "
+                    "undeclared variable. Enter the exact quoted command and "
+                    "submit once with Return. If the app visibly asks approval for "
+                    "desktop_tool.get_desktop_state, choose Allow once only; do not approve "
+                    "a Space move or session access. Wait for the app's typed result. Do not "
+                    "switch Spaces yourself, inspect unrelated apps, or use a shell fallback. "
+                    "User request: "
+                )
             response = driver.wait_rpc(driver.rpc("turn/start", {
                 "threadId": thread, "input": [{"type": "text", "text": instruction + phrase}],
             }))
-            turn = driver.wait_turn()
+            turn = driver.wait_turn(seconds=300 if index == 19 else 180)
             if stop_thread:
                 stop_thread.join(timeout=85)
                 if stop_thread.is_alive() or not stop_outcome.get("pressed"):
@@ -1218,7 +1615,7 @@ def main():
                     if space_after and space_after["current"] == expected_space:
                         break
                     time.sleep(0.5)
-            elif index in (13, 17, 18):
+            elif index in (13, 17, 18, 19, 20):
                 space_after = space_state()
             negative_result = re.search(
                 r"couldn.t|cannot|can.t|declined|unverified|failed|unable to",
@@ -1277,6 +1674,29 @@ def main():
                                 rows, report, space_before["current"], after_id, prior_ids,
                                 mode=args.finder_mode)
                             driver.record("finder_rejection_receipt_verified", **exact_receipt)
+                    elif index == 19:
+                        run_id, port, fixture_log = fixture
+                        fixture_rows = [json.loads(line) for line in fixture_log.read_text().splitlines()]
+                        if args.finder_mode != "normal":
+                            exact_receipt = verify_composed_rejection_receipt(
+                                rows, fixture_rows, space_before["current"], after_id,
+                                prior_ids, mode=args.finder_mode)
+                        elif args.browser_mode != "normal":
+                            exact_receipt = verify_composed_failure_receipt(
+                                rows, run_id, fixture_rows, space_before["current"],
+                                after_id, prior_ids, mode=args.browser_mode)
+                        else:
+                            exact_receipt = verify_composed_receipt(
+                                rows, run_id, port, fixture_rows, report,
+                                driver.browser_observations, driver.finder_observations,
+                                space_before["current"], after_id, prior_ids)
+                        driver.record("composed_receipt_verified", **exact_receipt)
+                    elif index == 20:
+                        independent_frontmost = frontmost_bundle_id()
+                        exact_receipt = verify_desktop_state_receipt(
+                            rows, space_before, space_after, independent_frontmost,
+                            prior_ids)
+                        driver.record("desktop_state_receipt_verified", **exact_receipt)
                     else:
                         exact_receipt = verify_mcp_receipt(
                             rows, mcp_case_phrase(index), MCP_CASES[index],
@@ -1286,7 +1706,7 @@ def main():
                     driver.record("exact_app_receipt_rejected", reason=str(error))
                     verified = False
                 else:
-                    verified = exact_receipt is not None and (verified or index in (13, 17, 18))
+                    verified = exact_receipt is not None and (verified or index in (13, 17, 18, 19, 20))
             recovered_stale_ui = (
                 index == 13 and exact_receipt is not None
                 and driver.tool_failures == ["stale_ui_state"])
@@ -1295,7 +1715,7 @@ def main():
             success = (turn.get("status") == "completed" and verified
                        and (not driver.tool_failures or recovered_stale_ui)
                        and all(a["allowed"] for a in driver.approvals)
-                       and (expected_space is not None or index in (17, 18) or not negative_result))
+                       and (expected_space is not None or index in (17, 18, 19, 20) or not negative_result))
             driver.record("command_finished", success=success,
                           elapsed_ms=round((time.monotonic() - started) * 1000),
                           tool_failures=driver.tool_failures, approvals=driver.approvals,

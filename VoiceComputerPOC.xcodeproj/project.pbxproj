@@ -16,14 +16,17 @@
 		11B249B1108AD14B1E9D8685 /* SpaceToolBridgeSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77A1C0131F46AF8B11A108D1 /* SpaceToolBridgeSecurityTests.swift */; };
 		12FF087DE21D8239BCD03A9F /* BrowserFormRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DF9270A4C2BF78718E5B479 /* BrowserFormRouteTests.swift */; };
 		1903CCB753DCB55130698DD5 /* AppServerClient+SpaceVerification.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BBEAB99B854E808C3A2E50 /* AppServerClient+SpaceVerification.swift */; };
+		22B5A1CA537B63DE01F1D6C6 /* DesktopStateToolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40F6B7E3FEC860F101A14BCB /* DesktopStateToolTests.swift */; };
 		25389F8BE59799C7694C9D72 /* AppServerClient+SpaceAXExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658A3A41C80234ACA5A36A8D /* AppServerClient+SpaceAXExecution.swift */; };
 		2E46C2BD23DBA8D96B16443B /* router-output.schema.json in Resources */ = {isa = PBXBuildFile; fileRef = 6BE7479ACF49C5F779513C79 /* router-output.schema.json */; };
 		2FC0AEA630182A4F6C177E93 /* AppServerClient+Connection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1553759D35311E1698534226 /* AppServerClient+Connection.swift */; };
+		35BE6A806BEF9D928C5D7EB2 /* AppServerClient+TurnOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5BD5359A5FB8D299E90C067 /* AppServerClient+TurnOutcome.swift */; };
 		39ED284ACB1970972009A7AE /* CommandRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B74AD102A7A7BE23EB6619A /* CommandRoute.swift */; };
 		45B59E7EEC152F2A6831E556 /* SpaceNavigatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17DD4353727E45891FEF5DAB /* SpaceNavigatorTests.swift */; };
 		469F4D49DCCEDEC5032649B8 /* NativeSpaceAXExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6428F055CAE5F977ECD76618 /* NativeSpaceAXExecution.swift */; };
 		46A0B1E7E64FAA6B4DAF7B21 /* AppServerClientNotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D197EA13232A8EC0DF17BCA1 /* AppServerClientNotificationTests.swift */; };
 		46B4B0D406445B2F5DA025D6 /* AppServerClient+Spaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C996441AC1A3E32F91757B /* AppServerClient+Spaces.swift */; };
+		4B14C7884D6097F09FA1273B /* BrowserFinderRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CED138CCCC69522CE2E17A2 /* BrowserFinderRouteTests.swift */; };
 		4B75BA142D677494C7DB4484 /* FixtureAXVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 437F4703D8FF94A3D866FA6A /* FixtureAXVerifier.swift */; };
 		4B783A83A2C9EC4A3D90A251 /* SpaceNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4892574811141080E9E93FE /* SpaceNavigator.swift */; };
 		4C89AD07C7FD92FE012B26E3 /* NativeSpaceAXExecutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAF6FC2A95408A77DEB5287E /* NativeSpaceAXExecutionTests.swift */; };
@@ -34,11 +37,14 @@
 		8C8E6085BEBB050DAC7DE0EB /* AppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5685373ED6C8075DD282EA /* AppServerClient.swift */; };
 		956571D06FD82926DEBD3B4D /* SpaceToolContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7EBF26FA90A2A71786A1435 /* SpaceToolContractTests.swift */; };
 		99965E951BC65D2FC6AE76D9 /* WindowManagerAXProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5D25FC23DE94B511E999EB7 /* WindowManagerAXProbe.swift */; };
+		9B4393A106D5712AF33ACBDD /* AppServerClient+Stop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5D3E2993C12E02F3127F0D /* AppServerClient+Stop.swift */; };
 		9E495468E25A3000878BC3B8 /* AppServerClient+FixtureVerification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872783EC2FBD66E63D00C835 /* AppServerClient+FixtureVerification.swift */; };
 		A8852D260D8504D5024ABB58 /* AppServerClient+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DA61CCE4D3F6CC8236658A /* AppServerClient+Lifecycle.swift */; };
 		AA621174BB334EDF6B44707F /* SpaceToolBridgePythonPeerSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17C96BB825E16BE3B775FD87 /* SpaceToolBridgePythonPeerSupport.swift */; };
 		B00819EC5F0AB40C9AEDB658 /* LocalVoiceInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */; };
 		B1977B752C4EF9097128F4DF /* MissionControlAXDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FBF783BA4090E303FF1E695 /* MissionControlAXDiscovery.swift */; };
+		B20109C691FC13B37CB4A276 /* DesktopStateToolContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = D552F358A7F8C27CC1457175 /* DesktopStateToolContract.swift */; };
+		B50F7B771224521A7B3B691D /* AppServerClient+DesktopState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EB983EE3835E4C22691C543 /* AppServerClient+DesktopState.swift */; };
 		BC4753D6EC07F923ED6AE722 /* DiagnosticLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BDB7479844A824CE79FA957 /* DiagnosticLogTests.swift */; };
 		CA907AAE2B1E537AD1A8EDF4 /* ApprovalProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF54FE5EDD2D827D67E8AF4 /* ApprovalProtocol.swift */; };
 		CCC922B84BD4EA953E7D52BE /* WindowManagerAXExecutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 707B471B25A7F1DAAE972363 /* WindowManagerAXExecutionTests.swift */; };
@@ -72,10 +78,13 @@
 		1553759D35311E1698534226 /* AppServerClient+Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Connection.swift"; sourceTree = "<group>"; };
 		17C96BB825E16BE3B775FD87 /* SpaceToolBridgePythonPeerSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolBridgePythonPeerSupport.swift; sourceTree = "<group>"; };
 		17DD4353727E45891FEF5DAB /* SpaceNavigatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceNavigatorTests.swift; sourceTree = "<group>"; };
+		1B5D3E2993C12E02F3127F0D /* AppServerClient+Stop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Stop.swift"; sourceTree = "<group>"; };
 		34C996441AC1A3E32F91757B /* AppServerClient+Spaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Spaces.swift"; sourceTree = "<group>"; };
 		3DF9270A4C2BF78718E5B479 /* BrowserFormRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserFormRouteTests.swift; sourceTree = "<group>"; };
 		3E5685373ED6C8075DD282EA /* AppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClient.swift; sourceTree = "<group>"; };
+		40F6B7E3FEC860F101A14BCB /* DesktopStateToolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopStateToolTests.swift; sourceTree = "<group>"; };
 		437F4703D8FF94A3D866FA6A /* FixtureAXVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureAXVerifier.swift; sourceTree = "<group>"; };
+		4CED138CCCC69522CE2E17A2 /* BrowserFinderRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserFinderRouteTests.swift; sourceTree = "<group>"; };
 		4DF54FE5EDD2D827D67E8AF4 /* ApprovalProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalProtocol.swift; sourceTree = "<group>"; };
 		5C9F9324497C1AD7B0B64440 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		6428F055CAE5F977ECD76618 /* NativeSpaceAXExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSpaceAXExecution.swift; sourceTree = "<group>"; };
@@ -86,6 +95,7 @@
 		77A1C0131F46AF8B11A108D1 /* SpaceToolBridgeSecurityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolBridgeSecurityTests.swift; sourceTree = "<group>"; };
 		7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalVoiceInput.swift; sourceTree = "<group>"; };
 		7BDB7479844A824CE79FA957 /* DiagnosticLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogTests.swift; sourceTree = "<group>"; };
+		7EB983EE3835E4C22691C543 /* AppServerClient+DesktopState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+DesktopState.swift"; sourceTree = "<group>"; };
 		872783EC2FBD66E63D00C835 /* AppServerClient+FixtureVerification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+FixtureVerification.swift"; sourceTree = "<group>"; };
 		8B74AD102A7A7BE23EB6619A /* CommandRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandRoute.swift; sourceTree = "<group>"; };
 		8D890B71ED4ECE57D20290F2 /* SpaceToolContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolContract.swift; sourceTree = "<group>"; };
@@ -94,12 +104,14 @@
 		A5D25FC23DE94B511E999EB7 /* WindowManagerAXProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManagerAXProbe.swift; sourceTree = "<group>"; };
 		AAEE0B9B8B1A5F7E5359DD50 /* AppServerClient+Routing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Routing.swift"; sourceTree = "<group>"; };
 		B4892574811141080E9E93FE /* SpaceNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceNavigator.swift; sourceTree = "<group>"; };
+		B5BD5359A5FB8D299E90C067 /* AppServerClient+TurnOutcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+TurnOutcome.swift"; sourceTree = "<group>"; };
 		BCBEEB7CA0E2EE76DD16B602 /* AppServerClient+TurnInstruction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+TurnInstruction.swift"; sourceTree = "<group>"; };
 		BED1EF7D88AEDFF253DD76FC /* router-instruction.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "router-instruction.txt"; sourceTree = "<group>"; };
 		C0BFCDA2960DFBDC48C0D048 /* WindowManagerAXExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManagerAXExecution.swift; sourceTree = "<group>"; };
 		D197EA13232A8EC0DF17BCA1 /* AppServerClientNotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClientNotificationTests.swift; sourceTree = "<group>"; };
 		D3BBEAB99B854E808C3A2E50 /* AppServerClient+SpaceVerification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+SpaceVerification.swift"; sourceTree = "<group>"; };
 		D478EB08637ACB3628315EC6 /* router-cli-args.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "router-cli-args.json"; sourceTree = "<group>"; };
+		D552F358A7F8C27CC1457175 /* DesktopStateToolContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopStateToolContract.swift; sourceTree = "<group>"; };
 		D632B99140C3882305A8768D /* CommandRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandRouteTests.swift; sourceTree = "<group>"; };
 		D9EB4AB5FB13BC8D4FE6427F /* NativeSpaceCancellationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSpaceCancellationTests.swift; sourceTree = "<group>"; };
 		DEF216825C70926B73579A26 /* AppServerClient+Responses.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Responses.swift"; sourceTree = "<group>"; };
@@ -128,8 +140,10 @@
 				0021295ABADC32033A3EDE68 /* ApprovalProtocolTests.swift */,
 				D197EA13232A8EC0DF17BCA1 /* AppServerClientNotificationTests.swift */,
 				6B71C5871C819570F0B56DC8 /* AppServerClientRoutingTests.swift */,
+				4CED138CCCC69522CE2E17A2 /* BrowserFinderRouteTests.swift */,
 				3DF9270A4C2BF78718E5B479 /* BrowserFormRouteTests.swift */,
 				D632B99140C3882305A8768D /* CommandRouteTests.swift */,
+				40F6B7E3FEC860F101A14BCB /* DesktopStateToolTests.swift */,
 				7BDB7479844A824CE79FA957 /* DiagnosticLogTests.swift */,
 				135FE916EA2229230A66BEA1 /* FixtureAXVerifierTests.swift */,
 				FAF6FC2A95408A77DEB5287E /* NativeSpaceAXExecutionTests.swift */,
@@ -169,6 +183,7 @@
 				4DF54FE5EDD2D827D67E8AF4 /* ApprovalProtocol.swift */,
 				3E5685373ED6C8075DD282EA /* AppServerClient.swift */,
 				1553759D35311E1698534226 /* AppServerClient+Connection.swift */,
+				7EB983EE3835E4C22691C543 /* AppServerClient+DesktopState.swift */,
 				872783EC2FBD66E63D00C835 /* AppServerClient+FixtureVerification.swift */,
 				0462EAA1EC591D98B59A5113 /* AppServerClient+FocusActivation.swift */,
 				E1DA61CCE4D3F6CC8236658A /* AppServerClient+Lifecycle.swift */,
@@ -178,9 +193,12 @@
 				658A3A41C80234ACA5A36A8D /* AppServerClient+SpaceAXExecution.swift */,
 				34C996441AC1A3E32F91757B /* AppServerClient+Spaces.swift */,
 				D3BBEAB99B854E808C3A2E50 /* AppServerClient+SpaceVerification.swift */,
+				1B5D3E2993C12E02F3127F0D /* AppServerClient+Stop.swift */,
 				BCBEEB7CA0E2EE76DD16B602 /* AppServerClient+TurnInstruction.swift */,
+				B5BD5359A5FB8D299E90C067 /* AppServerClient+TurnOutcome.swift */,
 				8B74AD102A7A7BE23EB6619A /* CommandRoute.swift */,
 				5C9F9324497C1AD7B0B64440 /* ContentView.swift */,
+				D552F358A7F8C27CC1457175 /* DesktopStateToolContract.swift */,
 				0F9746E05DAF2F18E2164AE0 /* DiagnosticLog.swift */,
 				437F4703D8FF94A3D866FA6A /* FixtureAXVerifier.swift */,
 				7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */,
@@ -311,8 +329,10 @@
 				46A0B1E7E64FAA6B4DAF7B21 /* AppServerClientNotificationTests.swift in Sources */,
 				6E47380606EC3DFF30BF1E0E /* AppServerClientRoutingTests.swift in Sources */,
 				8832F6771617F802E160B22F /* ApprovalProtocolTests.swift in Sources */,
+				4B14C7884D6097F09FA1273B /* BrowserFinderRouteTests.swift in Sources */,
 				12FF087DE21D8239BCD03A9F /* BrowserFormRouteTests.swift in Sources */,
 				815AE3BC1BD46EA6E2F4BF79 /* CommandRouteTests.swift in Sources */,
+				22B5A1CA537B63DE01F1D6C6 /* DesktopStateToolTests.swift in Sources */,
 				BC4753D6EC07F923ED6AE722 /* DiagnosticLogTests.swift in Sources */,
 				04C47D3FA66A1B5677B5375B /* FixtureAXVerifierTests.swift in Sources */,
 				4C89AD07C7FD92FE012B26E3 /* NativeSpaceAXExecutionTests.swift in Sources */,
@@ -330,6 +350,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2FC0AEA630182A4F6C177E93 /* AppServerClient+Connection.swift in Sources */,
+				B50F7B771224521A7B3B691D /* AppServerClient+DesktopState.swift in Sources */,
 				9E495468E25A3000878BC3B8 /* AppServerClient+FixtureVerification.swift in Sources */,
 				FB9DF7EBC9313DD2DDF7F5A5 /* AppServerClient+FocusActivation.swift in Sources */,
 				A8852D260D8504D5024ABB58 /* AppServerClient+Lifecycle.swift in Sources */,
@@ -339,11 +360,14 @@
 				25389F8BE59799C7694C9D72 /* AppServerClient+SpaceAXExecution.swift in Sources */,
 				1903CCB753DCB55130698DD5 /* AppServerClient+SpaceVerification.swift in Sources */,
 				46B4B0D406445B2F5DA025D6 /* AppServerClient+Spaces.swift in Sources */,
+				9B4393A106D5712AF33ACBDD /* AppServerClient+Stop.swift in Sources */,
 				F616BD6FF7CBF612D3B7B071 /* AppServerClient+TurnInstruction.swift in Sources */,
+				35BE6A806BEF9D928C5D7EB2 /* AppServerClient+TurnOutcome.swift in Sources */,
 				8C8E6085BEBB050DAC7DE0EB /* AppServerClient.swift in Sources */,
 				CA907AAE2B1E537AD1A8EDF4 /* ApprovalProtocol.swift in Sources */,
 				39ED284ACB1970972009A7AE /* CommandRoute.swift in Sources */,
 				E807A0BA7ED80F13CE2784C6 /* ContentView.swift in Sources */,
+				B20109C691FC13B37CB4A276 /* DesktopStateToolContract.swift in Sources */,
 				0233268CC94C9A26838D022C /* DiagnosticLog.swift in Sources */,
 				4B75BA142D677494C7DB4484 /* FixtureAXVerifier.swift in Sources */,
 				B00819EC5F0AB40C9AEDB658 /* LocalVoiceInput.swift in Sources */,

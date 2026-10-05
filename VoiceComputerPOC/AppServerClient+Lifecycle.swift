@@ -58,6 +58,7 @@ extension AppServerClient {
 
     func cleanupProcess() {
         spaceToolApproval = nil
+        desktopStateApproval = nil
         desktopToolPreflight?.cancel()
         desktopToolPreflight = nil
         spaceToolBridge?.stop()
@@ -80,7 +81,7 @@ extension AppServerClient {
         errorLinesLogged = 0
     }
 
-    func rotateServerAfterSpaceTool() {
+    func rotateServerAfterCommand() {
         guard let process else { return }
         record("mcp_server_rotating", details: ["pid": String(process.processIdentifier)])
         if process.isRunning { process.terminate() }
@@ -89,6 +90,7 @@ extension AppServerClient {
 
     func fail(_ message: String) {
         spaceToolApproval = nil
+        desktopStateApproval = nil
         spaceToolBridge?.revoke()
         desktopToolPreflight?.cancel()
         desktopToolPreflight = nil
@@ -118,9 +120,17 @@ extension AppServerClient {
         expectedToolDirection = nil
         activeToolDirection = nil
         requestedToolDirection = nil
+        requestedDesktopState = false
+        activeStateToolItemID = nil
+        activeStateToolTurnID = nil
+        stateToolResult = nil
+        stateToolCallCompleted = false
         queuedPhrase = nil
         spaceCountAtTurnStart = nil
         focusTargetBundleID = nil
+        composedReportURL = nil
+        composedBrowserVerified = false
+        composedOriginSpace = nil
         activatedBundleIDsThisTurn.removeAll()
         if process != nil {
             record("server_reset_after_error")
@@ -178,6 +188,7 @@ extension AppServerClient {
     func finishCommand() {
         recordLiveSpaceObservation("after_completion")
         spaceToolApproval = nil
+        desktopStateApproval = nil
         spaceToolBridge?.revoke()
         desktopToolPreflight?.cancel()
         desktopToolPreflight = nil

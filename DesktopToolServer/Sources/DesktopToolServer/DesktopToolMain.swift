@@ -9,10 +9,17 @@ struct DesktopToolMain {
             capabilities: .init(tools: .init()))
         await server.withMethodHandler(ListTools.self) { _ in
             ToolServer.stage("tools_list")
-            return .init(tools: [ToolServer.definition()])
+            return .init(tools: [ToolServer.definition(), StateToolServer.definition()])
         }
         await server.withMethodHandler(CallTool.self) { params in
             ToolServer.stage("call_received")
+            if params.name == StateToolServer.toolName {
+                let result = StateToolServer.call(arguments: params.arguments) {
+                    BridgeClient.invokeState()
+                }
+                ToolServer.stage("call_result_\(result.status)")
+                return StateToolServer.toolResponse(result)
+            }
             guard params.name == ToolServer.toolName else {
                 return ToolServer.toolResponse(
                     .failure("unknown_tool", "unknown", "Unknown tool."))

@@ -6,7 +6,9 @@ extension AppServerClient {
         guard let request = approval else { return }
         let accepted =
             request.serverName == "desktop_tool"
-            ? decideSpaceApproval(request, allow: allow, forSession: forSession) : allow
+            ? (request.desktopStateRead
+                ? decideDesktopStateApproval(request, allow: allow, forSession: forSession)
+                : decideSpaceApproval(request, allow: allow, forSession: forSession)) : allow
         sendRaw(request.response(allow: accepted, forSession: forSession))
         if !accepted, request.serverName == "cua_repl" {
             generalTurnFailure = .accessDeclined
@@ -38,7 +40,7 @@ extension AppServerClient {
                 self.launchServer(helperExecutable: path)
             case .failed(let reason):
                 self.record("mcp_preflight_failed", details: ["reason": reason])
-                if self.requestedToolDirection == nil {
+                if self.requestedToolDirection == nil && !self.requestedDesktopState {
                     self.launchServer(helperExecutable: nil)
                 } else {
                     self.fail("The desktop tool could not be prepared (\(reason)).")
@@ -65,7 +67,7 @@ extension AppServerClient {
                 "mcp_local_config",
                 details: [
                     "server": spaceToolBridge == nil ? "unavailable" : "desktop_tool",
-                    "startup_grace_ms": "0", "startup_timeout_sec": "30",
+                    "startup_grace_ms": "10000", "startup_timeout_sec": "30",
                     "launcher": helperExecutable == nil ? "none" : "direct_executable",
                     "safe_probe": String(Self.safeSpaceProbe),
                 ])
@@ -89,6 +91,12 @@ extension AppServerClient {
         bridge?.expectedExecutablePath = helperExecutable
         bridge?.onRequest = { [weak self] request, peer, reply in
             self?.handleSpaceToolRequest(request, peer: peer, reply: reply)
+        }
+        bridge?.onStateRequest = { [weak self] request, peer, reply in
+            self?.handleDesktopStateRequest(request, peer: peer, reply: reply)
+        }
+        bridge?.onPeerRejected = { [weak self] reason in
+            self?.record("mcp_peer_rejected", details: ["reason": reason])
         }
         spaceToolBridge = bridge
         if bridge == nil { record("mcp_bridge_unavailable") }
@@ -120,7 +128,7 @@ extension AppServerClient {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: executable)
         task.arguments =
-            ["app-server", "-c", "mcp_optional_startup_grace_ms=0"]
+            ["app-server", "-c", "mcp_optional_startup_grace_ms=10000"]
             + (bridge.flatMap { bridge in
                 helperExecutable.map { ["-c", toolServerConfig(bridge, executable: $0)] }
             } ?? [])
@@ -181,6 +189,7 @@ extension AppServerClient {
         if let direction = requestedToolDirection {
             record("mcp_action_requested", details: ["direction": direction.rawValue])
         }
+        if requestedDesktopState { record("mcp_state_requested") }
         if requestedToolDirection == nil, phrase.localizedCaseInsensitiveContains("chrome"),
             let runningChrome = NSWorkspace.shared.runningApplications.first(where: {
                 $0.bundleIdentifier == "com.google.Chrome" && $0.activationPolicy == .regular
@@ -196,11 +205,13 @@ extension AppServerClient {
             "turn_requested",
             details: [
                 "thread_id": threadID, "model": selectedModel ?? "unknown",
-                "route": requestedToolDirection != nil
-                    ? "space"
-                    : browserDocsURL != nil || browserFormURL != nil
-                        ? "browser"
-                        : finderReportURL != nil ? "finder" : "computer_use",
+                "route": requestedDesktopState
+                    ? "desktop_state"
+                    : requestedToolDirection != nil
+                        ? "space"
+                        : browserDocsURL != nil || browserFormURL != nil
+                            ? "browser"
+                            : finderReportURL != nil ? "finder" : "computer_use",
             ])
         _ = send(
             "turn/start",

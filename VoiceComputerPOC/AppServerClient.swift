@@ -54,6 +54,9 @@ final class AppServerClient: ObservableObject {
     var browserFormURL: URL?
     var browserFormQuery: String?
     var finderReportURL: URL?
+    var composedReportURL: URL?
+    var composedBrowserVerified = false
+    var composedOriginSpace: SpaceSnapshot?
     var activatedBundleIDsThisTurn: Set<String> = []
     var activeCommandID: String?
     var cancelledNativeSpaceCommandID: String?
@@ -68,6 +71,12 @@ final class AppServerClient: ObservableObject {
     var desktopToolPreflight: DesktopToolPreflight?
     var expectedToolDirection: SpaceDirection?
     var requestedToolDirection: SpaceDirection?
+    var requestedDesktopState = false
+    var activeStateToolItemID: String?
+    var activeStateToolTurnID: String?
+    var stateToolResult: DesktopStateToolResult?
+    var stateToolCallCompleted = false
+    var desktopStateApproval: DesktopStateApproval?
     var activeToolDirection: SpaceDirection?
     var toolReply: ((SpaceToolResult) -> Void)?
     var toolCallObserved = false
@@ -203,6 +212,11 @@ final class AppServerClient: ObservableObject {
             return
         }
         if SpaceToolRequest.direction(for: phrase) == nil {
+            if DesktopStateToolRequest.matches(phrase) {
+                requestedDesktopState = true
+                beginActingTurn()
+                return
+            }
             routePhrase(phrase)
             return
         }
@@ -214,8 +228,17 @@ final class AppServerClient: ObservableObject {
         browserFormURL = nil
         browserFormQuery = nil
         finderReportURL = nil
+        composedReportURL = nil
+        composedBrowserVerified = false
+        composedOriginSpace = nil
         expectedToolDirection = SpaceToolRequest.direction(for: phrase)
         requestedToolDirection = expectedToolDirection
+        requestedDesktopState = false
+        activeStateToolItemID = nil
+        activeStateToolTurnID = nil
+        stateToolResult = nil
+        stateToolCallCompleted = false
+        desktopStateApproval = nil
         activeToolDirection = nil
         toolCallObserved = false
         activeMCPToolItemID = nil
@@ -252,49 +275,4 @@ final class AppServerClient: ObservableObject {
         }
     }
 
-    func stop() {
-        guard isWorking else { return }
-        cancelledNativeSpaceCommandID = activeCommandID
-        spaceToolApproval = nil
-        spaceToolBridge?.revoke()
-        record("stop_requested")
-        if queuedPhrase?.lowercased() == "inspect mission control desktop controls" {
-            status = "Stopped"
-            result = "Stopped the Mission Control inspection."
-            record("mission_control_probe_stopped")
-            queuedPhrase = nil
-            isWorking = false
-            finishCommand()
-            return
-        }
-        if nativeSpacePollTimer != nil || toolReply != nil
-            || queuedPhrase.flatMap({ SpaceCommand(phrase: $0) }) != nil
-        {
-            let hadToolReply = toolReply != nil
-            nativeSpacePollTimer?.invalidate()
-            nativeSpacePollTimer = nil
-            completeNativeSpace(
-                status: "stopped", verification: "unverified",
-                message: "Stopped the desktop Space command.", details: [:])
-            if hadToolReply, let threadID, let turnID {
-                _ = send(
-                    "turn/interrupt", params: ["threadId": threadID, "turnId": turnID],
-                    pendingKind: .interrupt)
-                status = "Stopping…"
-            }
-            return
-        }
-        if let threadID, let turnID {
-            _ = send(
-                "turn/interrupt", params: ["threadId": threadID, "turnId": turnID], pendingKind: .interrupt)
-            status = "Stopping…"
-        } else {
-            queuedPhrase = nil
-            isWorking = false
-            status = "Stopped"
-            record("command_stopped", details: ["elapsed_ms": commandElapsedMilliseconds])
-            finishCommand()
-            process?.terminate()
-        }
-    }
 }

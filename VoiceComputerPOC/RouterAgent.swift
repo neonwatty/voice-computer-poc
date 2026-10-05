@@ -41,14 +41,19 @@ enum RouterAgent {
             "properties": [
                 "route": [
                     "type": "string",
-                    "enum": ["space", "computer_use", "browser", "finder", "clarification"],
+                    "enum": [
+                        "space", "computer_use", "browser", "finder", "browser_finder", "clarification",
+                    ],
                 ],
                 "directions": [
                     "type": "array", "items": ["type": "string", "enum": ["left", "right"]],
                 ],
                 "target": [
                     "type": "string",
-                    "enum": ["", "calculator", "local_docs", "local_form", "fixture_report"],
+                    "enum": [
+                        "", "calculator", "local_docs", "local_form", "fixture_report",
+                        "local_docs_fixture_report",
+                    ],
                 ],
             ],
         ]

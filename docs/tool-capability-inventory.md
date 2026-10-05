@@ -2,8 +2,10 @@
 
 Status: October 4, 2026. Speech input and Foil integration are deferred while
 desktop actions and unattended testing are validated.
-The [next-capabilities plan](next-capabilities-plan.md) covers Browser, Finder,
-and Codex desktop status work.
+The [first capabilities plan](next-capabilities-plan.md) covers the completed
+Browser and Finder slices and Codex desktop status feasibility. The
+[tranche 2 plan](desktop-capabilities-tranche-2.md) covers one composed request,
+read-only desktop state, and repeatable machine tests.
 
 ## Current paths
 
@@ -13,11 +15,13 @@ and Codex desktop status work.
 | Open Calculator and verify it is frontmost | Can operate its window; a CUA action alone did not establish foreground focus | App requests Launch Services activation after a completed CUA call and checks macOS focus | No | The Mac Mini observed `com.apple.calculator` frontmost after the handoff. |
 | Inspect Mission Control desktop controls | CUA targeting Mission Control/Finder did not expose usable thumbnails on either test Mac | Read-only Accessibility scan of `WindowManager` on macOS 27, Dock on older versions | No | Unattended case 13 has found two controls with live Space ID 5 unchanged, but it is intermittent when another app takes focus as Mission Control opens. It remains a fail-closed optional gate for Space control tests. |
 | Switch one desktop Space | CUA Control-Arrow and Mission Control attempts did not produce a verified change | Exact phrases use one bounded Accessibility press and verify the expected live ID plus Space notification | `switch_space(direction: right\|left)` uses the same app-owned action via an authenticated bridge and visible Allow once approval | One unattended MCP right-left pair verified 5 → 6 → 5 on the Mac Mini. |
-| Route other typed requests | UI can act after the request is selected | Isolated router permits Space, Calculator, a local Browser fixture, a Finder fixture report, or clarification | Only the Space action is exposed | Router corpus and local tests pass; supported actions remain narrow. |
+| Route other typed requests | UI can act after the request is selected | Isolated router permits Space, Calculator, local Browser and Finder fixtures, one composed Browser → Finder fixture, or clarification | Space switching and desktop-state reading are exposed | Router corpus and local tests pass; supported actions remain narrow. |
 | Navigate local Home → Docs | Safari Computer Use can open a loopback fixture, click Docs, and expose the final URL and heading | Route validator accepts only the exact fixture grammar; a bounded Safari Accessibility read matches the exact Docs URL and heading before the app reports `verified` | No Browser MCP tool | The strict Browser → Finder suite passed with app-owned and outer Safari evidence. Focused missing-link, 404, and local-redirect negatives returned app-owned `unverified`, matched fixture requests and rendered Safari state, and kept the Space unchanged. |
 | Stop Browser before Docs | The acting Safari turn is interrupted through the app's Stop button | Test fixture holds Home while a harness Accessibility helper presses Stop on the exact app PID | No MCP action | The exact-app case recorded an interrupted, unverified result, one Home request, zero Docs requests, and unchanged Space 5. |
 | Submit local Docs form | Safari Computer Use enters the run-specific test query and clicks Submit once | Exact route grammar and Safari Accessibility check require the submitted URL and heading | No Browser MCP tool | The focused form case matched one Docs request, one exact submission, app-owned and independent Safari evidence, and unchanged Space 5. |
 | Reveal a fixture file in Finder | Finder Go to Folder selected the exact report beside a similarly named decoy | Existing `Show File` action can open a Finder window; a bounded Finder Accessibility read requires the exact selected report URL and visible decoy | No Finder MCP tool | The strict suite matched app-owned and outer selected-file evidence, fresh command ID, and unchanged Space. Missing-file, symlink-escape, and decoy-target runs rejected the request without an acting turn. Every fixture was removed. No Finder MCP action is needed for this slice. |
+| Complete Browser → Finder in one request | Separate Safari and Finder Computer Use turns act within one app command | The app verifies the exact Docs URL and heading before queuing Finder, then verifies the selected report; Stop prevents the second step | No Browser or Finder MCP action | Case 19 passed with one command, two ordered turns, app-owned Accessibility checks, independent Safari/Finder observations, exact HTTP requests, and unchanged Space. Missing link, 404, redirect, and Stop produced no Finder turn; unsafe file targets started neither actor. |
+| Read current desktop state | CUA can inspect a visible app but cannot authoritatively report live Main Space IDs | The app takes a coherent native snapshot without changing Space or focus | `get_desktop_state({})` returns typed Main Space IDs, frontmost bundle ID, and observation time after visible Allow once | Case 20 agreed with an independent macOS observer on both Main Spaces; the full suite read state before and after a 5 → 6 → 5 pair. Synthetic ambiguous-topology and incomplete-read cases return non-success. |
 | Read existing Codex task state | The nested CUA session cannot inspect the Codex host UI | Separate app-server `thread/read` returned the exact task ID but `notLoaded` for a host-active task | No Codex status MCP tool | Cross-process status is unsupported; `scripts/probe_codex_status.py` records this without reading task turns. |
 | Record/transcribe speech | No | Local recording and transcript review exist | No | Deferred; no speech-to-action acceptance claimed. |
 
@@ -25,31 +29,17 @@ The exact Space phrases currently bypass MCP, while `agent switch desktop space
 right/left` invokes it. Both ultimately call the same app-owned Space action.
 Keeping this distinction visible is important when attributing a test result.
 
-## Next commands to build and validate
+## Next capabilities to build and validate
 
-1. **Read-only desktop state:** `get_desktop_state` should return the live main
-   Space ID, ordered main desktop IDs, frontmost bundle ID, and observation
-   status. It should omit window titles, screenshots, and unrelated app data.
-   Validate it against an independent macOS observer on both Spaces, including
-   unavailable and multi-display cases. This is the most useful next MCP tool:
-   an agent can check a precondition and verify a move without guessing from a
-   visual change.
-2. **One allowlisted app activation:** `activate_app` should accept a small
-   enumerated target set, starting with Calculator and Finder, and return the
-   observed frontmost bundle ID. Validate activation from another app, an
-   already-frontmost target, and a missing target. Reuse the existing macOS
-   focus observation. Expose Voice Computer only if a real request needs it;
-   the app's own test handoff already handles its foreground requirement.
-3. **Existing Space action:** Repeat unattended right-left MCP pairs from a
-   verified two-Space starting state. The first pair passed on October 3.
-   Require separate Allow once approvals, exact tool items and command IDs,
-   one AX press per step, Space notifications, typed `verified` results, and
-   independent IDs 5 → 6 → 5. Stop on the first failure. Then test a boundary
-   `no_adjacent_space` result without an AX press.
-4. **UI action fixture:** Keep Calculator arithmetic as a Computer Use test,
-   with a fresh visible result. Add a small disposable in-repo UI fixture only
-   when a text-entry or multiwindow test needs repeatable state; avoid writing
-   into personal documents for a smoke test.
+1. Expand Safari tab cleanup and Finder selection checks to already-open user
+   windows after the disposable fixture workflow remains stable.
+2. Investigate a narrow `activate_app` action only if repeated runs demonstrate
+   a focus handoff that Computer Use cannot verify.
+3. Keep Codex host-task status deferred until Voice Computer can use a supported
+   host-aware interface. Continue testing it separately from desktop actions.
+
+The [tranche 2 plan](desktop-capabilities-tranche-2.md) records the contracts
+and acceptance evidence. Keep Calculator arithmetic as a Computer Use fixture.
 
 Do not add a general shell, arbitrary keystroke, or unrestricted app-control
 MCP tool. Each MCP action should have a typed schema, one bounded effect,
@@ -61,8 +51,8 @@ success.
 Computer Use is suitable for app UI tasks whose target and result are visible
 through Accessibility or a screenshot. The observed gaps on these Macs are
 reliable desktop Space selection, authoritative live Space state, and confirmed
-foreground activation. The current MCP Space tool addresses selection; the two
-proposed tools address state and focus. Computer Use can continue to operate
+foreground activation. The current MCP Space tool addresses selection, and the
+read-only tool addresses state. Computer Use can continue to operate
 Calculator, text fields, and ordinary app controls. A tool should be added to
 MCP when repeatable execution and OS-level verification matter, not merely
 because a UI action takes several clicks.
