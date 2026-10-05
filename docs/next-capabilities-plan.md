@@ -1,5 +1,9 @@
 # Next desktop capabilities: Browser, Finder, and Codex
 
+The follow-on [tranche 2 plan](desktop-capabilities-tranche-2.md) records the
+composed Browser → Finder and read-only desktop-state implementation built from
+these isolated Browser and Finder cases.
+
 Status: October 4, 2026. The narrow Safari and Finder slices are implemented;
 three isolated Safari runs and multiple Safari→Finder sequences passed, as did
 repeated Finder runs. The default suite passed on the final app build, and all

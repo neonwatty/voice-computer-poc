@@ -7,6 +7,7 @@ struct ApprovalRequest: Identifiable {
     let detail: String
     let supportsSessionGrant: Bool
     let spaceDirection: SpaceDirection?
+    let desktopStateRead: Bool
 
     static func parse(method: String, id: Int, params: [String: Any]) -> ApprovalRequest? {
         let metadata = params["_meta"] as? [String: Any] ?? [:]
@@ -18,9 +19,16 @@ struct ApprovalRequest: Identifiable {
 
         guard metadata["codex_approval_kind"] as? String == "mcp_tool_call" else { return nil }
         if params["serverName"] as? String == "desktop_tool" {
-            guard
-                let arguments = metadata["tool_params"] as? [String: Any],
-                arguments.count == 1,
+            guard let arguments = metadata["tool_params"] as? [String: Any] else { return nil }
+            if arguments.isEmpty {
+                return ApprovalRequest(
+                    id: id, serverName: "desktop_tool",
+                    message: params["message"] as? String ?? "Allow desktop state read?",
+                    detail: "Desktop tool · get_desktop_state · read only",
+                    supportsSessionGrant: false, spaceDirection: nil,
+                    desktopStateRead: true)
+            }
+            guard arguments.count == 1,
                 let direction = arguments["direction"] as? String,
                 direction == "left" || direction == "right"
             else { return nil }
@@ -30,7 +38,7 @@ struct ApprovalRequest: Identifiable {
                 message: params["message"] as? String ?? "Allow the Space tool to continue?",
                 detail: "Space tool · switch_space · \(direction)",
                 supportsSessionGrant: false,
-                spaceDirection: SpaceDirection(rawValue: direction))
+                spaceDirection: SpaceDirection(rawValue: direction), desktopStateRead: false)
         }
 
         guard params["serverName"] as? String == "cua_repl",
@@ -47,7 +55,8 @@ struct ApprovalRequest: Identifiable {
             serverName: "cua_repl",
             message: params["message"] as? String ?? "Allow \(connector) to continue?",
             detail: detail,
-            supportsSessionGrant: scopes.contains("session"), spaceDirection: nil
+            supportsSessionGrant: scopes.contains("session"), spaceDirection: nil,
+            desktopStateRead: false
         )
     }
 
@@ -72,6 +81,14 @@ struct SpaceToolApproval {
     let turnID: String
     let direction: SpaceDirection
     var state: State = .pending
+}
+
+struct DesktopStateApproval {
+    let requestID: Int
+    let commandID: String
+    let itemID: String
+    let turnID: String
+    var state: SpaceToolApproval.State = .pending
 }
 
 extension AppServerClient {
@@ -116,5 +133,45 @@ extension AppServerClient {
 
     func consumeSpaceApproval() {
         spaceToolApproval?.state = .consumed
+    }
+
+    func stageDesktopStateApproval(_ request: ApprovalRequest) -> Bool {
+        guard request.desktopStateRead, desktopStateApproval == nil,
+            requestedDesktopState, isWorking, let activeCommandID,
+            let itemID = activeStateToolItemID, let turnID,
+            activeStateToolTurnID == turnID
+        else { return false }
+        desktopStateApproval = DesktopStateApproval(
+            requestID: request.id, commandID: activeCommandID,
+            itemID: itemID, turnID: turnID)
+        return true
+    }
+
+    func desktopStateApprovalMatchesCurrent(_ grant: DesktopStateApproval) -> Bool {
+        requestedDesktopState && grant.commandID == activeCommandID
+            && grant.itemID == activeStateToolItemID
+            && grant.turnID == turnID && grant.turnID == activeStateToolTurnID
+    }
+
+    func decideDesktopStateApproval(
+        _ request: ApprovalRequest, allow: Bool,
+        forSession: Bool
+    ) -> Bool {
+        guard var grant = desktopStateApproval, grant.requestID == request.id,
+            grant.state == .pending, desktopStateApprovalMatchesCurrent(grant), !forSession
+        else {
+            desktopStateApproval = nil
+            return false
+        }
+        grant.state = allow ? .accepted : .declined
+        desktopStateApproval = grant
+        return allow
+    }
+
+    func hasAcceptedDesktopStateApproval(commandID: String, itemID: String) -> Bool {
+        guard let grant = desktopStateApproval, grant.state == .accepted,
+            grant.commandID == commandID, grant.itemID == itemID
+        else { return false }
+        return desktopStateApprovalMatchesCurrent(grant)
     }
 }

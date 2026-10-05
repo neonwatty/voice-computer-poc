@@ -53,6 +53,33 @@ struct SpaceSnapshot: Equatable {
     }
 }
 enum SpaceNavigator {
+    static func displayTopologyAmbiguous() -> Bool? {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
+        task.arguments = ["export", "com.apple.spaces", "-"]
+        let output = Pipe()
+        task.standardOutput = output
+        task.standardError = Pipe()
+        do {
+            try task.run()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            task.waitUntilExit()
+            guard task.terminationStatus == 0,
+                let plist = try PropertyListSerialization.propertyList(from: data, format: nil)
+                    as? [String: Any],
+                let configuration = plist["SpacesDisplayConfiguration"] as? [String: Any],
+                let management = configuration["Management Data"] as? [String: Any],
+                let monitors = management["Monitors"] as? [[String: Any]]
+            else { return nil }
+            let mainCount = monitors.filter { $0["Display Identifier"] as? String == "Main" }.count
+            let secondaryActive = monitors.contains { monitor in
+                monitor["Display Identifier"] as? String != "Main"
+                    && ((monitor["Spaces"] as? [[String: Any]])?.isEmpty == false)
+            }
+            return mainCount != 1 || secondaryActive
+        } catch { return nil }
+    }
+
     static func snapshot() -> SpaceSnapshot? {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")

@@ -2,6 +2,10 @@ import Foundation
 
 extension AppServerClient {
     func turnInstruction(for phrase: String) -> String {
+        if requestedDesktopState {
+            return
+                "The desktop_tool server reports get_desktop_state ready. Call its mcp__desktop_tool__get_desktop_state tool exactly once with JSON arguments {}. Report only its typed result. Do not use Computer Use or another tool. User request: \(phrase)"
+        }
         if let url = finderReportURL {
             return
                 "Use only mcp__cua_repl.js with Finder (com.apple.finder). Get Finder, use Go to Folder (Command-Shift-G), enter exactly \(url.path), and press Return once. Inspect Finder's Accessibility state and report the selected item's exact file URL. Stop if Finder has no window, the file is missing, the selected item differs, access is declined, or the tool fails. Do not open or edit the file, use a shell, or control another app. User request: \(phrase)"
@@ -21,7 +25,7 @@ extension AppServerClient {
         }
         if let direction = requestedToolDirection ?? SpaceToolRequest.direction(for: phrase) {
             return
-                "Call the MCP tool mcp__desktop_tool__switch_space from desktop_tool exactly once with JSON arguments {\"direction\":\"\(direction.rawValue)\"}. This is one adjacent desktop Space move. Do not use Computer Use or another tool. Report the typed tool result; do not claim success without verified status. User request: \(phrase)"
+                "The desktop_tool server reports switch_space ready. Call its MCP tool mcp__desktop_tool__switch_space exactly once with JSON arguments {\"direction\":\"\(direction.rawValue)\"}. This is one adjacent desktop Space move. Do not use Computer Use or another tool. Report the typed tool result; do not claim success without verified status. User request: \(phrase)"
         }
         return
             "This prototype is for reversible, low-impact desktop tests. For other requests, explain that the prototype does not support them. Use only mcp__cua_repl.js for desktop UI interaction. Do not use shell commands, AppleScript, or file operations. If Computer Use access is needed, request it. Check the visible result before reporting success. Distinguish a declined access request from a tool failure; do not call a tool failure an access denial."

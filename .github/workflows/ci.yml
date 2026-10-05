@@ -64,8 +64,11 @@ jobs:
       - name: Verify bundled Debug desktop helper
         run: |
           helper="DerivedData/Build/Products/Debug/VoiceComputerPOC.app/Contents/Helpers/DesktopToolServer"
-          product="DerivedData/Build/Intermediates.noindex/VoiceComputerPOC.build/Debug/VoiceComputerPOC.build/DerivedSources/DesktopToolServer-Debug/debug/DesktopToolServer"
+          source="DerivedData/Build/Intermediates.noindex/VoiceComputerPOC.build/Debug/VoiceComputerPOC.build/DerivedSources/DesktopToolServer-Debug"
+          product="$source/out/Products/Debug/DesktopToolServer"
+          if test ! -f "$product"; then product="$source/debug/DesktopToolServer"; fi
           test -f "$helper" && test -x "$helper" && test ! -L "$helper"
+          test -f "$product"
           cmp "$product" "$helper"
           test "$(shasum -a 256 "$helper" | awk '{print $1}')" = "$(cat "$helper.sha256")"
       - name: Run Release unit tests
@@ -90,8 +93,11 @@ jobs:
       - name: Verify bundled Release desktop helper
         run: |
           helper="DerivedData/Build/Products/Release/VoiceComputerPOC.app/Contents/Helpers/DesktopToolServer"
-          product="DerivedData/Build/Intermediates.noindex/VoiceComputerPOC.build/Release/VoiceComputerPOC.build/DerivedSources/DesktopToolServer-Release/release/DesktopToolServer"
+          source="DerivedData/Build/Intermediates.noindex/VoiceComputerPOC.build/Release/VoiceComputerPOC.build/DerivedSources/DesktopToolServer-Release"
+          product="$source/out/Products/Release/DesktopToolServer"
+          if test ! -f "$product"; then product="$source/release/DesktopToolServer"; fi
           test -f "$helper" && test -x "$helper" && test ! -L "$helper"
+          test -f "$product"
           cmp "$product" "$helper"
           test "$(shasum -a 256 "$helper" | awk '{print $1}')" = "$(cat "$helper.sha256")"
       - name: Check for unused Swift code

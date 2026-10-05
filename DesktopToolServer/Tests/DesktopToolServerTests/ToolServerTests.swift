@@ -76,7 +76,7 @@ final class ToolServerTests: XCTestCase {
         XCTAssertFalse(result.verified)
     }
 
-    func testProtocolAdvertisesOneToolAndTypedFailure() {
+    func testProtocolAdvertisesSpaceToolAndTypedFailure() {
         XCTAssertEqual(ToolServer.definition().name, "switch_space")
         let invalid = ToolServer.call(arguments: ["direction": "up"]) { _ in
             XCTFail("Invalid direction reached bridge")
@@ -91,5 +91,39 @@ final class ToolServerTests: XCTestCase {
         }
         XCTAssertEqual(result.status, "bridge_unavailable")
         XCTAssertEqual(ToolServer.toolResponse(result).isError, true)
+    }
+
+    func testDesktopStateToolRejectsArgumentsAndIncompleteSuccess() {
+        XCTAssertEqual(StateToolServer.definition().name, "get_desktop_state")
+        var calls = 0
+        let invalid = StateToolServer.call(arguments: ["direction": "right"]) {
+            calls += 1
+            return .failure("unexpected", "Bridge called")
+        }
+        XCTAssertEqual(invalid.status, "invalid_arguments")
+        XCTAssertEqual(calls, 0)
+        let incomplete = StateToolServer.call(arguments: [:]) {
+            calls += 1
+            return .init(
+                status: "observed", observedAt: "2026-10-05T00:00:00Z",
+                displayScope: "Main", currentMainSpaceID: 5,
+                orderedMainSpaceIDs: [6], frontmostBundleID: "com.apple.finder",
+                message: "Incomplete")
+        }
+        XCTAssertEqual(incomplete.status, "unavailable")
+        XCTAssertEqual(calls, 1)
+        XCTAssertEqual(StateToolServer.toolResponse(incomplete).isError, true)
+    }
+
+    func testDesktopStateToolReturnsTypedObservation() {
+        let observed = StateToolServer.call(arguments: nil) {
+            .init(
+                status: "observed", observedAt: "2026-10-05T00:00:00Z",
+                displayScope: "Main", currentMainSpaceID: 5,
+                orderedMainSpaceIDs: [5, 6], frontmostBundleID: "com.apple.finder",
+                message: "Observed")
+        }
+        XCTAssertTrue(observed.verified)
+        XCTAssertEqual(StateToolServer.toolResponse(observed).isError, false)
     }
 }

@@ -6,6 +6,7 @@ enum CommandRoute: Equatable {
     case browserDocs(URL)
     case browserForm(URL, String)
     case finderReveal(URL)
+    case browserThenFinder(URL, URL)
     case clarification
 
     static func parse(_ data: Data, originalPhrase: String) -> Self? {
@@ -40,6 +41,11 @@ enum CommandRoute: Equatable {
                 let url = RouteSafety.finderFixtureURL(in: originalPhrase)
             else { return nil }
             return .finderReveal(url)
+        case "browser_finder":
+            guard directions.isEmpty, target == "local_docs_fixture_report",
+                let (home, report) = RouteSafety.browserFinderRequest(in: originalPhrase)
+            else { return nil }
+            return .browserThenFinder(home, report)
         case "clarification":
             guard directions.isEmpty, target.isEmpty else { return nil }
             return .clarification
@@ -69,6 +75,7 @@ enum RouteHandoff: Equatable {
     case browserDocs(URL)
     case browserForm(URL, String)
     case finderReveal(URL)
+    case browserThenFinder(URL, URL)
 
     static func decide(_ data: Data?, phrase: String) -> Self {
         guard let data, let route = CommandRoute.parse(data, originalPhrase: phrase) else {
@@ -82,11 +89,35 @@ enum RouteHandoff: Equatable {
         case .browserDocs(let url): return .browserDocs(url)
         case .browserForm(let url, let query): return .browserForm(url, query)
         case .finderReveal(let url): return .finderReveal(url)
+        case .browserThenFinder(let home, let report):
+            return .browserThenFinder(home, report)
         }
     }
 }
 
 enum RouteSafety {
+    static func browserFinderRequest(in phrase: String) -> (URL, URL)? {
+        let trimmed = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
+        let separator = " and follow the Docs link, then reveal the test report at "
+        guard trimmed.hasSuffix(" in Finder."),
+            let range = trimmed.range(of: separator),
+            trimmed[range.upperBound...].range(of: separator) == nil
+        else { return nil }
+        let browserPhrase =
+            String(trimmed[..<range.lowerBound])
+            + " and follow the Docs link."
+        let finderPhrase =
+            "Reveal the test report at "
+            + String(trimmed[range.upperBound...])
+        guard let home = browserFixtureURL(in: browserPhrase),
+            let report = finderFixtureURL(in: finderPhrase),
+            let runID = URLComponents(url: home, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "run_id" })?.value,
+            runID == report.deletingLastPathComponent().lastPathComponent
+        else { return nil }
+        return (home, report)
+    }
+
     static func finderFixtureURL(in phrase: String) -> URL? {
         let trimmed = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
         let prefix = "Reveal the test report at "
@@ -203,6 +234,9 @@ enum RouteSafety {
             return request.0 == url && request.1 == query
         case .finderReveal(let url):
             return finderFixtureURL(in: phrase) == url
+        case .browserThenFinder(let home, let report):
+            guard let request = browserFinderRequest(in: phrase) else { return false }
+            return request.0 == home && request.1 == report
         case .clarification:
             return true
         }

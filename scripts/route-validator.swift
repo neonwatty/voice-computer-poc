@@ -31,6 +31,11 @@ struct RouteValidator {
                 result = ["route": "browser_form", "url": url.absoluteString, "query": query]
             case .finderReveal(let url):
                 result = ["route": "finder", "path": url.path]
+            case .browserThenFinder(let home, let report):
+                result = [
+                    "route": "browser_finder", "url": home.absoluteString,
+                    "path": report.path,
+                ]
             case .space(let first, let remaining):
                 result = [
                     "route": "space", "first": first.rawValue,

@@ -7,6 +7,14 @@ final class SpaceToolBridge {
     var serverPID: pid_t?
     var expectedExecutablePath: String?
     var onRequest: ((SpaceToolRequest, PeerIdentity, @escaping (SpaceToolResult) -> Void) -> Void)?
+    var onStateRequest:
+        (
+            (
+                DesktopStateToolRequest, PeerIdentity,
+                @escaping (DesktopStateToolResult) -> Void
+            ) -> Void
+        )?
+    var onPeerRejected: ((String) -> Void)?
     private let directory: URL
     private let socket: Int32
     private var running = true
@@ -156,6 +164,8 @@ final class SpaceToolBridge {
         guard getsockopt(client, SOL_LOCAL, LOCAL_PEERPID, &peer, &peerLength) == 0,
             let identity = eligiblePeer(peer)
         else {
+            let reason = peerRejectionReason(peer)
+            DispatchQueue.main.async { [weak self] in self?.onPeerRejected?(reason) }
             respond(
                 client,
                 .failure(
@@ -167,6 +177,25 @@ final class SpaceToolBridge {
         _ = setsockopt(
             client, SOL_SOCKET, SO_RCVTIMEO, &timeout,
             socklen_t(MemoryLayout.size(ofValue: timeout)))
+        guard let frame = readFrame(client) else {
+            respond(
+                client,
+                .failure(
+                    "invalid_request", commandID: "unknown",
+                    direction: "unknown", message: "Invalid bridge request."))
+            return
+        }
+        dispatchRequest(frame, client: client, identity: identity)
+    }
+
+    private func peerRejectionReason(_ peer: pid_t) -> String {
+        guard let info = processInfo(peer) else { return "peer_missing" }
+        guard pid_t(info.pbi_ppid) == serverPID else { return "parent_mismatch" }
+        guard executablePath(peer) == expectedExecutablePath else { return "executable_mismatch" }
+        return "helper_sibling_ambiguity"
+    }
+
+    private func readFrame(_ client: Int32) -> Data? {
         var data = Data()
         var bytes = [UInt8](repeating: 0, count: 512)
         while data.count < 2048 {
@@ -175,9 +204,20 @@ final class SpaceToolBridge {
             data.append(contentsOf: bytes.prefix(count))
             if data.contains(0x0A) { break }
         }
-        guard let newline = data.firstIndex(of: 0x0A),
-            let request = try? JSONDecoder().decode(
-                SpaceToolRequest.self, from: data.prefix(upTo: newline))
+        guard let newline = data.firstIndex(of: 0x0A) else { return nil }
+        return Data(data.prefix(upTo: newline))
+    }
+
+    private func dispatchRequest(_ frame: Data, client: Int32, identity: PeerIdentity) {
+        if let object = try? JSONSerialization.jsonObject(with: frame) as? [String: Any],
+            Set(object.keys) == Set(["sessionID", "operation"]),
+            let request = try? JSONDecoder().decode(DesktopStateToolRequest.self, from: frame),
+            request.operation == "get_desktop_state"
+        {
+            dispatchStateRequest(request, client: client, identity: identity)
+            return
+        }
+        guard let request = try? JSONDecoder().decode(SpaceToolRequest.self, from: frame)
         else {
             respond(
                 client,
@@ -186,6 +226,26 @@ final class SpaceToolBridge {
                     direction: "unknown", message: "Invalid bridge request."))
             return
         }
+        dispatchSpaceRequest(request, client: client, identity: identity)
+    }
+
+    private func dispatchStateRequest(
+        _ request: DesktopStateToolRequest, client: Int32, identity: PeerIdentity
+    ) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let onStateRequest = self.onStateRequest else {
+                self?.respondState(client, .failure("unavailable", "App session is unavailable."))
+                return
+            }
+            onStateRequest(request, identity) { [weak self] result in
+                self?.respondState(client, result)
+            }
+        }
+    }
+
+    private func dispatchSpaceRequest(
+        _ request: SpaceToolRequest, client: Int32, identity: PeerIdentity
+    ) {
         DispatchQueue.main.async { [weak self] in
             guard let self, let onRequest = self.onRequest else {
                 self?.respond(
@@ -200,6 +260,14 @@ final class SpaceToolBridge {
     }
 
     private func respond(_ client: Int32, _ result: SpaceToolResult) {
+        writeResponse(client, result)
+    }
+
+    private func respondState(_ client: Int32, _ result: DesktopStateToolResult) {
+        writeResponse(client, result)
+    }
+
+    private func writeResponse<T: Encodable>(_ client: Int32, _ result: T) {
         var noSignal: Int32 = 1
         _ = setsockopt(
             client, SOL_SOCKET, SO_NOSIGPIPE, &noSignal,

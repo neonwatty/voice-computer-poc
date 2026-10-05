@@ -14,7 +14,7 @@ extension AppServerClient {
                     "id": String(id), "method": kind.name,
                     "error": error["message"] as? String ?? "Unknown error",
                 ])
-            if kind == .mcpStatus, requestedToolDirection == nil {
+            if kind == .mcpStatus, requestedToolDirection == nil && !requestedDesktopState {
                 record("mcp_status_unavailable_for_general_turn")
                 startThread()
                 return
@@ -104,21 +104,27 @@ extension AppServerClient {
             details: [
                 "state": desktop?["status"] as? String ?? "unknown",
                 "tool_count": String(tools.count),
+                "tool_names": tools.keys.sorted().joined(separator: ","),
                 "fields": desktop?.keys.sorted().joined(separator: ",") ?? "none",
                 "error_kind": errorKind,
                 "error_code": String(describing: error["code"] ?? "none"),
             ])
-        guard tools["switch_space"] != nil else {
+        let needed = requestedDesktopState ? "get_desktop_state" : "switch_space"
+        guard tools[needed] != nil else {
             if requestedToolDirection == nil {
+                if requestedDesktopState {
+                    fail("The desktop_tool.get_desktop_state MCP tool is unavailable.")
+                    return
+                }
                 record("mcp_tool_unavailable_for_general_turn")
                 startThread()
             } else {
-                fail("The desktop_tool.switch_space MCP tool is unavailable.")
+                fail("The desktop_tool.\(needed) MCP tool is unavailable.")
             }
             return
         }
-        record("mcp_tool_status_ready", details: ["server": "desktop_tool", "tool": "switch_space"])
-        record("mcp_tool_ready", details: ["server": "desktop_tool", "tool": "switch_space"])
+        record("mcp_tool_status_ready", details: ["server": "desktop_tool", "tool": needed])
+        record("mcp_tool_ready", details: ["server": "desktop_tool", "tool": needed])
         startThread()
     }
 
@@ -141,8 +147,13 @@ extension AppServerClient {
         }
         if let request = ApprovalRequest.parse(method: method, id: id, params: params) {
             if request.serverName == "desktop_tool" {
-                guard stageSpaceApproval(request) else {
-                    sendRaw(["id": id, "error": ["code": -32601, "message": "Unmatched Space approval"]])
+                let staged =
+                    request.desktopStateRead
+                    ? stageDesktopStateApproval(request) : stageSpaceApproval(request)
+                guard staged else {
+                    sendRaw([
+                        "id": id, "error": ["code": -32601, "message": "Unmatched desktop tool approval"],
+                    ])
                     record("space_approval_rejected", details: ["request_id": String(id)])
                     return
                 }

@@ -42,6 +42,14 @@ extension AppServerClient {
             activeMCPToolItemID = itemID
             activeMCPToolTurnID = turnID
             activeMCPToolDirection = direction
+        } else if server == "desktop_tool" && tool == "get_desktop_state",
+            requestedDesktopState, isWorking, activeCommandID != nil,
+            let turnID, eventTurnID == turnID,
+            let itemID = item["id"] as? String, !itemID.isEmpty,
+            activeStateToolItemID == nil
+        {
+            activeStateToolItemID = itemID
+            activeStateToolTurnID = turnID
         } else if server == "cua_repl" {
             generalToolObserved = true
         }
@@ -80,7 +88,66 @@ extension AppServerClient {
         let isSpaceTool =
             item["server"] as? String == "desktop_tool"
             && item["tool"] as? String == "switch_space"
-        let isActiveSpaceTool = isSpaceTool && item["id"] as? String == activeMCPToolItemID
+        let isStateTool =
+            item["server"] as? String == "desktop_tool"
+            && item["tool"] as? String == "get_desktop_state"
+        let isActiveStateTool = isStateTool && item["id"] as? String == activeStateToolItemID
+        let stateTyped = (content?.first?["text"] as? String)?.data(using: .utf8)
+            .flatMap { try? JSONDecoder().decode(DesktopStateToolResult.self, from: $0) }
+        correlateCompletedTool(
+            item, status: status, resultIsError: resultIsError,
+            spaceResult: typed, stateResult: stateTyped)
+        var fields = [
+            "item_id": item["id"] as? String ?? "unknown",
+            "server": item["server"] as? String ?? "tool",
+            "tool": item["tool"] as? String ?? "call",
+            "status": status,
+            "result_is_error": String(resultIsError),
+        ]
+        if status == "failed" || resultIsError {
+            if item["server"] as? String == "cua_repl", generalTurnFailure == nil {
+                generalTurnFailure = .toolFailed
+            }
+            fields["error"] = detail ?? "Unknown tool error"
+            let label = isSpaceTool ? "Space tool call failed" : "Computer Use tool call failed"
+            append(detail.map { "\(label): \(String($0.prefix(500)))" } ?? label)
+        }
+        if isSpaceTool, let typed {
+            fields["typed_status"] = typed.status
+            fields["typed_command_id"] = typed.commandID
+            fields["typed_direction"] = typed.direction
+            fields["typed_verified"] = String(typed.verified)
+        }
+        if isStateTool, let stateTyped {
+            fields["typed_status"] = stateTyped.status
+            fields["typed_verified"] = String(stateTyped.verified)
+        }
+        record("tool_completed", details: fields)
+        if isSpaceTool, item["id"] as? String == activeMCPToolItemID {
+            spaceToolApproval = nil
+            activeMCPToolItemID = nil
+            activeMCPToolTurnID = nil
+            activeMCPToolDirection = nil
+            spaceToolBridge?.revoke()
+        }
+        if isActiveStateTool {
+            desktopStateApproval = nil
+            spaceToolBridge?.revoke()
+        }
+    }
+
+    private func correlateCompletedTool(
+        _ item: [String: Any], status: String, resultIsError: Bool,
+        spaceResult typed: SpaceToolResult?, stateResult stateTyped: DesktopStateToolResult?
+    ) {
+        let isActiveSpaceTool =
+            item["server"] as? String == "desktop_tool"
+            && item["tool"] as? String == "switch_space"
+            && item["id"] as? String == activeMCPToolItemID
+        let isActiveStateTool =
+            item["server"] as? String == "desktop_tool"
+            && item["tool"] as? String == "get_desktop_state"
+            && item["id"] as? String == activeStateToolItemID
         if isActiveSpaceTool, let typed, !typed.verified, self.toolResult == nil {
             self.toolResult = typed
         }
@@ -97,36 +164,11 @@ extension AppServerClient {
                     "space_before_id": typed.beforeID.map(String.init) ?? "unknown",
                 ])
         }
-        var fields = [
-            "item_id": item["id"] as? String ?? "unknown",
-            "server": item["server"] as? String ?? "tool",
-            "tool": item["tool"] as? String ?? "call",
-            "status": status,
-            "result_is_error": String(resultIsError),
-        ]
-        if status == "failed" || resultIsError {
-            if item["server"] as? String == "cua_repl", generalTurnFailure == nil {
-                generalTurnFailure = .toolFailed
-            }
-            fields["error"] = detail ?? "Unknown tool error"
-            let label = isSpaceTool ? "Space tool call failed" : "Computer Use tool call failed"
-            append(
-                detail.map { "\(label): \(String($0.prefix(500)))" }
-                    ?? label)
-        }
-        if isSpaceTool, let typed {
-            fields["typed_status"] = typed.status
-            fields["typed_command_id"] = typed.commandID
-            fields["typed_direction"] = typed.direction
-            fields["typed_verified"] = String(typed.verified)
-        }
-        record("tool_completed", details: fields)
-        if isSpaceTool, item["id"] as? String == activeMCPToolItemID {
-            spaceToolApproval = nil
-            activeMCPToolItemID = nil
-            activeMCPToolTurnID = nil
-            activeMCPToolDirection = nil
-            spaceToolBridge?.revoke()
+        if isActiveStateTool, status == "completed", !resultIsError,
+            let stateTyped, stateTyped == stateToolResult, stateTyped.verified
+        {
+            stateToolCallCompleted = true
+            record("mcp_state_result_correlated", details: ["item_id": activeStateToolItemID ?? "unknown"])
         }
     }
 
@@ -158,6 +200,7 @@ extension AppServerClient {
         }
         verification = applyTurnResult(outcome, verification: verification)
         if let fixture { displayFixtureTurnResult(fixture, outcome: outcome) }
+        verification = verifyComposedTurn(verification)
         record(
             "turn_completed",
             details: [
@@ -169,6 +212,7 @@ extension AppServerClient {
                 "verification": verification,
                 "elapsed_ms": commandElapsedMilliseconds,
             ])
+        if advanceComposedFixtureIfReady(outcome: outcome, verification: verification) { return }
         if outcome == "completed", verification == "verified",
             !remainingRoutedDirections.isEmpty, let phrase = routedOriginalPhrase
         {
@@ -176,7 +220,7 @@ extension AppServerClient {
             record("router_step_finished", details: ["verification": verification])
             record("router_next_step", details: ["direction": next.rawValue])
             prepareNextSpaceStep(next, phrase: phrase)
-            rotateServerAfterSpaceTool()
+            rotateServerAfterCommand()
             beginActingTurn()
             return
         }
@@ -186,6 +230,10 @@ extension AppServerClient {
                 "status": outcome, "verification": verification,
                 "elapsed_ms": commandElapsedMilliseconds,
             ])
+        resetAfterCompletedCommand()
+    }
+
+    private func resetAfterCompletedCommand() {
         remainingRoutedDirections = []
         routedOriginalPhrase = nil
         focusTargetBundleID = nil
@@ -193,7 +241,18 @@ extension AppServerClient {
         browserFormURL = nil
         browserFormQuery = nil
         finderReportURL = nil
+        composedReportURL = nil
+        composedBrowserVerified = false
+        composedOriginSpace = nil
+        let finishedStateTool = requestedDesktopState
+        requestedDesktopState = false
+        activeStateToolItemID = nil
+        activeStateToolTurnID = nil
+        stateToolResult = nil
+        stateToolCallCompleted = false
+        desktopStateApproval = nil
         let finishedSpaceTool = requestedToolDirection != nil
+        let finishedComputerUse = generalToolObserved
         requestedToolDirection = nil
         activatedBundleIDsThisTurn.removeAll()
         isWorking = false
@@ -201,7 +260,9 @@ extension AppServerClient {
         approval = nil
         queuedApprovals.removeAll()
         finishCommand()
-        if finishedSpaceTool { rotateServerAfterSpaceTool() }
+        if finishedSpaceTool || finishedStateTool || finishedComputerUse {
+            rotateServerAfterCommand()
+        }
     }
 
     private func prepareNextSpaceStep(_ direction: SpaceDirection, phrase: String) {
@@ -221,78 +282,4 @@ extension AppServerClient {
         turnID = nil
     }
 
-    func applyTurnResult(_ outcome: String, verification: String) -> String {
-        var updatedVerification = verification
-        if requestedToolDirection != nil {
-            if outcome == "completed", toolCallObserved, toolCallCompleted,
-                let toolResult, toolResult.verified,
-                toolResult.commandID == activeCommandID,
-                toolResult.direction == requestedToolDirection?.rawValue
-            {
-                result = toolResult.message
-            } else {
-                result =
-                    outcome == "completed"
-                    ? (toolResult?.message
-                        ?? "The acting turn did not complete a verified switch_space tool call.")
-                    : "The acting turn \(outcome); the Space move is unverified."
-                status = "Space unverified"
-            }
-        } else if let generalTurnFailure {
-            status = generalTurnFailure.rawValue
-            updatedVerification = generalTurnFailure.rawValue
-            switch generalTurnFailure {
-            case .approvalUnavailable:
-                result =
-                    "The app could not present the Computer Use approval request. No access decision was made."
-            case .accessDeclined:
-                result = "Computer Use access was declined in the app. The requested action was not verified."
-            case .toolFailed:
-                result = "Computer Use failed after the request. The requested action was not verified."
-            }
-        } else if generalToolObserved && updatedVerification != "verified" {
-            status = "Unverified"
-            result = "The Computer Use action did not have independent macOS verification."
-        }
-        return updatedVerification
-    }
-
-    func verifyTurnOutcome(_ outcome: String, frontmostBundleID: String?) -> String {
-        if requestedToolDirection != nil {
-            return outcome == "completed" && toolCallObserved && toolCallCompleted
-                && toolResult?.verified == true
-                && toolResult?.commandID == activeCommandID
-                && toolResult?.direction == requestedToolDirection?.rawValue
-                ? "verified" : "unverified"
-        }
-        var verification = "model_report_only"
-        if let baseline = spaceCountAtTurnStart {
-            if spaceChangeCount > baseline {
-                verification = "verified"
-                append("Verified: macOS reported an active Space change during this command")
-            } else {
-                verification = "unverified"
-                append("Unverified: macOS reported no active Space change during this command")
-                if outcome == "completed" {
-                    result =
-                        "The shortcut was attempted, but macOS reported no active Space change. The Space switch is unverified."
-                }
-            }
-        }
-        spaceCountAtTurnStart = nil
-        if let target = focusTargetBundleID {
-            if frontmostBundleID == target {
-                verification = "verified"
-                append("Verified: requested app is frontmost")
-            } else {
-                verification = "unverified"
-                append("Unverified: requested app is not frontmost")
-                if outcome == "completed" {
-                    result =
-                        "Computer Use inspected the app window, but macOS does not report the requested app as frontmost. Foreground focus is unverified."
-                }
-            }
-        }
-        return verification
-    }
 }

@@ -102,4 +102,59 @@ extension AppServerClient {
         }
         append(result)
     }
+
+    func verifyComposedTurn(_ verification: String) -> String {
+        guard composedReportURL != nil else { return verification }
+        guard let origin = composedOriginSpace, SpaceNavigator.snapshot() == origin else {
+            status = "Unverified"
+            result = "The desktop Space changed or could not be verified during the composed request."
+            return "unverified"
+        }
+        if finderReportURL != nil && !composedBrowserVerified {
+            status = "Unverified"
+            result = "The Finder step has no verified Safari prerequisite."
+            return "unverified"
+        }
+        return verification
+    }
+
+    func advanceComposedFixtureIfReady(outcome: String, verification: String) -> Bool {
+        guard let report = composedReportURL else { return false }
+        if browserDocsURL != nil {
+            guard outcome == "completed", verification == "verified", isWorking,
+                cancelledNativeSpaceCommandID != activeCommandID
+            else {
+                record("browser_step_failed", details: ["verification": verification])
+                return false
+            }
+            composedBrowserVerified = true
+            record("browser_step_verified", details: ["turn_id": turnID ?? "unknown"])
+            browserDocsURL = nil
+            finderReportURL = report
+            fixtureCUAToolStartedIDs.removeAll()
+            fixtureCUAToolCompletedIDs.removeAll()
+            generalToolObserved = false
+            generalTurnFailure = nil
+            activatedBundleIDsThisTurn.removeAll()
+            turnID = nil
+            queuedPhrase = "Reveal the test report at \(report.path) in Finder."
+            record("finder_step_queued")
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.isWorking,
+                    self.cancelledNativeSpaceCommandID != self.activeCommandID,
+                    self.finderReportURL == report
+                else { return }
+                self.beginActingTurn()
+            }
+            return true
+        }
+        if finderReportURL != nil, outcome == "completed", verification == "verified" {
+            record("finder_step_verified", details: ["turn_id": turnID ?? "unknown"])
+            result = "Verified: Safari displayed Docs, then Finder selected the exact test report."
+            append(result)
+        } else {
+            record("finder_step_failed", details: ["verification": verification])
+        }
+        return false
+    }
 }
