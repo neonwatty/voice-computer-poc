@@ -6,6 +6,9 @@ The [first capabilities plan](next-capabilities-plan.md) covers the completed
 Browser and Finder slices and Codex desktop status feasibility. The
 [tranche 2 plan](desktop-capabilities-tranche-2.md) covers one composed request,
 read-only desktop state, and repeatable machine tests.
+The [tranche 3 plan](desktop-capabilities-tranche-3.md) covers existing Safari
+and Finder windows, routine exact-build Mac testing, and a separate Codex
+host-status feasibility gate.
 
 ## Current paths
 
@@ -31,8 +34,9 @@ Keeping this distinction visible is important when attributing a test result.
 
 ## Next capabilities to build and validate
 
-1. Expand Safari tab cleanup and Finder selection checks to already-open user
-   windows after the disposable fixture workflow remains stable.
+1. Follow the tranche 3 plan to test Safari tabs and Finder selection with
+   already-open, test-owned sentinel windows while preserving unrelated user
+   context.
 2. Investigate a narrow `activate_app` action only if repeated runs demonstrate
    a focus handoff that Computer Use cannot verify.
 3. Keep Codex host-task status deferred until Voice Computer can use a supported
