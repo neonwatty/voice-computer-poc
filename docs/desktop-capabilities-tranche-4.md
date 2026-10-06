@@ -154,6 +154,13 @@ An exact-source rerun passed Safari case 21 and then encountered Finder case
 (`cgWindowNotFound`). The case 22 harness now prepares one run-owned Finder
 window only when its baseline inventory is empty; the agent must observe and
 reuse that same window, and the native observer requires its removal afterward.
+The subsequent exact-source suite passed TextEdit cases 23 and 24, then its
+composed case 19 hit the same empty-Finder boundary after Safari verified Docs.
+The positive composed fixture now prepares a run-owned Finder window only when
+none exists; a focused run passed with two ordered verified turns, exact Safari
+and Finder evidence, and cleanup. This is a harness precondition; general
+product behavior with headless Finder is a candidate for the next capability
+tranche.
 
 ## Work package 4: bounded TextEdit document workflow
 

@@ -2123,6 +2123,7 @@ def main():
             safari_windows_before = None
             finder_windows_before = None
             finder_prepared_by_host = False
+            composed_finder_prepared = False
             finder_run_id = None
             finder_decoy_run_id = None
             finder_decoy_report = None
@@ -2192,6 +2193,18 @@ def main():
                     outside_report.write_text("Outside composed fixture\n")
                     report.symlink_to(outside_report)
                 (fixture_root / "report-copy.txt").write_text("Decoy\n")
+                if (args.browser_mode == "normal" and args.finder_mode == "normal"
+                        and not finder_window_inventory()["window_ids"]):
+                    subprocess.run(["open", "-a", "Finder", str(fixture_root)],
+                                   check=True, timeout=15)
+                    deadline = time.monotonic() + 10
+                    while time.monotonic() < deadline:
+                        if len(finder_window_inventory(run_id)["matching_window_ids"]) == 1:
+                            composed_finder_prepared = True
+                            break
+                        time.sleep(0.2)
+                    if not composed_finder_prepared:
+                        raise RuntimeError("Composed Finder fixture window did not open")
                 if args.finder_mode == "decoy-target":
                     report = fixture_root / "report-copy.txt"
                 phrase = (f'In the exact Voice Computer POC app, enter "Open {url} '
@@ -2599,7 +2612,9 @@ def main():
                     "the exact Docs URL and heading and selected report URL. Safari is a native "
                     "app target here; never call cua.listTabs, cua.getBrowser, or createBrowserTab. "
                     "Close only the fixture Safari tab and Finder fixture window using their "
-                    "visible native controls after recording evidence. "
+                    "visible native controls after recording evidence. If Finder has no other "
+                    "window, close its fixture window in a final Computer Use call without "
+                    "requesting another Finder AX state; the native observer verifies closure. "
                     "Never inspect the Codex or ChatGPT host app. User request: "
                 )
                 if args.finder_mode != "normal":
