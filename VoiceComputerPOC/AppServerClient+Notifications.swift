@@ -70,8 +70,9 @@ extension AppServerClient {
         {
             result = text
         } else if item["type"] as? String == "mcpToolCall" {
-            observeFixtureToolCompleted(item)
-            handleToolCompleted(item)
+            let observedItem = observedFixtureItem(item)
+            observeFixtureToolCompleted(observedItem)
+            handleToolCompleted(observedItem)
         }
     }
 

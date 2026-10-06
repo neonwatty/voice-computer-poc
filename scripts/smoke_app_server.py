@@ -608,6 +608,95 @@ def verify_safari_context_interruption_receipt(rows, run_id, port, fixture_rows,
     raise ValueError("Stopped Safari tab and sentinel cleanup did not correlate")
 
 
+def verify_injected_cua_failure_receipt(rows, run_id, target, before, after,
+                                        prior_command_ids=()):
+    """Correlate a synthetic Debug CUA failure with app-owned non-success."""
+    starts = [row for row in rows if row.get("event") == "command_started"
+              and row.get("details", {}).get("user_action") == "run"]
+    if len(starts) != 1:
+        raise ValueError("Injected CUA test lacks one app command")
+    command_id = starts[0].get("details", {}).get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("Injected CUA test command ID missing or stale")
+    command_rows = [row for row in rows if row.get("details", {}).get("command_id") == command_id]
+    def events(name):
+        return [row.get("details", {}) for row in command_rows if row.get("event") == name]
+    routes, turns = events("router_decided"), events("turn_requested")
+    started, completed = events("tool_started"), events("tool_completed")
+    injection, ax = events("test_cua_failure_injected"), events("fixture_ax_verification")
+    finished, turn_finished = events("command_finished"), events("turn_completed")
+    if len(routes) != 1 or routes[0].get("route") != target \
+            or len(turns) != 1 or turns[0].get("route") != target:
+        raise ValueError("Injected CUA test used unexpected route or acting turn")
+    if len(injection) != 1 or injection[0].get("target") != target \
+            or injection[0].get("run_id") != run_id \
+            or injection[0].get("source") != "synthetic_debug_event":
+        raise ValueError("Synthetic CUA injection event missing or mismatched")
+    item_id = injection[0].get("item_id")
+    if not item_id or not any(entry.get("item_id") == item_id
+                              and entry.get("server") == "cua_repl"
+                              and entry.get("turn_matches") == "true" for entry in started):
+        raise ValueError("Injected CUA item did not start in the acting turn")
+    if not any(entry.get("item_id") == item_id and entry.get("server") == "cua_repl"
+               and entry.get("status") == "failed" for entry in completed):
+        raise ValueError("Injected CUA item did not reach the failure classifier")
+    if len(ax) != 1 or ax[0].get("target") != target \
+            or ax[0].get("verified") != "false" \
+            or ax[0].get("reason") != "tool_failure":
+        raise ValueError("App did not reject the failed CUA item")
+    if len(finished) != 1 or finished[0].get("verification") != "tool_failed" \
+            or len(turn_finished) != 1 \
+            or turn_finished[0].get("verification") != "tool_failed":
+        raise ValueError("Injected CUA failure produced a verified app result")
+    if any(row.get("event") in ("native_space_requested", "mcp_action_requested",
+                                    "space_changed", "finder_step_queued")
+           for row in command_rows) or before is None or after != before:
+        raise ValueError("Injected CUA failure changed Space or started a later step")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "target": target, "item_id": item_id,
+            "source": "synthetic_debug_event", "verification": "tool_failed",
+            "before": before, "after": after}
+
+
+def verify_injected_safari_context(run_id, port, fixture_rows, observations,
+                                   windows_before, windows_after):
+    sentinel = {"method": "GET", "path": "/sentinel", "run_id": [run_id]}
+    if not fixture_rows or fixture_rows[0] != sentinel \
+            or any(row.get("path") not in ("/sentinel", "/home", "/docs")
+                   or row.get("run_id") != [run_id] for row in fixture_rows):
+        raise ValueError("Injected Safari test made unexpected fixture requests")
+    if windows_after != windows_before:
+        raise ValueError("Injected Safari test did not restore window inventory")
+    snapshots = [snapshot for text in observations
+                 if (snapshot := safari_snapshot(text)) is not None]
+    sentinel_url = f"127.0.0.1:{port}/sentinel?run_id={run_id}"
+    for index, prepared in enumerate(snapshots):
+        window_id = prepared["window_id"]
+        if window_id in windows_before or sentinel_url not in prepared["state"]:
+            continue
+        if any(later["window_id"] == window_id and sentinel_url in later["state"]
+               and "Description: Tab bar, 2 tabs" not in later["state"]
+               for later in snapshots[index + 1:]):
+            return window_id
+    raise ValueError("Injected Safari test did not preserve its sentinel")
+
+
+def verify_injected_finder_context(report, observations,
+                                   windows_before, windows_after):
+    if windows_after != windows_before:
+        raise ValueError("Injected Finder test did not restore window inventory")
+    sentinel_url = report.with_name("sentinel.txt").as_uri()
+    for index, prepared in enumerate(observations):
+        window_id = prepared["window_id"]
+        if window_id is None or window_id in windows_before \
+                or sentinel_url not in prepared["state"]:
+            continue
+        if any(later["window_id"] == window_id and sentinel_url in later["state"]
+               for later in observations[index + 1:]):
+            return window_id
+    raise ValueError("Injected Finder test did not preserve its prepared window")
+
+
 def verify_browser_interruption_receipt(rows, run_id, fixture_rows, before, after,
                                         prior_command_ids=()):
     """Require a Stop during the held Home response and no subsequent Docs request."""
@@ -1496,6 +1585,8 @@ def main():
                         help="Number of test-owned sentinel windows for focused --case 21")
     parser.add_argument("--finder-context-windows", type=int, choices=(1, 2), default=1,
                         help="Number of test-owned fixture windows for focused --case 22")
+    parser.add_argument("--inject-inner-cua-failure", action="store_true",
+                        help="Synthetic Debug CUA completion failure for focused case 21 or 22")
     parser.add_argument("--codex-thread-id",
                         help="Optional exact existing Codex task UUID for --suite's read-only status probe")
     parser.add_argument("--app-path", type=Path,
@@ -1515,6 +1606,10 @@ def main():
         parser.error("Two Safari context windows require normal focused --case 21")
     if args.finder_context_windows != 1 and (selected != [22] or args.finder_mode != "normal"):
         parser.error("Two Finder context windows require normal focused --case 22")
+    if args.inject_inner_cua_failure and (selected not in ([21], [22])
+            or args.browser_mode != "normal" or args.finder_mode != "normal"
+            or args.safari_context_windows != 1 or args.finder_context_windows != 1):
+        parser.error("Injected CUA failure requires one normal focused case 21 or 22 window")
     if args.finder_mode != "normal" and selected not in ([18], [19], [22]):
         parser.error("--finder-mode requires a focused --case 18, 19, or 22 run")
     if selected == [19] and args.browser_mode == "form-submit":
@@ -1539,6 +1634,8 @@ def main():
             app_path = canonical_app_path(args.app_path)
         except (OSError, ValueError) as error:
             parser.error(str(error))
+    if args.inject_inner_cua_failure and "Debug" not in app_path.parts:
+        parser.error("Injected CUA failure requires an exact Debug app")
     if mcp_selected:
         try:
             validate_mcp_cases(
@@ -1614,6 +1711,12 @@ def main():
                               'window and report its exact URL and visible heading. Do not navigate Safari '
                               'yourself or submit a second app command.')
                 if index == 21:
+                    if args.inject_inner_cua_failure:
+                        marker_root = support / "TestFixtures" / run_id
+                        marker_root.mkdir(parents=True, mode=0o700)
+                        finder_fixtures.append(marker_root)
+                        (marker_root / "inject_cua_failure").write_text(
+                            f"browser:{run_id}\n")
                     sentinel_url = (f"http://127.0.0.1:{server.server_port}/sentinel"
                                     f"?run_id={run_id}")
                     safari_windows_before = safari_window_ids()
@@ -1675,6 +1778,9 @@ def main():
                     report.symlink_to(outside_report)
                 (fixture_root / "report-copy.txt").write_text("Decoy\n")
                 if index == 22:
+                    if args.inject_inner_cua_failure:
+                        (fixture_root / "inject_cua_failure").write_text(
+                            f"finder:{finder_run_id}\n")
                     (fixture_root / "sentinel.txt").write_text("Finder window sentinel\n")
                     finder_windows_before = finder_window_inventory()["window_ids"]
                     if args.finder_context_windows == 2:
@@ -2177,7 +2283,16 @@ def main():
                         driver.record("safari_context_requests_observed",
                                       paths=[entry.get("path") for entry in fixture_rows])
                         safari_windows_after = safari_window_ids()
-                        if home_requested:
+                        if args.inject_inner_cua_failure:
+                            exact_receipt = verify_injected_cua_failure_receipt(
+                                rows, run_id, "browser", space_before["current"],
+                                after_id, prior_ids)
+                            exact_receipt["context_window_id"] = verify_injected_safari_context(
+                                run_id, port, fixture_rows, driver.browser_observations,
+                                safari_windows_before, safari_windows_after)
+                            driver.record("safari_context_injected_failure_verified",
+                                          **exact_receipt)
+                        elif home_requested:
                             exact_receipt = verify_safari_context_interruption_receipt(
                                 rows, run_id, port, fixture_rows,
                                 driver.browser_observations, safari_windows_before,
@@ -2193,7 +2308,16 @@ def main():
                         driver.record("safari_context_receipt_verified", **exact_receipt)
                     elif index == 22:
                         finder_windows_after = finder_window_inventory()["window_ids"]
-                        if args.finder_mode == "normal":
+                        if args.inject_inner_cua_failure:
+                            exact_receipt = verify_injected_cua_failure_receipt(
+                                rows, finder_run_id, "finder", space_before["current"],
+                                after_id, prior_ids)
+                            exact_receipt["context_window_id"] = verify_injected_finder_context(
+                                report, driver.finder_context_observations,
+                                finder_windows_before, finder_windows_after)
+                            driver.record("finder_context_injected_failure_verified",
+                                          **exact_receipt)
+                        elif args.finder_mode == "normal":
                             exact_receipt = verify_finder_context_receipt(
                                 rows, report, driver.finder_context_observations,
                                 finder_windows_before, finder_windows_after,

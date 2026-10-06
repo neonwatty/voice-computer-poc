@@ -99,4 +99,54 @@ final class FixtureAXVerifierTests: XCTestCase {
         client.observeFixtureToolCompleted(item, status: "completed", failed: false)
         XCTAssertEqual(client.fixtureCUAToolCompletedIDs, ["tool-one"])
     }
+
+    #if DEBUG
+        func testSyntheticCUAFailureUsesRealFixtureRejectionPath() throws {
+            for target in ["browser", "finder"] {
+                let runID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+                let root = FileManager.default.urls(
+                    for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                    .appendingPathComponent("VoiceComputerPOC/TestFixtures/\(runID)")
+                try FileManager.default.createDirectory(
+                    at: root, withIntermediateDirectories: true)
+                defer { try? FileManager.default.removeItem(at: root) }
+                try "\(target):\(runID)\n".write(
+                    to: root.appendingPathComponent("inject_cua_failure"),
+                    atomically: true, encoding: .utf8)
+                let client = AppServerClient(
+                    logDirectory: FileManager.default.temporaryDirectory
+                        .appendingPathComponent(UUID().uuidString))
+                client.isWorking = true
+                client.activeCommandID = "command-\(target)"
+                client.turnID = "turn-\(target)"
+                if target == "browser" {
+                    client.browserDocsURL = try XCTUnwrap(
+                        URL(string: "http://127.0.0.1:61234/home?run_id=\(runID)"))
+                } else {
+                    client.finderReportURL = root.appendingPathComponent("report.txt")
+                }
+                let item: [String: Any] = [
+                    "type": "mcpToolCall", "server": "cua_repl", "tool": "js",
+                    "id": "tool-\(target)", "status": "completed",
+                    "error": NSNull(),
+                    "result": ["isError": false],
+                ]
+                client.handleItemStarted(item, eventTurnID: client.turnID)
+                client.handleItemCompleted(item)
+                XCTAssertTrue(client.fixtureCUAFailureInjected)
+                XCTAssertEqual(
+                    client.fixtureTurnResult(outcome: "completed")?.observation.reason,
+                    "tool_failure")
+                XCTAssertEqual(
+                    client.diagnosticEntries.filter {
+                        $0.event == "test_cua_failure_injected"
+                    }.count, 1)
+                client.handleItemCompleted(item)
+                XCTAssertEqual(
+                    client.diagnosticEntries.filter {
+                        $0.event == "test_cua_failure_injected"
+                    }.count, 1)
+            }
+        }
+    #endif
 }

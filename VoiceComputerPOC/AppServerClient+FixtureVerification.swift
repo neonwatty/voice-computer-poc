@@ -8,6 +8,63 @@ struct FixtureTurnResult {
 }
 
 extension AppServerClient {
+    func observedFixtureItem(_ item: [String: Any]) -> [String: Any] {
+        #if DEBUG
+            injectFixtureCUAFailureIfRequested(item)
+        #else
+            item
+        #endif
+    }
+
+    #if DEBUG
+        func injectFixtureCUAFailureIfRequested(_ item: [String: Any]) -> [String: Any] {
+            guard isWorking, !fixtureCUAFailureInjected,
+                item["server"] as? String == "cua_repl",
+                item["status"] as? String == "completed",
+                (item["error"] as? [String: Any])?["message"] as? String == nil,
+                (item["result"] as? [String: Any])?["isError"] as? Bool != true,
+                let itemID = item["id"] as? String,
+                fixtureCUAToolStartedIDs.contains(itemID),
+                let (runID, target) = fixtureFailureTarget()
+            else { return item }
+            let support = FileManager.default.urls(
+                for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            let marker = support.appendingPathComponent(
+                "VoiceComputerPOC/TestFixtures/\(runID)/inject_cua_failure", isDirectory: false)
+            guard marker.resolvingSymlinksInPath() == marker,
+                (try? String(contentsOf: marker, encoding: .utf8)) == "\(target):\(runID)\n"
+            else { return item }
+            fixtureCUAFailureInjected = true
+            record(
+                "test_cua_failure_injected",
+                details: [
+                    "target": target, "run_id": runID, "item_id": itemID,
+                    "source": "synthetic_debug_event",
+                ])
+            var failed = item
+            failed["status"] = "failed"
+            failed["error"] = ["message": "Synthetic Debug CUA failure for fixture test"]
+            return failed
+        }
+
+        private func fixtureFailureTarget() -> (String, String)? {
+            if let browserDocsURL,
+                let runID = URLComponents(url: browserDocsURL, resolvingAgainstBaseURL: false)?
+                    .queryItems?.first(where: { $0.name == "run_id" })?.value,
+                runID.range(of: #"^[0-9a-f]{32}$"#, options: .regularExpression) != nil
+            {
+                return (runID, "browser")
+            }
+            if let finderReportURL {
+                let runID = finderReportURL.deletingLastPathComponent().lastPathComponent
+                if runID.range(of: #"^[0-9a-f]{32}$"#, options: .regularExpression) != nil {
+                    return (runID, "finder")
+                }
+            }
+            return nil
+        }
+    #endif
+
     func observeFixtureToolStarted(_ item: [String: Any], eventTurnID: String?) {
         guard browserDocsURL != nil || browserFormURL != nil || finderReportURL != nil,
             item["server"] as? String == "cua_repl",

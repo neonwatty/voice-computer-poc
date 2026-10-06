@@ -97,6 +97,7 @@ final class AppServerClient: ObservableObject {
     #if DEBUG
         var actingTurnOverride: (() -> Void)?
         var routingOverride: ((String) -> Void)?
+        var fixtureCUAFailureInjected = false
     #endif
     let diagnosticLog: DiagnosticLog?
 
@@ -228,6 +229,9 @@ final class AppServerClient: ObservableObject {
     }
 
     private func configureCommandRouting(_ phrase: String) {
+        #if DEBUG
+            fixtureCUAFailureInjected = false
+        #endif
         browserDocsURL = nil
         browserFormURL = nil
         browserFormQuery = nil

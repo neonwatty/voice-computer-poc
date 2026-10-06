@@ -9,6 +9,8 @@ read-only desktop state, and repeatable machine tests.
 The [tranche 3 plan](desktop-capabilities-tranche-3.md) covers existing Safari
 and Finder windows, routine exact-build Mac testing, and a separate Codex
 host-status feasibility gate.
+The [tranche 4 plan](desktop-capabilities-tranche-4.md) covers the PR Mac-test
+gate, Safari/Finder CUA failure paths, and a bounded TextEdit document workflow.
 
 ## Current paths
 
@@ -35,33 +37,28 @@ right/left` invokes it. Both ultimately call the same app-owned Space action.
 Keeping this distinction visible is important when attributing a test result.
 
 The exact-SHA Mac runner passed its ordered nine-case suite three times on
-`555a1007376b7e236e0c21e9fb35641da5abacad`. A reviewed-PR entry point
-now checks the exact approved head and green CI/CodeQL before using this
-Accessibility-enabled Mac, then attaches a redacted commit status. Its live
-dispatch has not yet been exercised against an approved PR.
-One later full run exposed intermittent nested tool discovery after the Space
-pair: the final desktop-state preflight listed its MCP tool, but that model
-turn could not call it. The app failed closed. The read-only route now gets
-one fresh app-server discovery attempt in this case; its new exact head still
-needs the full repeatability gate.
-An isolated router-output failure also caused one case-21 clarification
-without a Safari acting turn. The test-owned sentinel was identified and
-closed. The app now retries unavailable classifier output once before any
-actor starts, while malformed or unsafe output remains a no-action result.
-The standalone Codex CLI must expose a supported ChatGPT-sign-in model. An
-outdated CLI catalog offered retired models and produced an immediate failed
-nested turn; updating to 0.160.1 restored the current catalog. The app and
-harness now reject stale catalogs before starting an acting turn.
+`52b8e7edc9993089883bd5da9aa6f2e2dce13a5b`, the tested head of merged
+PR #14. The app retries read-only desktop-tool discovery once if the first
+nested turn lacks its tool and retries unavailable isolated router output once
+before an actor starts. The app and harness reject an outdated Codex CLI model
+catalog. The PR trigger checks an exact approved head and green CI/CodeQL,
+then posts a redacted commit status; its positive path has not run because
+this repository has one collaborator and cannot supply independent approval.
+The Mac status is not yet a required merge check.
+Focused Debug case 21 and 22 synthetic inner-CUA failure runs now passed with
+app-owned `tool_failed` results, independent sentinel/window cleanup evidence,
+and unchanged Space 5. They exercise the app's failure classification, not a
+real remote CUA service outage; the tranche 4 exact-head suite is pending.
 
 ## Next capabilities to build and validate
 
-1. Follow the tranche 3 plan to test Safari tabs and Finder selection with
-   already-open, test-owned sentinel windows while preserving unrelated user
-   context.
-2. Investigate a narrow `activate_app` action only if repeated runs demonstrate
-   a focus handoff that Computer Use cannot verify.
-3. Keep Codex host-task status deferred until Voice Computer can use a supported
-   host-aware interface. Continue testing it separately from desktop actions.
+1. Exercise Safari/Finder CUA failure boundaries and replace the impossible
+   independent-review Mac trigger gate with explicit exact-SHA owner dispatch.
+2. Prove the trigger's positive and rejection paths, then make the Mac status
+   required after repeatability and blocking behavior are observed.
+3. Add the bounded TextEdit save/reopen workflow in the tranche 4 plan. Keep
+   Codex host-task status deferred until a supported host-aware interface is
+   available.
 
 The [tranche 2 plan](desktop-capabilities-tranche-2.md) records the contracts
 and acceptance evidence. Keep Calculator arithmetic as a Computer Use fixture.

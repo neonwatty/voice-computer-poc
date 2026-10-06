@@ -29,7 +29,10 @@ from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path
                               verify_composed_rejection_receipt,
                               verify_desktop_state_receipt,
                               verify_safari_context_receipt,
-                              verify_safari_context_interruption_receipt)  # noqa: E402
+                              verify_safari_context_interruption_receipt,
+                              verify_injected_cua_failure_receipt,
+                              verify_injected_safari_context,
+                              verify_injected_finder_context)  # noqa: E402
 
 
 COMMAND_ID = "A1B2C3D4"
@@ -100,6 +103,67 @@ def read_only_rows():
         row("command_finished", status="completed"),
         row("live_space_observed", phase="after_completion", live_space_id="3"),
     ]
+
+
+def injected_failure_rows(target="browser", run_id="a" * 32):
+    return [
+        row("command_started", user_action="run"),
+        row("router_decided", route=target),
+        row("turn_requested", route=target),
+        row("tool_started", item_id=ITEM_ID, server="cua_repl", turn_matches="true"),
+        row("test_cua_failure_injected", target=target, run_id=run_id,
+            item_id=ITEM_ID, source="synthetic_debug_event"),
+        row("tool_completed", item_id=ITEM_ID, server="cua_repl", status="failed"),
+        row("fixture_ax_verification", target=target, verified="false",
+            reason="tool_failure"),
+        row("turn_completed", verification="tool_failed"),
+        row("command_finished", verification="tool_failed"),
+    ]
+
+
+class InjectedFailureReceiptTests(unittest.TestCase):
+    def test_failure_correlates_and_rejects_missing_or_false_evidence(self):
+        original = injected_failure_rows()
+        self.assertEqual(verify_injected_cua_failure_receipt(
+            original, "a" * 32, "browser", 5, 5)["verification"], "tool_failed")
+        changes = ((3, "turn_matches", "false"), (4, "item_id", "wrong"),
+                   (4, "source", "actual"), (5, "status", "completed"),
+                   (6, "verified", "true"), (8, "verification", "verified"))
+        for index, field, value in changes:
+            candidate = copy.deepcopy(original)
+            candidate[index]["details"][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                verify_injected_cua_failure_receipt(candidate, "a" * 32,
+                                                    "browser", 5, 5)
+        with self.assertRaisesRegex(ValueError, "stale"):
+            verify_injected_cua_failure_receipt(original, "a" * 32, "browser",
+                                                5, 5, {COMMAND_ID})
+        with self.assertRaisesRegex(ValueError, "changed Space"):
+            verify_injected_cua_failure_receipt(original, "a" * 32,
+                                                "browser", 5, 6)
+        with self.assertRaisesRegex(ValueError, "later step"):
+            verify_injected_cua_failure_receipt(
+                original + [row("finder_step_queued")], "a" * 32, "browser", 5, 5)
+
+    def test_context_cleanup_requires_known_sentinel_and_window(self):
+        run_id = "a" * 32
+        sentinel = {"method": "GET", "path": "/sentinel", "run_id": [run_id]}
+        safari_id = "12345678-1234-1234-1234-123456789ABC"
+        url = f"127.0.0.1:61234/sentinel?run_id={run_id}"
+        prepared = (f"App: Safari\n0 standard window Test ID: SafariWindow?UUID={safari_id}"
+                    f"\n{url}\n")
+        cleaned = prepared + "Description: Tab bar, 1 tab\n"
+        self.assertEqual(verify_injected_safari_context(
+            run_id, 61234, [sentinel], [prepared, cleaned], set(), set()), safari_id)
+        with self.assertRaisesRegex(ValueError, "restore window"):
+            verify_injected_safari_context(
+                run_id, 61234, [sentinel], [prepared, cleaned], set(), {safari_id})
+        report = Path("/tmp") / run_id / "report.txt"
+        finder = [{"window_id": 99, "state": report.with_name("sentinel.txt").as_uri()}] * 2
+        self.assertEqual(verify_injected_finder_context(
+            report, finder, set(), set()), 99)
+        with self.assertRaisesRegex(ValueError, "prepared window"):
+            verify_injected_finder_context(report, finder, {99}, {99})
 
 
 class ExactAppBindingTests(unittest.TestCase):
