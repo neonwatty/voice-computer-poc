@@ -14,17 +14,22 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).parent))
 from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path,
                               cua_exact_path_call, mcp_case_phrase, parse_open_session_log,
-                              running_app_pids, screen_is_locked, selected_cases,
+                              preferred_available_model, running_app_pids, screen_is_locked,
+                              selected_cases,
                               validate_exact_space_state,
                               validate_mcp_cases, verify_mcp_receipt,
                               verify_read_only_receipt, verify_browser_receipt,
                               verify_browser_interruption_receipt,
                               verify_finder_receipt,
+                              verify_finder_context_receipt,
+                              verify_finder_context_rejection_receipt,
                               verify_finder_rejection_receipt,
                               verify_composed_receipt,
                               verify_composed_failure_receipt,
                               verify_composed_rejection_receipt,
-                              verify_desktop_state_receipt)  # noqa: E402
+                              verify_desktop_state_receipt,
+                              verify_safari_context_receipt,
+                              verify_safari_context_interruption_receipt)  # noqa: E402
 
 
 COMMAND_ID = "A1B2C3D4"
@@ -37,9 +42,15 @@ def row(event, **details):
 
 
 class SuiteSelectionTests(unittest.TestCase):
+    def test_model_selection_rejects_stale_cli_catalog(self):
+        self.assertEqual(preferred_available_model(["gpt-5.4", "gpt-6.1-sol"]),
+                         "gpt-6.1-sol")
+        with self.assertRaisesRegex(ValueError, "update the standalone Codex CLI"):
+            preferred_available_model(["gpt-5.4", "gpt-5.3-codex"])
+
     def test_mission_control_is_explicit_for_browser_finder_suite(self):
-        self.assertEqual(selected_cases(True, None, False), [20, 17, 18, 19, 15, 16, 20])
-        self.assertEqual(selected_cases(True, None, True), [13, 20, 17, 18, 19, 15, 16, 20])
+        self.assertEqual(selected_cases(True, None, False), [20, 17, 18, 21, 22, 19, 15, 16, 20])
+        self.assertEqual(selected_cases(True, None, True), [13, 20, 17, 18, 21, 22, 19, 15, 16, 20])
         with self.assertRaisesRegex(ValueError, "requires --suite"):
             selected_cases(False, [17], True)
         with self.assertRaisesRegex(ValueError, "cannot be combined"):
@@ -240,6 +251,57 @@ class ExactAppBindingTests(unittest.TestCase):
 
 
 class BrowserReceiptTests(unittest.TestCase):
+    def test_safari_context_requires_same_owned_window_and_tab_cleanup(self):
+        run_id, port = "fixture-1234", 49328
+        uuid = "A1B2C3D4-1111-2222-3333-444455556666"
+        other = "B1B2C3D4-1111-2222-3333-444455556666"
+        prefix = (f'Window: "Fixture", App: Safari.\n0 standard window Fixture, '
+                  f'ID: SafariWindow?IsSecure=false&UUID={uuid}\n')
+        sentinel = (prefix + f'5 HTML content URL: 127.0.0.1:{port}/sentinel?run_id={run_id}\n'
+                    f'6 heading Voice Computer Sentinel {run_id}\n')
+        acted = (prefix + f'5 HTML content URL: 127.0.0.1:{port}/docs?run_id={run_id}\n'
+                 f'6 heading Voice Computer Docs {run_id}\n'
+                 f'24 tab group Description: Tab bar, 2 tabs\n'
+                 f'25 tab Sentinel {run_id}, Value: off\n')
+        rows = [row("command_started", user_action="run"),
+                row("router_decided", route="browser", action="follow_docs",
+                    target="loopback_fixture"),
+                row("turn_requested", route="browser"),
+                row("tool_started", server="cua_repl", tool="js"),
+                row("fixture_ax_verification", target="browser", verified="true",
+                    reason="exact_url_and_heading"),
+                row("turn_completed", status="completed", verification="verified"),
+                row("command_finished", status="completed", verification="verified")]
+        requests = [{"method": "GET", "path": path, "run_id": [run_id]}
+                    for path in ("/sentinel", "/home", "/docs")]
+        before = {other}
+        observations = [sentinel, acted, sentinel]
+        receipt = verify_safari_context_receipt(
+            rows, run_id, port, requests, observations, before, before, 5, 5)
+        self.assertEqual(receipt["context_window_id"], uuid)
+        decoy_uuid = "C1B2C3D4-1111-2222-3333-444455556666"
+        decoy = sentinel.replace(uuid, decoy_uuid)
+        double = [decoy, sentinel, acted, sentinel, decoy]
+        doubled_requests = [requests[0], *requests]
+        doubled = verify_safari_context_receipt(
+            rows, run_id, port, doubled_requests, double, before, before, 5, 5,
+            sentinel_count=2)
+        self.assertEqual(doubled["decoy_window_id"], decoy_uuid)
+        with self.assertRaisesRegex(ValueError, "did not correlate"):
+            verify_safari_context_receipt(
+                rows, run_id, port, doubled_requests, double[:-1], before, before, 5, 5,
+                sentinel_count=2)
+        with self.assertRaisesRegex(ValueError, "inventory"):
+            verify_safari_context_receipt(rows, run_id, port, requests,
+                                          observations, before, before | {uuid}, 5, 5)
+        with self.assertRaisesRegex(ValueError, "did not correlate"):
+            verify_safari_context_receipt(rows, run_id, port, requests,
+                                          [sentinel, acted], before, before, 5, 5)
+        with self.assertRaisesRegex(ValueError, "did not correlate"):
+            verify_safari_context_receipt(rows, run_id, port, requests,
+                                          [sentinel.replace(uuid, other), acted, sentinel],
+                                          before, before, 5, 5)
+
     def test_form_receipt_requires_exact_query_and_rendered_result(self):
         run_id, port = "fixture-1234", 49328
         rows = [
@@ -298,6 +360,34 @@ class BrowserReceiptTests(unittest.TestCase):
         premature[6]["details"]["status"] = "completed"
         with self.assertRaisesRegex(ValueError, "successful"):
             verify_browser_interruption_receipt(premature, run_id, requests, 5, 5)
+
+    def test_safari_context_stop_preserves_owned_sentinel(self):
+        run_id, port = "fixture-1234", 49328
+        uuid = "A1B2C3D4-1111-2222-3333-444455556666"
+        prefix = (f'Window: "Fixture", App: Safari.\n0 standard window Fixture, '
+                  f'ID: SafariWindow?IsSecure=false&UUID={uuid}\n')
+        sentinel = (prefix + f'5 URL: 127.0.0.1:{port}/sentinel?run_id={run_id}\n'
+                    f'6 heading Voice Computer Sentinel {run_id}\n')
+        acted = (prefix + f'5 URL: 127.0.0.1:{port}/home?run_id={run_id}\n'
+                 '24 tab group Description: Tab bar, 2 tabs\n')
+        rows = [row("command_started", user_action="run"),
+                row("router_decided", route="browser", action="follow_docs",
+                    target="loopback_fixture"),
+                row("turn_requested", route="browser"),
+                row("tool_started", server="cua_repl", tool="js"),
+                row("stop_requested"),
+                row("fixture_ax_verification", target="browser", verified="false",
+                    reason="turn_incomplete"),
+                row("turn_completed", status="interrupted", verification="unverified"),
+                row("command_finished", status="interrupted", verification="unverified")]
+        requests = [{"method": "GET", "path": path, "run_id": [run_id]}
+                    for path in ("/sentinel", "/home")]
+        receipt = verify_safari_context_interruption_receipt(
+            rows, run_id, port, requests, [sentinel, acted, sentinel], set(), set(), 5, 5)
+        self.assertTrue(receipt["sentinel_preserved"])
+        with self.assertRaisesRegex(ValueError, "did not correlate"):
+            verify_safari_context_interruption_receipt(
+                rows, run_id, port, requests, [sentinel, acted], set(), set(), 5, 5)
 
     def test_browser_receipt_requires_correlated_render_and_requests(self):
         run_id = "fixture-1234"
@@ -409,6 +499,17 @@ class FinderReceiptTests(unittest.TestCase):
                 verify_finder_rejection_receipt(rows, report, 5, 6)
             with self.assertRaisesRegex(ValueError, "stale"):
                 verify_finder_rejection_receipt(rows, report, 5, 5, {COMMAND_ID})
+            sentinel = root / "sentinel.txt"
+            sentinel.write_text("sentinel")
+            context = [{"state": f"Window: fixture, App: Finder\n"
+                                 f"10 row\n11 text field URL: {sentinel.as_uri()}\n",
+                        "window_id": 101}]
+            self.assertTrue(verify_finder_context_rejection_receipt(
+                rows, report, context * 2, {99}, {99}, 5, 5)["window_unchanged"])
+            with self.assertRaisesRegex(ValueError, "changed its prepared window"):
+                verify_finder_context_rejection_receipt(
+                    rows, report, [context[0], {**context[0], "window_id": 102}],
+                    {99}, {99}, 5, 5)
             outside = root / "outside.txt"
             outside.write_text("outside")
             report.symlink_to(outside)
@@ -468,6 +569,42 @@ class FinderReceiptTests(unittest.TestCase):
                 verify_finder_receipt(rows, report, [selected], 5, 5, {COMMAND_ID})
             with self.assertRaisesRegex(ValueError, "changed desktop"):
                 verify_finder_receipt(rows, report, [selected], 5, 6)
+            sentinel = root / "sentinel.txt"
+            sentinel.write_text("sentinel")
+            prepared = ("Window: fixture, App: Finder\n"
+                        f"10 row\n11 text field URL: {sentinel.as_uri()}\n"
+                        f"12 row\n13 text field URL: {report.as_uri()}\n")
+            context = [{"state": prepared, "window_id": 101},
+                       {"state": selected, "window_id": 101}]
+            receipt = verify_finder_context_receipt(
+                rows, report, context, {99}, {99}, 5, 5)
+            self.assertEqual(receipt["context_window_id"], 101)
+            decoy_root = root / "other-folder"
+            decoy_root.mkdir()
+            decoy_report = decoy_root / "report.txt"
+            decoy_report.write_text("other")
+            decoy_sentinel = decoy_root / "sentinel.txt"
+            decoy_sentinel.write_text("other sentinel")
+            decoy_state = ("Window: other-folder, App: Finder\n"
+                           f"10 row\n11 text field URL: {decoy_sentinel.as_uri()}\n"
+                           f"12 row\n13 text field URL: {decoy_report.as_uri()}\n")
+            double = [{"state": decoy_state, "window_id": 102}, *context,
+                      {"state": decoy_state, "window_id": 102}]
+            doubled = verify_finder_context_receipt(
+                rows, report, double, {99}, {99}, 5, 5,
+                decoy_report=decoy_report)
+            self.assertEqual(doubled["decoy_window_id"], 102)
+            with self.assertRaisesRegex(ValueError, "did not correlate"):
+                verify_finder_context_receipt(
+                    rows, report, double[:-1], {99}, {99}, 5, 5,
+                    decoy_report=decoy_report)
+            with self.assertRaisesRegex(ValueError, "inventory"):
+                verify_finder_context_receipt(rows, report, context,
+                                              {99}, {99, 101}, 5, 5)
+            with self.assertRaisesRegex(ValueError, "did not correlate"):
+                verify_finder_context_receipt(rows, report,
+                                              [context[0], {**context[1], "window_id": 102}],
+                                              {99}, {99}, 5, 5)
 
 
 class MCPReceiptTests(unittest.TestCase):
@@ -724,6 +861,14 @@ class DesktopStateReceiptTests(unittest.TestCase):
         def check(current=rows, after=state, frontmost="com.neonwatty.VoiceComputerPOC"):
             return verify_desktop_state_receipt(current, state, after, frontmost)
         self.assertEqual(check()["space_id"], 5)
+        retried = (rows[:3] + [row("mcp_state_discovery_retry", reason="no_tool_call"),
+                               row("mcp_state_requested"),
+                               row("turn_requested", route="desktop_state")]
+                   + rows[3:])
+        self.assertEqual(check(current=retried)["read_attempts"], 2)
+        bad_retry = rows[:4] + retried[3:6] + rows[4:]
+        with self.assertRaisesRegex(ValueError, "followed a tool"):
+            check(current=bad_retry)
         with self.assertRaisesRegex(ValueError, "Independent desktop Space"):
             check(after={"current": 6, "ordered": [5, 6]})
         with self.assertRaisesRegex(ValueError, "foreground app"):

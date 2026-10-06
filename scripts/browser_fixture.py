@@ -48,6 +48,9 @@ def make_server(run_id, log_path, mode="normal", home_requested=None, home_relea
                 link = ("" if mode == "missing-link" else
                         f'<a href="/docs?run_id={run_id}">Docs</a>')
                 self.respond(200, f"<h1>Voice Computer Home {html.escape(run_id)}</h1>{link}")
+            elif path == "/sentinel":
+                self.respond(200, f"<h1>Voice Computer Sentinel {html.escape(run_id)}</h1>",
+                             title=f"Sentinel {run_id}")
             elif path == "/docs" and mode == "redirect":
                 self.send_response(302)
                 self.send_header("Location", f"/error?run_id={run_id}")
@@ -63,8 +66,8 @@ def make_server(run_id, log_path, mode="normal", home_requested=None, home_relea
             else:
                 self.respond(404, "<h1>Fixture page not found</h1>")
 
-        def respond(self, status, body):
-            page = f"<!doctype html><html><head><title>Voice Computer Fixture</title></head>"
+        def respond(self, status, body, title="Voice Computer Fixture"):
+            page = f"<!doctype html><html><head><title>{html.escape(title)}</title></head>"
             page += f"<body>{body}</body></html>"
             encoded = page.encode("utf-8")
             self.send_response(status)

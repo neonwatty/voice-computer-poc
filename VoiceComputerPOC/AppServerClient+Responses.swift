@@ -2,6 +2,14 @@ import AppKit
 import Foundation
 
 extension AppServerClient {
+    static func preferredAvailableModel(_ available: [String]) -> String? {
+        let supported = [
+            "gpt-5.6-sol", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna",
+            "gpt-5.6-terra", "gpt-5.6-luna", "gpt-6-astra",
+        ]
+        return supported.first(where: available.contains)
+    }
+
     func handleResponse(id: Int, message: [String: Any]) {
         guard let kind = pending.removeValue(forKey: id) else {
             record("unexpected_rpc_response", details: ["id": String(id)])
@@ -55,8 +63,8 @@ extension AppServerClient {
     private func selectModelAndDiscoverTool(_ payload: [String: Any]) {
         let models = payload["data"] as? [[String: Any]] ?? []
         let available = models.compactMap { $0["id"] as? String }
-        guard let model = available.first(where: { $0 == "gpt-5.6-sol" }) ?? available.first else {
-            fail("Codex reported no available models.")
+        guard let model = Self.preferredAvailableModel(available) else {
+            fail("Codex CLI has no supported model for this app. Update the standalone Codex CLI.")
             return
         }
         selectedModel = model

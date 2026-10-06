@@ -20,12 +20,12 @@ extension AppServerClient {
 
     func processRouterOutput(_ data: Data?, phrase: String) {
         guard isWorking else { return }
+        if retryUnavailableRouterOutput(data, phrase: phrase) { return }
         switch RouteHandoff.decide(data, phrase: phrase) {
         case .invalid:
             completeRouteWithoutAction("Router output was unavailable or unsafe.")
         case .clarification:
-            record("router_decided", details: ["route": "clarification"])
-            completeRouteWithoutAction("Please clarify the requested desktop action.")
+            completeClarificationRoute()
         case .space(let direction, let remaining):
             record(
                 "router_decided",
@@ -79,6 +79,19 @@ extension AppServerClient {
             queuedPhrase = "Open \(home.absoluteString) and follow the Docs link."
             beginActingTurn()
         }
+    }
+
+    private func retryUnavailableRouterOutput(_ data: Data?, phrase: String) -> Bool {
+        guard data == nil, !routerOutputRetried else { return false }
+        routerOutputRetried = true
+        record("router_output_retry", details: ["reason": "unavailable", "attempt": "2"])
+        routePhrase(phrase)
+        return true
+    }
+
+    private func completeClarificationRoute() {
+        record("router_decided", details: ["route": "clarification"])
+        completeRouteWithoutAction("Please clarify the requested desktop action.")
     }
 
     func completeRouteWithoutAction(_ message: String) {

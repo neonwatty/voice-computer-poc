@@ -8,7 +8,7 @@ extension AppServerClient {
         }
         if let url = finderReportURL {
             return
-                "Use only mcp__cua_repl.js with Finder (com.apple.finder). Get Finder, use Go to Folder (Command-Shift-G), enter exactly \(url.path), and press Return once. Inspect Finder's Accessibility state and report the selected item's exact file URL. Stop if Finder has no window, the file is missing, the selected item differs, access is declined, or the tool fails. Do not open or edit the file, use a shell, or control another app. User request: \(phrase)"
+                "Use only mcp__cua_repl.js with Finder (com.apple.finder). Your first Computer Use call must assign var vcFinderTarget = await cua.getApp('com.apple.finder'); use vcFinderTarget for every later Finder action. Click the visible Go menu, then click Go to Folder. Do not use a keyboard shortcut for that menu item. Enter exactly \(url.path), and press Return once. Inspect Finder's Accessibility state and report the selected item's exact file URL. Stop if Finder has no window, the file is missing, the selected item differs, access is declined, or the tool fails. Do not open or edit the file, use a shell, or control another app. User request: \(phrase)"
         }
         if let url = browserFormURL, let query = browserFormQuery {
             var submitted = URLComponents(url: url, resolvingAgainstBaseURL: false)

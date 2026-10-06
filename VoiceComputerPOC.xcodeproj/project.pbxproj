@@ -41,6 +41,7 @@
 		9E495468E25A3000878BC3B8 /* AppServerClient+FixtureVerification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872783EC2FBD66E63D00C835 /* AppServerClient+FixtureVerification.swift */; };
 		A8852D260D8504D5024ABB58 /* AppServerClient+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DA61CCE4D3F6CC8236658A /* AppServerClient+Lifecycle.swift */; };
 		AA621174BB334EDF6B44707F /* SpaceToolBridgePythonPeerSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17C96BB825E16BE3B775FD87 /* SpaceToolBridgePythonPeerSupport.swift */; };
+		AF487C5644218A3A386E1AC2 /* RouterRetryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B830BC1C49F30F83959D186E /* RouterRetryTests.swift */; };
 		B00819EC5F0AB40C9AEDB658 /* LocalVoiceInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */; };
 		B1977B752C4EF9097128F4DF /* MissionControlAXDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FBF783BA4090E303FF1E695 /* MissionControlAXDiscovery.swift */; };
 		B20109C691FC13B37CB4A276 /* DesktopStateToolContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = D552F358A7F8C27CC1457175 /* DesktopStateToolContract.swift */; };
@@ -105,6 +106,7 @@
 		AAEE0B9B8B1A5F7E5359DD50 /* AppServerClient+Routing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Routing.swift"; sourceTree = "<group>"; };
 		B4892574811141080E9E93FE /* SpaceNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceNavigator.swift; sourceTree = "<group>"; };
 		B5BD5359A5FB8D299E90C067 /* AppServerClient+TurnOutcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+TurnOutcome.swift"; sourceTree = "<group>"; };
+		B830BC1C49F30F83959D186E /* RouterRetryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouterRetryTests.swift; sourceTree = "<group>"; };
 		BCBEEB7CA0E2EE76DD16B602 /* AppServerClient+TurnInstruction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+TurnInstruction.swift"; sourceTree = "<group>"; };
 		BED1EF7D88AEDFF253DD76FC /* router-instruction.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "router-instruction.txt"; sourceTree = "<group>"; };
 		C0BFCDA2960DFBDC48C0D048 /* WindowManagerAXExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManagerAXExecution.swift; sourceTree = "<group>"; };
@@ -148,6 +150,7 @@
 				135FE916EA2229230A66BEA1 /* FixtureAXVerifierTests.swift */,
 				FAF6FC2A95408A77DEB5287E /* NativeSpaceAXExecutionTests.swift */,
 				D9EB4AB5FB13BC8D4FE6427F /* NativeSpaceCancellationTests.swift */,
+				B830BC1C49F30F83959D186E /* RouterRetryTests.swift */,
 				17DD4353727E45891FEF5DAB /* SpaceNavigatorTests.swift */,
 				17C96BB825E16BE3B775FD87 /* SpaceToolBridgePythonPeerSupport.swift */,
 				77A1C0131F46AF8B11A108D1 /* SpaceToolBridgeSecurityTests.swift */,
@@ -337,6 +340,7 @@
 				04C47D3FA66A1B5677B5375B /* FixtureAXVerifierTests.swift in Sources */,
 				4C89AD07C7FD92FE012B26E3 /* NativeSpaceAXExecutionTests.swift in Sources */,
 				F8ED3CAF55A6B34F67BE9856 /* NativeSpaceCancellationTests.swift in Sources */,
+				AF487C5644218A3A386E1AC2 /* RouterRetryTests.swift in Sources */,
 				45B59E7EEC152F2A6831E556 /* SpaceNavigatorTests.swift in Sources */,
 				AA621174BB334EDF6B44707F /* SpaceToolBridgePythonPeerSupport.swift in Sources */,
 				11B249B1108AD14B1E9D8685 /* SpaceToolBridgeSecurityTests.swift in Sources */,
