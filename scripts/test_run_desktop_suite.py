@@ -27,7 +27,8 @@ class DesktopSuiteRunnerTests(unittest.TestCase):
 
     def test_receipt_requires_complete_ordered_suite_and_context_evidence(self):
         rows = [{"event": "safari_context_receipt_verified"},
-                {"event": "finder_context_receipt_verified"}]
+                {"event": "finder_context_receipt_verified"},
+                {"event": "textedit_context_receipt_verified"}]
         rows += [{"event": "command_finished", "command_index": index,
                   "success": True, "space_before": {"current": 5},
                   "space_after": {"current": 5}} for index in (20, 21, 22)]
@@ -42,7 +43,7 @@ class DesktopSuiteRunnerTests(unittest.TestCase):
                     self.assertTrue(summarize_smoke(path, [20, 21, 22])["all_cases_passed"])
             verify(rows)
             verify(rows[:-1], "complete ordered")
-            verify(rows[:1] + rows[2:], "context-window")
+            verify(rows[:2] + rows[3:], "context-window")
             changed = json.loads(json.dumps(rows))
             changed[-1]["space_after"]["current"] = 6
             verify(changed, "starting Space")

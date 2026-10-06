@@ -14,7 +14,7 @@ import run_reviewed_desktop_suite as trigger
 
 SHA = "a" * 40
 OTHER_SHA = "b" * 40
-CASES = [20, 17, 18, 21, 22, 19, 15, 16, 20]
+CASES = [20, 17, 18, 21, 22, 23, 19, 15, 16, 20]
 
 
 def green_pr():

@@ -13,7 +13,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 EVALS = ROOT / "evals"
-FIXTURES = json.loads((EVALS / "router-v5.json").read_text())
+FIXTURES = json.loads((EVALS / "router-v6.json").read_text())
 INSTRUCTION = (EVALS / "router-instruction.txt").read_text()
 CLI_ARGS = json.loads((EVALS / "router-cli-args.json").read_text())
 SCHEMA = EVALS / "router-output.schema.json"
@@ -127,7 +127,7 @@ def evaluate(reusable=None):
         decisions = { (index, trial): decision for (index, trial, _, _), decision
                       in zip(valid_results, valid_decisions) }
 
-    report = {"corpus": "router-v5", "fixture_count": len(FIXTURES),
+    report = {"corpus": "router-v6", "fixture_count": len(FIXTURES),
               "independent_model_turns": len(results), "reused_trial_count": len(reusable),
               "new_trial_count": len(jobs), "trials": [], "misses": []}
     report["trace_errors"] = []
@@ -152,6 +152,9 @@ def evaluate(reusable=None):
         elif expected["route"] == "finder":
             correct = correct and handoff.get("route") == "finder" \
                 and handoff.get("path") in expected["phrase"]
+        elif expected["route"] == "textedit":
+            correct = correct and handoff.get("route") == "textedit" \
+                and handoff.get("path") in expected["phrase"]
         elif expected["route"] == "browser_finder":
             correct = correct and handoff.get("route") == "browser_finder" \
                 and handoff.get("url") in expected["phrase"] \
@@ -175,10 +178,11 @@ def evaluate(reusable=None):
         for row in report["trials"])
     report["clarification_actions"] = sum(
         row["expected"]["route"] == "clarification"
-        and row["handoff"]["route"] in ("space", "calculator", "browser", "browser_form", "finder", "browser_finder")
+        and row["handoff"]["route"] in ("space", "calculator", "browser", "browser_form", "finder", "textedit", "browser_finder")
         for row in report["trials"])
-    (EVALS / "router-v5-report.json").write_text(
-        json.dumps(report, indent=2).replace(FINDER_PATH, "@FINDER_REPORT@") + "\n")
+    (EVALS / "router-v6-report.json").write_text(
+        json.dumps(report, indent=2).replace(FINDER_PATH, "@FINDER_REPORT@")
+        .replace(TEXTEDIT_PATH, "@TEXTEDIT_NOTE@") + "\n")
     summary = {key: report[key] for key in ("fixture_count", "independent_model_turns", "accuracy",
                                           "wrong_direction_actions", "clarification_actions")}
     summary["miss_count"] = len(report["misses"])
@@ -189,11 +193,11 @@ def evaluate(reusable=None):
 
 
 def main():
-    global FIXTURES, FINDER_PATH
+    global FIXTURES, FINDER_PATH, TEXTEDIT_PATH
     if sys.argv[1:] not in ([], ["--resume"]):
         raise SystemExit("Usage: eval-router.py [--resume]")
     templates = FIXTURES
-    saved_report = EVALS / "router-v5-report.json"
+    saved_report = EVALS / "router-v6-report.json"
     reusable = reusable_trials(json.loads(saved_report.read_text()), templates) \
         if sys.argv[1:] == ["--resume"] else {}
     root = (Path.home() / "Library/Application Support/VoiceComputerPOC/TestFixtures"
@@ -202,8 +206,12 @@ def main():
     report = root / "report.txt"
     report.write_text("Router Finder fixture\n")
     FINDER_PATH = str(report)
+    note = root / "note.txt"
+    note.write_text(f"Voice Computer draft {root.name}")
+    TEXTEDIT_PATH = str(note)
     FIXTURES = [{**row, "phrase": row["phrase"]
                  .replace("@FINDER_REPORT@", FINDER_PATH)
+                 .replace("@TEXTEDIT_NOTE@", TEXTEDIT_PATH)
                  .replace("@FINDER_RUN_ID@", root.name)}
                 for row in FIXTURES]
     try:

@@ -1,0 +1,5605 @@
+{
+  "corpus": "router-v6",
+  "fixture_count": 85,
+  "independent_model_turns": 255,
+  "reused_trial_count": 231,
+  "new_trial_count": 24,
+  "trials": [
+    {
+      "id": 0,
+      "trial": 1,
+      "phrase": "Switch one desktop Space to the left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "route": "space",
+        "first": "left"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 0,
+      "trial": 2,
+      "phrase": "Switch one desktop Space to the left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "first": "left",
+        "remaining": [],
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 0,
+      "trial": 3,
+      "phrase": "Switch one desktop Space to the left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "route": "space",
+        "first": "left"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 1,
+      "trial": 1,
+      "phrase": "Switch one desktop Space to the right",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "route": "space",
+        "remaining": [],
+        "first": "right"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 1,
+      "trial": 2,
+      "phrase": "Switch one desktop Space to the right",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 1,
+      "trial": 3,
+      "phrase": "Switch one desktop Space to the right",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 2,
+      "trial": 1,
+      "phrase": "Go to the previous desktop Space",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 2,
+      "trial": 2,
+      "phrase": "Go to the previous desktop Space",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 2,
+      "trial": 3,
+      "phrase": "Go to the previous desktop Space",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 3,
+      "trial": 1,
+      "phrase": "Go to the next desktop Space",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 3,
+      "trial": 2,
+      "phrase": "Go to the next desktop Space",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 3,
+      "trial": 3,
+      "phrase": "Go to the next desktop Space",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 4,
+      "trial": 1,
+      "phrase": "Move one desktop to the left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 4,
+      "trial": 2,
+      "phrase": "Move one desktop to the left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 4,
+      "trial": 3,
+      "phrase": "Move one desktop to the left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 5,
+      "trial": 1,
+      "phrase": "Move one desktop to the right",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 5,
+      "trial": 2,
+      "phrase": "Move one desktop to the right",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 5,
+      "trial": 3,
+      "phrase": "Move one desktop to the right",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 6,
+      "trial": 1,
+      "phrase": "Please switch Spaces left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 6,
+      "trial": 2,
+      "phrase": "Please switch Spaces left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 6,
+      "trial": 3,
+      "phrase": "Please switch Spaces left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 7,
+      "trial": 1,
+      "phrase": "Please switch Spaces right",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 7,
+      "trial": 2,
+      "phrase": "Please switch Spaces right",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 7,
+      "trial": 3,
+      "phrase": "Please switch Spaces right",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 8,
+      "trial": 1,
+      "phrase": "Can you move to the left desktop?",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 8,
+      "trial": 2,
+      "phrase": "Can you move to the left desktop?",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 8,
+      "trial": 3,
+      "phrase": "Can you move to the left desktop?",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 9,
+      "trial": 1,
+      "phrase": "Can you move to the right desktop?",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": false,
+      "trace_errors": []
+    },
+    {
+      "id": 9,
+      "trial": 2,
+      "phrase": "Can you move to the right desktop?",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 9,
+      "trial": 3,
+      "phrase": "Can you move to the right desktop?",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 10,
+      "trial": 1,
+      "phrase": "Desktop Space left, please!",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 10,
+      "trial": 2,
+      "phrase": "Desktop Space left, please!",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 10,
+      "trial": 3,
+      "phrase": "Desktop Space left, please!",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 11,
+      "trial": 1,
+      "phrase": "Desktop Space right, please!",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 11,
+      "trial": 2,
+      "phrase": "Desktop Space right, please!",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 11,
+      "trial": 3,
+      "phrase": "Desktop Space right, please!",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 12,
+      "trial": 1,
+      "phrase": "Switch to the prior desktop",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 12,
+      "trial": 2,
+      "phrase": "Switch to the prior desktop",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 12,
+      "trial": 3,
+      "phrase": "Switch to the prior desktop",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 13,
+      "trial": 1,
+      "phrase": "Switch to the next desktop",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 13,
+      "trial": 2,
+      "phrase": "Switch to the next desktop",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 13,
+      "trial": 3,
+      "phrase": "Switch to the next desktop",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 14,
+      "trial": 1,
+      "phrase": "One Space left.",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 14,
+      "trial": 2,
+      "phrase": "One Space left.",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 14,
+      "trial": 3,
+      "phrase": "One Space left.",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "left",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 15,
+      "trial": 1,
+      "phrase": "One Space right.",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 15,
+      "trial": 2,
+      "phrase": "One Space right.",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 15,
+      "trial": 3,
+      "phrase": "One Space right.",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 16,
+      "trial": 1,
+      "phrase": "Go right one desktop space, then back left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [
+          "left"
+        ],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 16,
+      "trial": 2,
+      "phrase": "Go right one desktop space, then back left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [
+          "left"
+        ],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 16,
+      "trial": 3,
+      "phrase": "Go right one desktop space, then back left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [
+          "left"
+        ],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 17,
+      "trial": 1,
+      "phrase": "Switch one desktop Space right and then back left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [
+          "left"
+        ],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 17,
+      "trial": 2,
+      "phrase": "Switch one desktop Space right and then back left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [
+          "left"
+        ],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 17,
+      "trial": 3,
+      "phrase": "Switch one desktop Space right and then back left",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [
+          "left"
+        ],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 18,
+      "trial": 1,
+      "phrase": "Move right a Space, then left to return",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [
+          "left"
+        ],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 18,
+      "trial": 2,
+      "phrase": "Move right a Space, then left to return",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [
+          "left"
+        ],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 18,
+      "trial": 3,
+      "phrase": "Move right a Space, then left to return",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [
+          "left"
+        ],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 19,
+      "trial": 1,
+      "phrase": "Go to the next desktop then back to the previous one",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [
+          "left"
+        ],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 19,
+      "trial": 2,
+      "phrase": "Go to the next desktop then back to the previous one",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [
+          "left"
+        ],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 19,
+      "trial": 3,
+      "phrase": "Go to the next desktop then back to the previous one",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "space",
+        "directions": [
+          "right",
+          "left"
+        ],
+        "target": ""
+      },
+      "handoff": {
+        "remaining": [
+          "left"
+        ],
+        "first": "right",
+        "route": "space"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 20,
+      "trial": 1,
+      "phrase": "Open Calculator",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 20,
+      "trial": 2,
+      "phrase": "Open Calculator",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 20,
+      "trial": 3,
+      "phrase": "Open Calculator",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 21,
+      "trial": 1,
+      "phrase": "Please open Calculator.",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 21,
+      "trial": 2,
+      "phrase": "Please open Calculator.",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 21,
+      "trial": 3,
+      "phrase": "Please open Calculator.",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 22,
+      "trial": 1,
+      "phrase": "Launch Calculator",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 22,
+      "trial": 2,
+      "phrase": "Launch Calculator",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 22,
+      "trial": 3,
+      "phrase": "Launch Calculator",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 23,
+      "trial": 1,
+      "phrase": "Bring Calculator to the foreground",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 23,
+      "trial": 2,
+      "phrase": "Bring Calculator to the foreground",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 23,
+      "trial": 3,
+      "phrase": "Bring Calculator to the foreground",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 24,
+      "trial": 1,
+      "phrase": "Show me Calculator",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 24,
+      "trial": 2,
+      "phrase": "Show me Calculator",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 24,
+      "trial": 3,
+      "phrase": "Show me Calculator",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 25,
+      "trial": 1,
+      "phrase": "Can you start Calculator?",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 25,
+      "trial": 2,
+      "phrase": "Can you start Calculator?",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 25,
+      "trial": 3,
+      "phrase": "Can you start Calculator?",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 26,
+      "trial": 1,
+      "phrase": "Open the Calculator app",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 26,
+      "trial": 2,
+      "phrase": "Open the Calculator app",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 26,
+      "trial": 3,
+      "phrase": "Open the Calculator app",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 27,
+      "trial": 1,
+      "phrase": "I need the calculator app",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 27,
+      "trial": 2,
+      "phrase": "I need the calculator app",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 27,
+      "trial": 3,
+      "phrase": "I need the calculator app",
+      "expected": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "output": {
+        "route": "computer_use",
+        "directions": [],
+        "target": "calculator"
+      },
+      "handoff": {
+        "route": "calculator"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 28,
+      "trial": 1,
+      "phrase": "Open Calculater",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 28,
+      "trial": 2,
+      "phrase": "Open Calculater",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 28,
+      "trial": 3,
+      "phrase": "Open Calculater",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 29,
+      "trial": 1,
+      "phrase": "Go to the write desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 29,
+      "trial": 2,
+      "phrase": "Go to the write desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 29,
+      "trial": 3,
+      "phrase": "Go to the write desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 30,
+      "trial": 1,
+      "phrase": "Go to the rite space",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 30,
+      "trial": 2,
+      "phrase": "Go to the rite space",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 30,
+      "trial": 3,
+      "phrase": "Go to the rite space",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 31,
+      "trial": 1,
+      "phrase": "Switch to the lift desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 31,
+      "trial": 2,
+      "phrase": "Switch to the lift desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 31,
+      "trial": 3,
+      "phrase": "Switch to the lift desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 32,
+      "trial": 1,
+      "phrase": "Move to a different desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 32,
+      "trial": 2,
+      "phrase": "Move to a different desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 32,
+      "trial": 3,
+      "phrase": "Move to a different desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 33,
+      "trial": 1,
+      "phrase": "Switch spaces",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 33,
+      "trial": 2,
+      "phrase": "Switch spaces",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 33,
+      "trial": 3,
+      "phrase": "Switch spaces",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 34,
+      "trial": 1,
+      "phrase": "Go left or right, whichever",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 34,
+      "trial": 2,
+      "phrase": "Go left or right, whichever",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 34,
+      "trial": 3,
+      "phrase": "Go left or right, whichever",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 35,
+      "trial": 1,
+      "phrase": "Switch to the right or left desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 35,
+      "trial": 2,
+      "phrase": "Switch to the right or left desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 35,
+      "trial": 3,
+      "phrase": "Switch to the right or left desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 36,
+      "trial": 1,
+      "phrase": "Switch two desktops left",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 36,
+      "trial": 2,
+      "phrase": "Switch two desktops left",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 36,
+      "trial": 3,
+      "phrase": "Switch two desktops left",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 37,
+      "trial": 1,
+      "phrase": "Go three Spaces right",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 37,
+      "trial": 2,
+      "phrase": "Go three Spaces right",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 37,
+      "trial": 3,
+      "phrase": "Go three Spaces right",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 38,
+      "trial": 1,
+      "phrase": "Move left then right",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 38,
+      "trial": 2,
+      "phrase": "Move left then right",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 38,
+      "trial": 3,
+      "phrase": "Move left then right",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 39,
+      "trial": 1,
+      "phrase": "Open Safari",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 39,
+      "trial": 2,
+      "phrase": "Open Safari",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 39,
+      "trial": 3,
+      "phrase": "Open Safari",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 40,
+      "trial": 1,
+      "phrase": "Delete all desktop files",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 40,
+      "trial": 2,
+      "phrase": "Delete all desktop files",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 40,
+      "trial": 3,
+      "phrase": "Delete all desktop files",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 41,
+      "trial": 1,
+      "phrase": "What time is it?",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 41,
+      "trial": 2,
+      "phrase": "What time is it?",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 41,
+      "trial": 3,
+      "phrase": "What time is it?",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 42,
+      "trial": 1,
+      "phrase": "Calculator or the next desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 42,
+      "trial": 2,
+      "phrase": "Calculator or the next desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 42,
+      "trial": 3,
+      "phrase": "Calculator or the next desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 43,
+      "trial": 1,
+      "phrase": "Go back",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 43,
+      "trial": 2,
+      "phrase": "Go back",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 43,
+      "trial": 3,
+      "phrase": "Go back",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 44,
+      "trial": 1,
+      "phrase": "Open a space",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 44,
+      "trial": 2,
+      "phrase": "Open a space",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 44,
+      "trial": 3,
+      "phrase": "Open a space",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 45,
+      "trial": 1,
+      "phrase": "Go left one desktop space, then back right",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 45,
+      "trial": 2,
+      "phrase": "Go left one desktop space, then back right",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 45,
+      "trial": 3,
+      "phrase": "Go left one desktop space, then back right",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 46,
+      "trial": 1,
+      "phrase": "Do not move right one desktop Space",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 46,
+      "trial": 2,
+      "phrase": "Do not move right one desktop Space",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 46,
+      "trial": 3,
+      "phrase": "Do not move right one desktop Space",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 47,
+      "trial": 1,
+      "phrase": "Never switch to the next desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 47,
+      "trial": 2,
+      "phrase": "Never switch to the next desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 47,
+      "trial": 3,
+      "phrase": "Never switch to the next desktop",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 48,
+      "trial": 1,
+      "phrase": "Maybe move right one Space",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 48,
+      "trial": 2,
+      "phrase": "Maybe move right one Space",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 48,
+      "trial": 3,
+      "phrase": "Maybe move right one Space",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 49,
+      "trial": 1,
+      "phrase": "Do not open Calculator",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 49,
+      "trial": 2,
+      "phrase": "Do not open Calculator",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 49,
+      "trial": 3,
+      "phrase": "Do not open Calculator",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 50,
+      "trial": 1,
+      "phrase": "Close Calculator",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 50,
+      "trial": 2,
+      "phrase": "Close Calculator",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 50,
+      "trial": 3,
+      "phrase": "Close Calculator",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 51,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "handoff": {
+        "url": "http://127.0.0.1:49328/home?run_id=fixture-1234",
+        "route": "browser"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 51,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "handoff": {
+        "url": "http://127.0.0.1:49328/home?run_id=fixture-1234",
+        "route": "browser"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 51,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "handoff": {
+        "url": "http://127.0.0.1:49328/home?run_id=fixture-1234",
+        "route": "browser"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 52,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link",
+      "expected": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "handoff": {
+        "url": "http://127.0.0.1:49328/home?run_id=fixture-1234",
+        "route": "browser"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 52,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link",
+      "expected": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "handoff": {
+        "url": "http://127.0.0.1:49328/home?run_id=fixture-1234",
+        "route": "browser"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 52,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link",
+      "expected": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "handoff": {
+        "url": "http://127.0.0.1:49328/home?run_id=fixture-1234",
+        "route": "browser"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 53,
+      "trial": 1,
+      "phrase": "Please open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "handoff": {
+        "route": "invalid"
+      },
+      "correct": false,
+      "trace_errors": []
+    },
+    {
+      "id": 53,
+      "trial": 2,
+      "phrase": "Please open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 53,
+      "trial": 3,
+      "phrase": "Please open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "handoff": {
+        "route": "invalid"
+      },
+      "correct": false,
+      "trace_errors": []
+    },
+    {
+      "id": 54,
+      "trial": 1,
+      "phrase": "Open https://example.com/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 54,
+      "trial": 2,
+      "phrase": "Open https://example.com/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 54,
+      "trial": 3,
+      "phrase": "Open https://example.com/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 55,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/home and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 55,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/home and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 55,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/home and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 56,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/error?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 56,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/error?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 56,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/error?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 57,
+      "trial": 1,
+      "phrase": "Do not open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 57,
+      "trial": 2,
+      "phrase": "Do not open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 57,
+      "trial": 3,
+      "phrase": "Do not open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 58,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link, then delete the page.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 58,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link, then delete the page.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 58,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link, then delete the page.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 59,
+      "trial": 1,
+      "phrase": "Reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "finder",
+        "directions": [],
+        "target": "fixture_report"
+      },
+      "output": {
+        "route": "finder",
+        "directions": [],
+        "target": "fixture_report"
+      },
+      "handoff": {
+        "path": "@FINDER_REPORT@",
+        "route": "finder"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 59,
+      "trial": 2,
+      "phrase": "Reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "finder",
+        "directions": [],
+        "target": "fixture_report"
+      },
+      "output": {
+        "route": "finder",
+        "directions": [],
+        "target": "fixture_report"
+      },
+      "handoff": {
+        "path": "@FINDER_REPORT@",
+        "route": "finder"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 59,
+      "trial": 3,
+      "phrase": "Reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "finder",
+        "directions": [],
+        "target": "fixture_report"
+      },
+      "output": {
+        "route": "finder",
+        "directions": [],
+        "target": "fixture_report"
+      },
+      "handoff": {
+        "path": "@FINDER_REPORT@",
+        "route": "finder"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 60,
+      "trial": 1,
+      "phrase": "Please reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 60,
+      "trial": 2,
+      "phrase": "Please reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 60,
+      "trial": 3,
+      "phrase": "Please reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 61,
+      "trial": 1,
+      "phrase": "Reveal the test report at @FINDER_REPORT@ in Finder, then open it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 61,
+      "trial": 2,
+      "phrase": "Reveal the test report at @FINDER_REPORT@ in Finder, then open it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 61,
+      "trial": 3,
+      "phrase": "Reveal the test report at @FINDER_REPORT@ in Finder, then open it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 62,
+      "trial": 1,
+      "phrase": "Delete the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 62,
+      "trial": 2,
+      "phrase": "Delete the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 62,
+      "trial": 3,
+      "phrase": "Delete the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 63,
+      "trial": 1,
+      "phrase": "Show the test report in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 63,
+      "trial": 2,
+      "phrase": "Show the test report in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 63,
+      "trial": 3,
+      "phrase": "Show the test report in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 64,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query test-fixture-1234.",
+      "expected": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_form"
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_form"
+      },
+      "handoff": {
+        "url": "http://127.0.0.1:49328/docs?run_id=fixture-1234",
+        "query": "test-fixture-1234",
+        "route": "browser_form"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 64,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query test-fixture-1234.",
+      "expected": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_form"
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_form"
+      },
+      "handoff": {
+        "url": "http://127.0.0.1:49328/docs?run_id=fixture-1234",
+        "query": "test-fixture-1234",
+        "route": "browser_form"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 64,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query test-fixture-1234.",
+      "expected": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_form"
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_form"
+      },
+      "handoff": {
+        "url": "http://127.0.0.1:49328/docs?run_id=fixture-1234",
+        "query": "test-fixture-1234",
+        "route": "browser_form"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 65,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query test-other-run.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 65,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query test-other-run.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 65,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query test-other-run.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 66,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query private-data.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 66,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query private-data.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 66,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query private-data.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 67,
+      "trial": 1,
+      "phrase": "Open https://example.com/docs?run_id=fixture-1234 and submit query test-fixture-1234.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 67,
+      "trial": 2,
+      "phrase": "Open https://example.com/docs?run_id=fixture-1234 and submit query test-fixture-1234.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 67,
+      "trial": 3,
+      "phrase": "Open https://example.com/docs?run_id=fixture-1234 and submit query test-fixture-1234.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 68,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query test-fixture-1234 twice.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 68,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query test-fixture-1234 twice.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 68,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query test-fixture-1234 twice.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 69,
+      "trial": 1,
+      "phrase": "Do not open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query test-fixture-1234.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 69,
+      "trial": 2,
+      "phrase": "Do not open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query test-fixture-1234.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 69,
+      "trial": 3,
+      "phrase": "Do not open http://127.0.0.1:49328/docs?run_id=fixture-1234 and submit query test-fixture-1234.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 70,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "browser_finder",
+        "directions": [],
+        "target": "local_docs_fixture_report"
+      },
+      "output": {
+        "route": "browser_finder",
+        "directions": [],
+        "target": "local_docs_fixture_report"
+      },
+      "handoff": {
+        "url": "http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040",
+        "path": "@FINDER_REPORT@",
+        "route": "browser_finder"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 70,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "browser_finder",
+        "directions": [],
+        "target": "local_docs_fixture_report"
+      },
+      "output": {
+        "route": "browser_finder",
+        "directions": [],
+        "target": "local_docs_fixture_report"
+      },
+      "handoff": {
+        "url": "http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040",
+        "path": "@FINDER_REPORT@",
+        "route": "browser_finder"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 70,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "browser_finder",
+        "directions": [],
+        "target": "local_docs_fixture_report"
+      },
+      "output": {
+        "route": "browser_finder",
+        "directions": [],
+        "target": "local_docs_fixture_report"
+      },
+      "handoff": {
+        "url": "http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040",
+        "path": "@FINDER_REPORT@",
+        "route": "browser_finder"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 71,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=00000000000000000000000000000000 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 71,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=00000000000000000000000000000000 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 71,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=00000000000000000000000000000000 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 72,
+      "trial": 1,
+      "phrase": "Do not open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 72,
+      "trial": 2,
+      "phrase": "Do not open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 72,
+      "trial": 3,
+      "phrase": "Do not open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 73,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder. Delete the report.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 73,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder. Delete the report.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 73,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder. Delete the report.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 74,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link or then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 74,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link or then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 74,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link or then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 75,
+      "trial": 1,
+      "phrase": "Open https://example.com:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 75,
+      "trial": 2,
+      "phrase": "Open https://example.com:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 75,
+      "trial": 3,
+      "phrase": "Open https://example.com:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 76,
+      "trial": 1,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder, then open Calculator.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 76,
+      "trial": 2,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder, then open Calculator.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 76,
+      "trial": 3,
+      "phrase": "Open http://127.0.0.1:49328/home?run_id=ffc64b374f3545cf9c984ad4c3379040 and follow the Docs link, then reveal the test report at @FINDER_REPORT@ in Finder, then open Calculator.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 77,
+      "trial": 1,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "textedit",
+        "directions": [],
+        "target": "fixture_note"
+      },
+      "output": {
+        "route": "textedit",
+        "directions": [],
+        "target": "fixture_note"
+      },
+      "handoff": {
+        "path": "@TEXTEDIT_NOTE@",
+        "route": "textedit"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 77,
+      "trial": 2,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "textedit",
+        "directions": [],
+        "target": "fixture_note"
+      },
+      "output": {
+        "route": "textedit",
+        "directions": [],
+        "target": "fixture_note"
+      },
+      "handoff": {
+        "path": "@TEXTEDIT_NOTE@",
+        "route": "textedit"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 77,
+      "trial": 3,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "textedit",
+        "directions": [],
+        "target": "fixture_note"
+      },
+      "output": {
+        "route": "textedit",
+        "directions": [],
+        "target": "fixture_note"
+      },
+      "handoff": {
+        "path": "@TEXTEDIT_NOTE@",
+        "route": "textedit"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 78,
+      "trial": 1,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer draft ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 78,
+      "trial": 2,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer draft ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 78,
+      "trial": 3,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer draft ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 79,
+      "trial": 1,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved 00000000000000000000000000000000\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 79,
+      "trial": 2,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved 00000000000000000000000000000000\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 79,
+      "trial": 3,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved 00000000000000000000000000000000\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 80,
+      "trial": 1,
+      "phrase": "In TextEdit, replace the test note at @FINDER_REPORT@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 80,
+      "trial": 2,
+      "phrase": "In TextEdit, replace the test note at @FINDER_REPORT@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 80,
+      "trial": 3,
+      "phrase": "In TextEdit, replace the test note at @FINDER_REPORT@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 81,
+      "trial": 1,
+      "phrase": "Do not In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 81,
+      "trial": 2,
+      "phrase": "Do not In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 81,
+      "trial": 3,
+      "phrase": "Do not In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 82,
+      "trial": 1,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it. Delete the note afterward.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 82,
+      "trial": 2,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it. Delete the note afterward.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 82,
+      "trial": 3,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it. Delete the note afterward.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 83,
+      "trial": 1,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it twice.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 83,
+      "trial": 2,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it twice.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 83,
+      "trial": 3,
+      "phrase": "In TextEdit, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it twice.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 84,
+      "trial": 1,
+      "phrase": "In Finder, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 84,
+      "trial": 2,
+      "phrase": "In Finder, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    },
+    {
+      "id": 84,
+      "trial": 3,
+      "phrase": "In Finder, replace the test note at @TEXTEDIT_NOTE@ with \"Voice Computer saved ffc64b374f3545cf9c984ad4c3379040\" and save it.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": true,
+      "trace_errors": []
+    }
+  ],
+  "misses": [
+    {
+      "id": 9,
+      "trial": 1,
+      "phrase": "Can you move to the right desktop?",
+      "expected": {
+        "route": "space",
+        "directions": [
+          "right"
+        ],
+        "target": ""
+      },
+      "output": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "handoff": {
+        "route": "clarification"
+      },
+      "correct": false,
+      "trace_errors": []
+    },
+    {
+      "id": 53,
+      "trial": 1,
+      "phrase": "Please open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "handoff": {
+        "route": "invalid"
+      },
+      "correct": false,
+      "trace_errors": []
+    },
+    {
+      "id": 53,
+      "trial": 3,
+      "phrase": "Please open http://127.0.0.1:49328/home?run_id=fixture-1234 and follow the Docs link.",
+      "expected": {
+        "route": "clarification",
+        "directions": [],
+        "target": ""
+      },
+      "output": {
+        "route": "browser",
+        "directions": [],
+        "target": "local_docs"
+      },
+      "handoff": {
+        "route": "invalid"
+      },
+      "correct": false,
+      "trace_errors": []
+    }
+  ],
+  "trace_errors": [],
+  "accuracy": 0.9882352941176471,
+  "wrong_direction_actions": 0,
+  "clarification_actions": 0
+}

@@ -8,6 +8,16 @@ extension AppServerClient {
         desktopStateApproval = nil
         spaceToolBridge?.revoke()
         record("stop_requested")
+        while let request = approval {
+            sendRaw(request.response(allow: false, forSession: false))
+            record(
+                "approval_decided",
+                details: [
+                    "request_id": String(request.id), "decision": "Declined on Stop",
+                    "server_name": request.serverName,
+                ])
+            approval = queuedApprovals.isEmpty ? nil : queuedApprovals.removeFirst()
+        }
         if queuedPhrase?.lowercased() == "inspect mission control desktop controls" {
             status = "Stopped"
             result = "Stopped the Mission Control inspection."

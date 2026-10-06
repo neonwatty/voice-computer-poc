@@ -8,6 +8,20 @@ struct FixtureTurnResult {
 }
 
 extension AppServerClient {
+    func handleCUAToolFailure() {
+        guard generalTurnFailure == nil else { return }
+        generalTurnFailure = .toolFailed
+        guard isWorking,
+            browserDocsURL != nil || browserFormURL != nil || finderReportURL != nil
+                || textEditNoteURL != nil,
+            let threadID, let turnID
+        else { return }
+        record("fixture_tool_failure_interrupt_requested", details: ["turn_id": turnID])
+        _ = send(
+            "turn/interrupt", params: ["threadId": threadID, "turnId": turnID],
+            pendingKind: .interrupt)
+    }
+
     func observedFixtureItem(_ item: [String: Any]) -> [String: Any] {
         #if DEBUG
             injectFixtureCUAFailureIfRequested(item)
@@ -61,12 +75,20 @@ extension AppServerClient {
                     return (runID, "finder")
                 }
             }
+            if let textEditNoteURL {
+                let runID = textEditNoteURL.deletingLastPathComponent().lastPathComponent
+                if runID.range(of: #"^[0-9a-f]{32}$"#, options: .regularExpression) != nil {
+                    return (runID, "textedit")
+                }
+            }
             return nil
         }
     #endif
 
     func observeFixtureToolStarted(_ item: [String: Any], eventTurnID: String?) {
-        guard browserDocsURL != nil || browserFormURL != nil || finderReportURL != nil,
+        guard
+            browserDocsURL != nil || browserFormURL != nil || finderReportURL != nil
+                || textEditNoteURL != nil,
             item["server"] as? String == "cua_repl",
             let turnID, eventTurnID == turnID,
             let itemID = item["id"] as? String, !itemID.isEmpty
@@ -91,7 +113,10 @@ extension AppServerClient {
     }
 
     func rejectMismatchedFixtureTurn(_ turn: [String: Any]) -> Bool {
-        guard browserDocsURL != nil || browserFormURL != nil || finderReportURL != nil else {
+        guard
+            browserDocsURL != nil || browserFormURL != nil || finderReportURL != nil
+                || textEditNoteURL != nil
+        else {
             return false
         }
         guard let turnID, turn["id"] as? String == turnID else {
@@ -106,13 +131,15 @@ extension AppServerClient {
         let kind =
             browserDocsURL != nil
             ? "browser"
-            : browserFormURL != nil ? "browser_form" : finderReportURL != nil ? "finder" : nil
+            : browserFormURL != nil
+                ? "browser_form"
+                : finderReportURL != nil ? "finder" : textEditNoteURL != nil ? "textedit" : nil
         guard let kind else { return nil }
         let observation: FixtureAXObservation
-        if outcome != "completed" {
-            observation = .reject("turn_incomplete")
-        } else if generalTurnFailure != nil {
+        if generalTurnFailure != nil {
             observation = .reject("tool_failure")
+        } else if outcome != "completed" {
+            observation = .reject("turn_incomplete")
         } else if fixtureCUAToolStartedIDs.isEmpty
             || fixtureCUAToolStartedIDs != fixtureCUAToolCompletedIDs
         {
@@ -124,6 +151,8 @@ extension AppServerClient {
                 docsURL: browserFormURL, query: browserFormQuery)
         } else if let finderReportURL {
             observation = FixtureAXVerifier.verifyFinder(reportURL: finderReportURL)
+        } else if let textEditNoteURL {
+            observation = FixtureAXVerifier.verifyTextEdit(noteURL: textEditNoteURL)
         } else {
             observation = .reject("missing_target")
         }
@@ -147,6 +176,7 @@ extension AppServerClient {
             switch fixture.kind {
             case "browser": result = "Verified: Safari displays the exact Docs URL and heading."
             case "browser_form": result = "Verified: Safari displays the exact form result."
+            case "textedit": result = "Verified: TextEdit saved the exact test note."
             default: result = "Verified: Finder selected the exact test report."
             }
         } else {
@@ -154,6 +184,7 @@ extension AppServerClient {
             switch fixture.kind {
             case "browser": result = "Safari did not expose the expected Docs URL and heading."
             case "browser_form": result = "Safari did not expose the exact form result."
+            case "textedit": result = "TextEdit did not expose the exact saved test note."
             default: result = "Finder did not expose the exact selected test report."
             }
         }

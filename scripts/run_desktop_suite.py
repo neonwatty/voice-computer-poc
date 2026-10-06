@@ -16,7 +16,7 @@ import uuid
 from smoke_app_server import (exact_build_identity, finder_window_inventory,
                               process_start_identity, running_app_pids,
                               safari_window_ids, screen_is_locked, selected_cases,
-                              space_state)
+                              space_state, textedit_window_inventory)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -65,7 +65,8 @@ def static_gate(derived_data, log_directory):
     run_gate("swift-format", ["xcrun", "swift-format", "lint", "--strict",
                               "--recursive", "VoiceComputerPOC", "VoiceComputerPOCTests",
                               "DesktopToolServer"], log_directory)
-    for helper in ("observe_safari_windows.swift", "observe_finder_windows.swift"):
+    for helper in ("observe_safari_windows.swift", "observe_finder_windows.swift",
+                   "observe_textedit_windows.swift"):
         run_gate(helper.removesuffix(".swift") + "-typecheck",
                  ["swiftc", "-typecheck", str(ROOT / "scripts" / helper)],
                  log_directory)
@@ -110,7 +111,8 @@ def summarize_smoke(path, expected_cases):
     if not isinstance(start, int) or end != start:
         raise ValueError("Machine suite did not return to its starting Space")
     if not any(row.get("event") == "safari_context_receipt_verified" for row in rows) \
-            or not any(row.get("event") == "finder_context_receipt_verified" for row in rows):
+            or not any(row.get("event") == "finder_context_receipt_verified" for row in rows) \
+            or not any(row.get("event") == "textedit_context_receipt_verified" for row in rows):
         raise ValueError("Machine suite is missing context-window evidence")
     return {"case_ids": cases, "starting_space_id": start,
             "final_space_id": end, "all_cases_passed": True}
@@ -144,6 +146,7 @@ def main():
         summary["started_at"] = datetime.now(timezone.utc).isoformat()
         safari_before = safari_window_ids()
         finder_before = finder_window_inventory()["window_ids"]
+        textedit_before = textedit_window_inventory()["window_ids"]
         start_space = space_state()
         static_gate(args.derived_data_path, log_directory)
         app_path = args.derived_data_path / "Build/Products/Debug/VoiceComputerPOC.app"
@@ -160,8 +163,9 @@ def main():
                 or process_start_identity(app_pid) != app_start:
             raise ValueError("App process identity changed during the machine suite")
         if safari_window_ids() != safari_before \
-                or finder_window_inventory()["window_ids"] != finder_before:
-            raise ValueError("Safari or Finder window inventory changed during the suite")
+                or finder_window_inventory()["window_ids"] != finder_before \
+                or textedit_window_inventory()["window_ids"] != textedit_before:
+            raise ValueError("Safari, Finder, or TextEdit window inventory changed during the suite")
         if space_state() != start_space:
             raise ValueError("Main desktop Space state changed after the suite")
         summary.update(evidence)

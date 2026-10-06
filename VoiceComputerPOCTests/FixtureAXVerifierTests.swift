@@ -102,7 +102,7 @@ final class FixtureAXVerifierTests: XCTestCase {
 
     #if DEBUG
         func testSyntheticCUAFailureUsesRealFixtureRejectionPath() throws {
-            for target in ["browser", "finder"] {
+            for target in ["browser", "finder", "textedit"] {
                 let runID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
                 let root = FileManager.default.urls(
                     for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -118,12 +118,16 @@ final class FixtureAXVerifierTests: XCTestCase {
                         .appendingPathComponent(UUID().uuidString))
                 client.isWorking = true
                 client.activeCommandID = "command-\(target)"
+                client.threadID = "thread-\(target)"
                 client.turnID = "turn-\(target)"
+                client.input = Pipe()
                 if target == "browser" {
                     client.browserDocsURL = try XCTUnwrap(
                         URL(string: "http://127.0.0.1:61234/home?run_id=\(runID)"))
-                } else {
+                } else if target == "finder" {
                     client.finderReportURL = root.appendingPathComponent("report.txt")
+                } else {
+                    client.textEditNoteURL = root.appendingPathComponent("note.txt")
                 }
                 let item: [String: Any] = [
                     "type": "mcpToolCall", "server": "cua_repl", "tool": "js",
@@ -141,10 +145,18 @@ final class FixtureAXVerifierTests: XCTestCase {
                     client.diagnosticEntries.filter {
                         $0.event == "test_cua_failure_injected"
                     }.count, 1)
+                XCTAssertEqual(
+                    client.diagnosticEntries.filter {
+                        $0.event == "fixture_tool_failure_interrupt_requested"
+                    }.count, 1)
                 client.handleItemCompleted(item)
                 XCTAssertEqual(
                     client.diagnosticEntries.filter {
                         $0.event == "test_cua_failure_injected"
+                    }.count, 1)
+                XCTAssertEqual(
+                    client.diagnosticEntries.filter {
+                        $0.event == "fixture_tool_failure_interrupt_requested"
                     }.count, 1)
             }
         }

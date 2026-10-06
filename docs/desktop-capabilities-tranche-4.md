@@ -1,8 +1,9 @@
 # Desktop capabilities, tranche 4
 
-Status: planned October 5, 2026. Start from merged `main` at `541bf2f`
-(PR #14). Speech input, Foil integration, and Codex host-task status remain
-deferred.
+Status: in progress October 5, 2026. PR #15 merged at
+`2fdddc1eab3a56e20c72485000a2b5fdfb13a2a7`; PR #16 is a draft for the
+TextEdit workflow. Speech input, Foil integration, and Codex host-task status
+remain deferred.
 
 ## Goal and baseline
 
@@ -17,11 +18,12 @@ PR #14 passed hosted CI and CodeQL on exact source SHA
 `52b8e7edc9993089883bd5da9aa6f2e2dce13a5b`. Three full Mac suites on
 that SHA passed cases `20,17,18,21,22,19,15,16,20`, each restoring the
 starting Space and Safari/Finder window inventories. Focused Safari and Finder
-positives, decoys, route rejections, and Browser Stop passed. The remaining
-limits are a live positive run of the PR trigger and controlled inner CUA
-failure cases for Safari and Finder. The trigger currently requires an
-independent exact-head GitHub approval, which the sole repository collaborator
-cannot provide. `main` has no branch-protection rule requiring the Mac status.
+positives, decoys, route rejections, and Browser Stop passed. PR #15 closed
+the original trigger and CUA failure-path gaps: its exact head passed the full
+suite, the owner-attested trigger posted success, and a wrong-SHA dispatch was
+rejected before running. The `Protect main` ruleset currently requires CI and
+CodeQL; the Mac status is optional until a second PR SHA and blocked/allowed
+rule behavior are observed.
 
 ## Work package 0: freeze and diagnose the baseline
 
@@ -72,8 +74,8 @@ case 21 and 22 both passed on the unlocked Mac: the app recorded the matching
 item, `tool_failed` verification, and one `synthetic_debug_event`; independent
 Safari/Finder observations confirmed sentinel preservation, known window
 identity, restored window inventory, and unchanged Space 5. These runs do not
-prove a failure in the remote CUA service itself. The exact clean-SHA full
-suite is still pending for this tranche.
+prove a failure in the remote CUA service itself. PR #15 subsequently passed
+the exact clean-SHA full suite and merged.
 
 ## Work package 2: owner-attested Mac PR trigger
 
@@ -128,6 +130,18 @@ been observed. Until then, describe the Mac status as reported but optional,
 and explicitly inspect it before merging desktop changes.
 
 ## Work package 4: bounded TextEdit document workflow
+
+**Implementation status:** PR #16 currently replaces one exact run-owned
+existing draft and reopens it through TextEdit. That path has no Save dialog,
+so the planned canceled-save variant requires a separate create or Save As
+flow and remains open. Three normal focused saves on an earlier PR #16
+revision, wrong-file/wrong-text rejections, synthetic CUA failure, and Stop
+at pending CUA approval have
+passed. One prepared-window run, one two-window decoy run, and a Debug-only
+read-only verifier failure passed with independent TextEdit window transition
+evidence, exact file bytes, and restored Space. Several preceding attempts
+returned genuine inner CUA `timeoutReached` or `noWindowsAvailable` errors;
+those failed receipts remain in the private Mac run directory.
 
 Build this after the trigger is working so its PR exercises the new check.
 Start from existing smoke case 3, which types into an unsaved TextEdit document
