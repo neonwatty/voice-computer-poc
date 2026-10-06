@@ -7,6 +7,7 @@ enum CommandRoute: Equatable {
     case browserForm(URL, String)
     case finderReveal(URL)
     case textEditSave(URL)
+    case textEditCreate(URL)
     case browserThenFinder(URL, URL)
     case clarification
 
@@ -66,10 +67,14 @@ enum CommandRoute: Equatable {
     }
 
     private static func parseTextEdit(target: String, directions: [String], phrase: String) -> Self? {
-        guard directions.isEmpty, target == "fixture_note",
-            let url = RouteSafety.textEditFixtureURL(in: phrase)
-        else { return nil }
-        return .textEditSave(url)
+        guard directions.isEmpty else { return nil }
+        if target == "fixture_note", let url = RouteSafety.textEditFixtureURL(in: phrase) {
+            return .textEditSave(url)
+        }
+        if target == "fixture_new_note", let url = RouteSafety.textEditNewFixtureURL(in: phrase) {
+            return .textEditCreate(url)
+        }
+        return nil
     }
 
     private static func parseFinder(target: String, directions: [String], phrase: String) -> Self? {
@@ -78,7 +83,6 @@ enum CommandRoute: Equatable {
         else { return nil }
         return .finderReveal(url)
     }
-
 }
 
 enum RouteHandoff: Equatable {
@@ -90,6 +94,7 @@ enum RouteHandoff: Equatable {
     case browserForm(URL, String)
     case finderReveal(URL)
     case textEditSave(URL)
+    case textEditCreate(URL)
     case browserThenFinder(URL, URL)
 
     static func decide(_ data: Data?, phrase: String) -> Self {
@@ -105,6 +110,7 @@ enum RouteHandoff: Equatable {
         case .browserForm(let url, let query): return .browserForm(url, query)
         case .finderReveal(let url): return .finderReveal(url)
         case .textEditSave(let url): return .textEditSave(url)
+        case .textEditCreate(let url): return .textEditCreate(url)
         case .browserThenFinder(let home, let report):
             return .browserThenFinder(home, report)
         }
@@ -282,6 +288,8 @@ enum RouteSafety {
             return finderFixtureURL(in: phrase) == url
         case .textEditSave(let url):
             return textEditFixtureURL(in: phrase) == url
+        case .textEditCreate(let url):
+            return textEditNewFixtureURL(in: phrase) == url
         case .browserThenFinder(let home, let report):
             guard let request = browserFinderRequest(in: phrase) else { return false }
             return request.0 == home && request.1 == report

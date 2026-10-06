@@ -253,6 +253,7 @@ extension AppServerClient {
         browserFormQuery = nil
         finderReportURL = nil
         textEditNoteURL = nil
+        textEditCreatesNote = false
         composedReportURL = nil
         composedBrowserVerified = false
         composedOriginSpace = nil

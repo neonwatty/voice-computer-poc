@@ -34,6 +34,7 @@ from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path
                               verify_injected_safari_context,
                               verify_injected_finder_context,
                               verify_textedit_receipt,
+                              verify_textedit_cancel_receipt,
                               verify_textedit_rejection_receipt,
                               verify_textedit_stop_receipt)  # noqa: E402
 
@@ -55,8 +56,8 @@ class SuiteSelectionTests(unittest.TestCase):
             preferred_available_model(["gpt-5.4", "gpt-5.3-codex"])
 
     def test_mission_control_is_explicit_for_browser_finder_suite(self):
-        self.assertEqual(selected_cases(True, None, False), [20, 17, 18, 21, 22, 23, 19, 15, 16, 20])
-        self.assertEqual(selected_cases(True, None, True), [13, 20, 17, 18, 21, 22, 23, 19, 15, 16, 20])
+        self.assertEqual(selected_cases(True, None, False), [20, 17, 18, 21, 22, 23, 24, 19, 15, 16, 20])
+        self.assertEqual(selected_cases(True, None, True), [13, 20, 17, 18, 21, 22, 23, 24, 19, 15, 16, 20])
         with self.assertRaisesRegex(ValueError, "requires --suite"):
             selected_cases(False, [17], True)
         with self.assertRaisesRegex(ValueError, "cannot be combined"):
@@ -64,6 +65,42 @@ class SuiteSelectionTests(unittest.TestCase):
 
 
 class TextEditReceiptTests(unittest.TestCase):
+    def test_canceled_create_requires_sheet_transition_and_no_later_actor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / ("a" * 32)
+            root.mkdir()
+            note = root / "note.txt"
+            (root / "note-copy.txt").write_text("Decoy note")
+            rows = [
+                row("command_started", user_action="run"),
+                row("router_decided", route="textedit", action="create_note",
+                    target="fixture_new_note"),
+                row("turn_requested", route="textedit"),
+                row("tool_started", server="cua_repl", item_id=ITEM_ID),
+                row("tool_completed", server="cua_repl", item_id=ITEM_ID,
+                    status="completed", result_is_error="false"),
+                row("textedit_cancel_cleanup", result="attempted"),
+                row("textedit_cancel_cleanup", result="discarded"),
+                row("fixture_ax_verification", target="textedit", verified="false",
+                    reason="file_bytes_mismatch"),
+                row("command_finished", verification="unverified"),
+            ]
+            transitions = [{"window_ids": ids} for ids in
+                           ([], [11], [11, 12], [11], [11, 13], [])]
+            result = verify_textedit_cancel_receipt(
+                rows, note, transitions, set(), set(), 5, 5)
+            self.assertTrue(result["file_absent"])
+            with self.assertRaisesRegex(ValueError, "sheet transition"):
+                verify_textedit_cancel_receipt(
+                    rows, note, [{"window_ids": []}], set(), set(), 5, 5)
+            unsafe = rows[:-1] + [
+                row("tool_started", server="cua_repl", item_id="later"),
+                row("tool_completed", server="cua_repl", item_id="later",
+                    status="completed", result_is_error="false"), rows[-1]]
+            with self.assertRaisesRegex(ValueError, "later actor"):
+                verify_textedit_cancel_receipt(
+                    unsafe, note, transitions, set(), set(), 5, 5)
+
     def test_stop_at_approval_starts_no_textedit_actor(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / ("c" * 32)

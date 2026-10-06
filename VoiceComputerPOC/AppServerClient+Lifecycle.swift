@@ -130,6 +130,7 @@ extension AppServerClient {
         focusTargetBundleID = nil
         composedReportURL = nil
         textEditNoteURL = nil
+        textEditCreatesNote = false
         composedBrowserVerified = false
         composedOriginSpace = nil
         activatedBundleIDsThisTurn.removeAll()

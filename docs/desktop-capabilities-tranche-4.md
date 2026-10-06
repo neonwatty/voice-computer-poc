@@ -1,9 +1,12 @@
 # Desktop capabilities, tranche 4
 
-Status: in progress October 5, 2026. PR #15 merged at
-`2fdddc1eab3a56e20c72485000a2b5fdfb13a2a7`; PR #16 is a draft for the
-TextEdit workflow. Speech input, Foil integration, and Codex host-task status
-remain deferred.
+Status: in progress October 6, 2026. PR #15 merged at
+`2fdddc1eab3a56e20c72485000a2b5fdfb13a2a7`; PR #16 merged at
+`010bf4471e28dfea3fdf83b18775c39737c917d7`. The new-document Save/Cancel
+extension is under test. Two focused new-document Save runs and one focused
+canceled Save run have passed with independent Mac observations. Speech input,
+Foil integration, and Codex host-task
+status remain deferred.
 
 ## Goal and baseline
 
@@ -126,15 +129,25 @@ does not waive the check silently. Keep unrelated PRs from inheriting an old
 SHA's result.
 
 **Gate:** the repository rule is active and its blocked/allowed behavior has
-been observed. Until then, describe the Mac status as reported but optional,
-and explicitly inspect it before merging desktop changes.
+been observed. Inspect all three exact-head checks before merging desktop
+changes.
+
+**Observed:** The active `Protect main` ruleset (ID 24084858) requires
+`Build and test`, `Analyze Swift`, and `Voice Computer / desktop suite`, with
+strict exact-head checks. PR #16 was blocked while its Mac status was pending
+and became mergeable after the same head passed. One real inner CUA
+`noWindowsAvailable` failure produced `tool_failed` and a failed Mac status;
+the same SHA was rerun after recovery and passed all ten ordered cases before
+merge. Recovery reruns the same SHA and never waives the check.
 
 ## Work package 4: bounded TextEdit document workflow
 
-**Implementation status:** PR #16 currently replaces one exact run-owned
-existing draft and reopens it through TextEdit. That path has no Save dialog,
-so the planned canceled-save variant requires a separate create or Save As
-flow and remains open. Three normal focused saves on an earlier PR #16
+**Implementation status:** PR #16 replaces one exact run-owned existing draft
+and reopens it through TextEdit. That path has no Save dialog. The separate
+new-document route now exercises TextEdit's Save sheet and has passed two
+focused normal runs and a focused canceled Save. The canceled Save showed a
+real sheet, produced no note file, returned `unverified`, and restored the
+starting windows and Space. Three normal focused saves on an earlier PR #16
 revision, wrong-file/wrong-text rejections, synthetic CUA failure, and Stop
 at pending CUA approval have
 passed. One prepared-window run, one two-window decoy run, and a Debug-only

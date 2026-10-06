@@ -53,7 +53,7 @@ enum RouterAgent {
                     "type": "string",
                     "enum": [
                         "", "calculator", "local_docs", "local_form", "fixture_report",
-                        "fixture_note", "local_docs_fixture_report",
+                        "fixture_note", "fixture_new_note", "local_docs_fixture_report",
                     ],
                 ],
             ],

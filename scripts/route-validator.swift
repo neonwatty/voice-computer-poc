@@ -33,6 +33,8 @@ struct RouteValidator {
                 result = ["route": "finder", "path": url.path]
             case .textEditSave(let url):
                 result = ["route": "textedit", "path": url.path]
+            case .textEditCreate(let url):
+                result = ["route": "textedit_create", "path": url.path]
             case .browserThenFinder(let home, let report):
                 result = [
                     "route": "browser_finder", "url": home.absoluteString,

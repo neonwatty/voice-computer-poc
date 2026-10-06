@@ -152,12 +152,39 @@ extension AppServerClient {
         } else if let finderReportURL {
             observation = FixtureAXVerifier.verifyFinder(reportURL: finderReportURL)
         } else if let textEditNoteURL {
-            observation = FixtureAXVerifier.verifyTextEdit(noteURL: textEditNoteURL)
+            observation = verifyTextEditAfterOptionalCleanup(noteURL: textEditNoteURL)
         } else {
             observation = .reject("missing_target")
         }
         return FixtureTurnResult(kind: kind, observation: observation)
     }
+
+    private func verifyTextEditAfterOptionalCleanup(noteURL: URL) -> FixtureAXObservation {
+        #if DEBUG
+            if textEditCreatesNote, isCanceledTextEditFixture(noteURL) {
+                let cleaned = TextEditCanceledFixtureCleanup.discard(noteURL: noteURL)
+                record(
+                    "textedit_cancel_cleanup",
+                    details: ["result": cleaned ? "discarded" : "failed"])
+                return cleaned
+                    ? FixtureAXVerifier.verifyTextEdit(noteURL: noteURL)
+                    : .reject("cancel_cleanup_failed")
+            }
+        #endif
+        return FixtureAXVerifier.verifyTextEdit(noteURL: noteURL)
+    }
+
+    #if DEBUG
+        private func isCanceledTextEditFixture(_ noteURL: URL) -> Bool {
+            let runID = noteURL.deletingLastPathComponent().lastPathComponent
+            let marker = noteURL.deletingLastPathComponent().appendingPathComponent("cancel_save")
+            guard marker.resolvingSymlinksInPath() == marker,
+                (try? String(contentsOf: marker, encoding: .utf8)) == "textedit:\(runID)\n"
+            else { return false }
+            record("textedit_cancel_cleanup", details: ["result": "attempted"])
+            return true
+        }
+    #endif
 
     func recordFixtureTurnResult(_ fixture: FixtureTurnResult) {
         record(
