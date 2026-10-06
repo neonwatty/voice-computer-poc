@@ -66,26 +66,34 @@ extension AppServerClient {
             queuedPhrase = "Reveal the test report at \(url.path) in Finder."
             beginActingTurn()
         case .textEditSave(let url):
-            record(
-                "router_decided",
-                details: ["route": "textedit", "action": "save_note", "target": "fixture_note"])
-            textEditNoteURL = url
-            queuedPhrase = phrase
-            beginActingTurn()
+            routeTextEditNote(url, phrase: phrase)
         case .browserThenFinder(let home, let report):
-            guard let snapshot = SpaceNavigator.snapshot() else {
-                fail("Could not read the starting desktop Space for the composed request.")
-                return
-            }
-            record(
-                "router_decided",
-                details: ["route": "browser_finder", "target": "matched_loopback_fixtures"])
-            composedReportURL = report
-            composedOriginSpace = snapshot
-            browserDocsURL = home
-            queuedPhrase = "Open \(home.absoluteString) and follow the Docs link."
-            beginActingTurn()
+            routeBrowserThenFinder(home, report: report)
         }
+    }
+
+    private func routeTextEditNote(_ url: URL, phrase: String) {
+        record(
+            "router_decided",
+            details: ["route": "textedit", "action": "save_note", "target": "fixture_note"])
+        textEditNoteURL = url
+        queuedPhrase = phrase
+        beginActingTurn()
+    }
+
+    private func routeBrowserThenFinder(_ home: URL, report: URL) {
+        guard let snapshot = SpaceNavigator.snapshot() else {
+            fail("Could not read the starting desktop Space for the composed request.")
+            return
+        }
+        record(
+            "router_decided",
+            details: ["route": "browser_finder", "target": "matched_loopback_fixtures"])
+        composedReportURL = report
+        composedOriginSpace = snapshot
+        browserDocsURL = home
+        queuedPhrase = "Open \(home.absoluteString) and follow the Docs link."
+        beginActingTurn()
     }
 
     private func retryUnavailableRouterOutput(_ data: Data?, phrase: String) -> Bool {

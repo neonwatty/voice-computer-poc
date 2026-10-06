@@ -211,7 +211,8 @@ extension AppServerClient {
                         ? "space"
                         : browserDocsURL != nil || browserFormURL != nil
                             ? "browser"
-                            : finderReportURL != nil ? "finder" : "computer_use",
+                            : finderReportURL != nil
+                                ? "finder" : textEditNoteURL != nil ? "textedit" : "computer_use",
             ])
         _ = send(
             "turn/start",

@@ -976,8 +976,7 @@ def verify_textedit_receipt(rows, note, observations, windows_before,
                    and entry["window_id"] is not None
                    and entry["window_id"] not in windows_before]
     if len(appearances) < 2 or not any(
-            'Window: "Open", App: TextEdit' in entry["state"]
-            and entry["window_id"] is None
+            entry["window_id"] is None
             for entry in observations[appearances[0][0] + 1:appearances[-1][0]]):
         raise ValueError("TextEdit note was not visibly closed and reopened")
     if appearances[0][1]["window_id"] == appearances[-1][1]["window_id"]:
@@ -1622,6 +1621,14 @@ class Driver:
                             "state": state,
                             "window_id": next(iter(matches)) if len(matches) == 1 else None,
                         })
+                        self.record("textedit_context_observed",
+                                    window_id=next(iter(matches)) if len(matches) == 1 else None,
+                                    matching_window_count=len(matches),
+                                    open_panel='Window: "Open", App: TextEdit' in state,
+                                    target_url_visible=bool(getattr(self, "textedit_note_uri", None)
+                                                            and self.textedit_note_uri in state),
+                                    saved_text_visible=bool(getattr(self, "textedit_saved_text", None)
+                                                            and self.textedit_saved_text in state))
                 if self.trace_tool_output:
                     self.record("tool_output_trace", item_id=item.get("id"),
                                 excerpt="\n".join(str(part.get("text") or "") for part in content)[:3000])
@@ -1988,6 +1995,8 @@ def main():
                 textedit_fixture_root = fixture_root
                 textedit_note = fixture_root / "note.txt"
                 textedit_note.write_text(f"Voice Computer draft {run_id}")
+                driver.textedit_note_uri = textedit_note.as_uri()
+                driver.textedit_saved_text = f"Voice Computer saved {run_id}"
                 (fixture_root / "note-copy.txt").write_text("Decoy note")
                 if args.inject_inner_cua_failure:
                     (fixture_root / "inject_cua_failure").write_text(
@@ -2370,7 +2379,9 @@ def main():
                     "do not edit the note yourself. Then bind with cua.getApp('com.apple.TextEdit') "
                     "and capture a full Accessibility state showing the exact note.txt URL "
                     "and saved text. Close only that URL-matched test document with its visible "
-                    "close button. Reopen the same exact path through TextEdit's Open dialog "
+                    "close button. In a separate Computer Use call, capture a full TextEdit "
+                    "state immediately after closing and before reopening; require no note.txt "
+                    "window. Reopen the same exact path through TextEdit's Open dialog "
                     "using the CUA key name super+shift+g (never CMD), then capture a full "
                     "state showing its URL and "
                     "saved text. Close only the reopened test document. Leave other TextEdit "

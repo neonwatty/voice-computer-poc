@@ -38,15 +38,9 @@ enum CommandRoute: Equatable {
         case "browser":
             return parseBrowser(target: target, directions: directions, phrase: originalPhrase)
         case "finder":
-            guard directions.isEmpty, target == "fixture_report",
-                let url = RouteSafety.finderFixtureURL(in: originalPhrase)
-            else { return nil }
-            return .finderReveal(url)
+            return parseFinder(target: target, directions: directions, phrase: originalPhrase)
         case "textedit":
-            guard directions.isEmpty, target == "fixture_note",
-                let url = RouteSafety.textEditFixtureURL(in: originalPhrase)
-            else { return nil }
-            return .textEditSave(url)
+            return parseTextEdit(target: target, directions: directions, phrase: originalPhrase)
         case "browser_finder":
             guard directions.isEmpty, target == "local_docs_fixture_report",
                 let (home, report) = RouteSafety.browserFinderRequest(in: originalPhrase)
@@ -69,6 +63,20 @@ enum CommandRoute: Equatable {
             return .browserForm(url, query)
         }
         return nil
+    }
+
+    private static func parseTextEdit(target: String, directions: [String], phrase: String) -> Self? {
+        guard directions.isEmpty, target == "fixture_note",
+            let url = RouteSafety.textEditFixtureURL(in: phrase)
+        else { return nil }
+        return .textEditSave(url)
+    }
+
+    private static func parseFinder(target: String, directions: [String], phrase: String) -> Self? {
+        guard directions.isEmpty, target == "fixture_report",
+            let url = RouteSafety.finderFixtureURL(in: phrase)
+        else { return nil }
+        return .finderReveal(url)
     }
 
 }
