@@ -20,7 +20,7 @@ gate, Safari/Finder CUA failure paths, and a bounded TextEdit document workflow.
 | Open Calculator and verify it is frontmost | Can operate its window; a CUA action alone did not establish foreground focus | App requests Launch Services activation after a completed CUA call and checks macOS focus | No | The Mac Mini observed `com.apple.calculator` frontmost after the handoff. |
 | Inspect Mission Control desktop controls | CUA targeting Mission Control/Finder did not expose usable thumbnails on either test Mac | Read-only Accessibility scan of `WindowManager` on macOS 27, Dock on older versions | No | Unattended case 13 has found two controls with live Space ID 5 unchanged, but it is intermittent when another app takes focus as Mission Control opens. It remains a fail-closed optional gate for Space control tests. |
 | Switch one desktop Space | CUA Control-Arrow and Mission Control attempts did not produce a verified change | Exact phrases use one bounded Accessibility press and verify the expected live ID plus Space notification | `switch_space(direction: right\|left)` uses the same app-owned action via an authenticated bridge and visible Allow once approval | One unattended MCP right-left pair verified 5 → 6 → 5 on the Mac Mini. |
-| Route other typed requests | UI can act after the request is selected | Isolated router permits Space, Calculator, local Browser and Finder fixtures, one composed Browser → Finder fixture, or clarification | Space switching and desktop-state reading are exposed | Router corpus and local tests pass; supported actions remain narrow. |
+| Route other typed requests | UI can act after the request is selected | Isolated router permits Space, Calculator, local Browser and Finder fixtures, one composed Browser → Finder fixture, one exact TextEdit note fixture, or clarification | Space switching and desktop-state reading are exposed | Router corpus v6 passed 252/255 trials (98.8%) with zero wrong direction actions; 231 prior v5 trials were reused and all 24 new TextEdit trials passed. Supported actions remain narrow. |
 | Navigate local Home → Docs | Safari Computer Use can open a loopback fixture, click Docs, and expose the final URL and heading | Route validator accepts only the exact fixture grammar; a bounded Safari Accessibility read matches the exact Docs URL and heading before the app reports `verified` | No Browser MCP tool | The strict Browser → Finder suite passed with app-owned and outer Safari evidence. Focused missing-link, 404, and local-redirect negatives returned app-owned `unverified`, matched fixture requests and rendered Safari state, and kept the Space unchanged. |
 | Preserve an existing Safari tab | Computer Use opens a new run-specific tab in a test-owned window | App verifies the exact Docs URL and heading; the outer runner correlates the sentinel tab and window UUID before and after cleanup | No Browser MCP tool | Focused case 21 passed three positive runs, missing-link, 404, redirect, Stop, and a two-window decoy run. Three exact-SHA full suites passed with independent Safari window inventory and unchanged Space. |
 | Stop Browser before Docs | The acting Safari turn is interrupted through the app's Stop button | Test fixture holds Home while a harness Accessibility helper presses Stop on the exact app PID | No MCP action | The exact-app case recorded an interrupted, unverified result, one Home request, zero Docs requests, and unchanged Space 5. |
@@ -29,6 +29,7 @@ gate, Safari/Finder CUA failure paths, and a bounded TextEdit document workflow.
 | Reuse an existing Finder window | Computer Use reveals the report in a test-owned window prepared before the command | The app checks exact selection; the outer runner joins Finder's numeric window ID with prepared and acted Accessibility states | No Finder MCP tool | Focused case 22 passed three positive runs, a two-window decoy run, and missing-file, symlink-escape, and decoy-target rejections. Three exact-SHA full suites passed with the same Finder window ID and restored window inventory. |
 | Complete Browser → Finder in one request | Separate Safari and Finder Computer Use turns act within one app command | The app verifies the exact Docs URL and heading before queuing Finder, then verifies the selected report; Stop prevents the second step | No Browser or Finder MCP action | Case 19 passed with one command, two ordered turns, app-owned Accessibility checks, independent Safari/Finder observations, exact HTTP requests, and unchanged Space. Missing link, 404, redirect, and Stop produced no Finder turn; unsafe file targets started neither actor. |
 | Read current desktop state | CUA can inspect a visible app but cannot authoritatively report live Main Space IDs | The app takes a coherent native snapshot without changing Space or focus | `get_desktop_state({})` returns typed Main Space IDs, frontmost bundle ID, and observation time after visible Allow once | Case 20 agreed with an independent macOS observer on both Main Spaces; the full suite read state before and after a 5 → 6 → 5 pair. Synthetic ambiguous-topology and incomplete-read cases return non-success. |
+| Save and reopen a run-owned TextEdit note | Computer Use edits the exact existing draft, saves through TextEdit, then the outer runner closes and reopens the same file through UI | Route safety binds one canonical fixture path and exact text; native verifier requires exact bytes, document URL, and visible text in one window | No TextEdit MCP action | Three focused unattended saves passed on an earlier PR #16 revision. A prepared open note and a two-window decoy run passed with stable target/decoy IDs, distinct reopened ID, exact bytes, and restored windows/Space. Wrong-text and wrong-file requests were rejected before acting. Synthetic CUA failure returned `tool_failed` without changing the draft; Stop at pending approval kept the draft and decoy unchanged. A Debug-only read-only verifier failure returned `unverified` despite saved bytes and reopened text. Genuine inner CUA timeouts failed closed. The exact-head suite remains pending. |
 | Read existing Codex task state | The nested CUA session cannot inspect the Codex host UI | Separate app-server `thread/read` returned the exact task ID but `notLoaded` for a host-active task | No Codex status MCP tool | Cross-process status is unsupported; the [feasibility report](codex-host-status-feasibility.md) compares a host-active ID with a fresh read-only probe. |
 | Record/transcribe speech | No | Local recording and transcript review exist | No | Deferred; no speech-to-action acceptance claimed. |
 
@@ -41,24 +42,26 @@ The exact-SHA Mac runner passed its ordered nine-case suite three times on
 PR #14. The app retries read-only desktop-tool discovery once if the first
 nested turn lacks its tool and retries unavailable isolated router output once
 before an actor starts. The app and harness reject an outdated Codex CLI model
-catalog. The PR trigger checks an exact approved head and green CI/CodeQL,
-then posts a redacted commit status; its positive path has not run because
-this repository has one collaborator and cannot supply independent approval.
-The Mac status is not yet a required merge check.
-Focused Debug case 21 and 22 synthetic inner-CUA failure runs now passed with
+catalog. The owner-attested PR trigger checks an exact reviewed head and green
+CI/CodeQL, then posts a redacted commit status. PR #15 passed the full suite
+and posted `Voice Computer / desktop suite` success on its exact SHA before
+merge; a wrong-SHA dispatch was rejected before running. The Mac status is not
+yet a required merge check because the second distinct PR SHA and repository
+rule behavior are pending.
+Focused Debug case 21, 22, and 23 synthetic inner-CUA failure runs passed with
 app-owned `tool_failed` results, independent sentinel/window cleanup evidence,
-and unchanged Space 5. They exercise the app's failure classification, not a
-real remote CUA service outage; the tranche 4 exact-head suite is pending.
+unchanged fixture bytes, and unchanged Space. They exercise the app's failure
+classification, not a real remote CUA service outage; the TextEdit exact-head
+suite is pending.
 
 ## Next capabilities to build and validate
 
-1. Exercise Safari/Finder CUA failure boundaries and replace the impossible
-   independent-review Mac trigger gate with explicit exact-SHA owner dispatch.
-2. Prove the trigger's positive and rejection paths, then make the Mac status
-   required after repeatability and blocking behavior are observed.
-3. Add the bounded TextEdit save/reopen workflow in the tranche 4 plan. Keep
-   Codex host-task status deferred until a supported host-aware interface is
-   available.
+1. Run the TextEdit exact-head suite on PR #16. The separate new-document
+   Save/Cancel flow remains to be built and tested.
+2. Dispatch the owner-attested Mac check on PR #16's final SHA, then configure
+   and observe the required repository rule if permissions allow.
+3. Keep Codex host-task status deferred until a supported host-aware interface
+   is available.
 
 The [tranche 2 plan](desktop-capabilities-tranche-2.md) records the contracts
 and acceptance evidence. Keep Calculator arithmetic as a Computer Use fixture.

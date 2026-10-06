@@ -153,6 +153,15 @@ enum FixtureAXVerifier {
             values.isRegularFile == true, let size = values.fileSize, size <= 256,
             (try? Data(contentsOf: noteURL)) == Data(expected.utf8)
         else { return .reject("file_bytes_mismatch") }
+        #if DEBUG
+            let marker = noteURL.deletingLastPathComponent().appendingPathComponent(
+                "inject_ax_failure", isDirectory: false)
+            if marker.resolvingSymlinksInPath() == marker,
+                (try? String(contentsOf: marker, encoding: .utf8)) == "textedit:\(runID)\n"
+            {
+                return .reject("synthetic_accessibility_failure")
+            }
+        #endif
         guard let windows = windows(for: "com.apple.TextEdit") else {
             return .reject("accessibility_unavailable")
         }

@@ -210,6 +210,50 @@ def textedit_window_inventory(title=None):
     return {"window_ids": set(ids), "matching_window_ids": set(matches)}
 
 
+class TextEditWindowSampler:
+    """Record run-time TextEdit window transitions independently of CUA events."""
+
+    def __init__(self):
+        helper = Path(__file__).with_name("observe_textedit_windows.swift")
+        self.process = subprocess.Popen(
+            ["swift", str(helper), "note.txt", "--watch"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+        self.transitions = []
+        self.ready = threading.Event()
+        self.reader = threading.Thread(target=self._read, daemon=True)
+        self.reader.start()
+        if not self.ready.wait(timeout=10):
+            self.stop()
+            raise RuntimeError("TextEdit window sampler did not start")
+
+    def _read(self):
+        for line in self.process.stdout:
+            try:
+                row = json.loads(line)
+                ids = row["window_ids"]
+                matches = row["matching_window_ids"]
+                if not isinstance(ids, list) or not isinstance(matches, list) \
+                        or any(type(value) is not int or value <= 0
+                               for value in ids + matches) \
+                        or not set(matches).issubset(ids):
+                    raise ValueError("invalid TextEdit transition")
+                self.transitions.append({"window_ids": ids,
+                                         "matching_window_ids": matches})
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+                self.transitions.append({"invalid": True})
+            finally:
+                self.ready.set()
+
+    def stop(self):
+        if self.process.poll() is None:
+            self.process.terminate()
+        self.process.wait(timeout=5)
+        self.reader.join(timeout=2)
+        if not self.transitions or any(row.get("invalid") for row in self.transitions):
+            raise ValueError("TextEdit window sampler returned invalid transitions")
+        return list(self.transitions)
+
+
 def validate_exact_space_state(state, case):
     """Require two distinct live Main desktops and the case's starting edge."""
     if not isinstance(state, dict):
@@ -792,6 +836,36 @@ def stop_browser_when_home(requested, release, app_pid, session_log, log_offset,
         release.set()
 
 
+def stop_textedit_before_approval(app_pid, session_log, log_offset, started_at, outcome):
+    """Press Stop while exact-app TextEdit Computer Use still awaits approval."""
+    try:
+        deadline = time.monotonic() + 90
+        while time.monotonic() < deadline:
+            rows = app_log_rows(session_log, started_at, log_offset)
+            if any(row.get("event") == "approval_requested"
+                   and row.get("details", {}).get("server_name") == "cua_repl"
+                   for row in rows):
+                break
+            time.sleep(0.05)
+        else:
+            raise TimeoutError("TextEdit CUA approval did not appear")
+        helper = Path(__file__).with_name("press_voice_stop.swift")
+        pressed = subprocess.run(["swift", str(helper), str(app_pid)],
+                                 capture_output=True, text=True, timeout=20, check=False)
+        if pressed.returncode != 0 or pressed.stdout.strip() != "pressed_stop":
+            raise RuntimeError("Exact-app Stop button could not be pressed")
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            if any(row.get("event") == "stop_requested" for row in
+                   app_log_rows(session_log, started_at, log_offset)):
+                outcome["pressed"] = True
+                return
+            time.sleep(0.05)
+        raise TimeoutError("TextEdit Stop was pressed but not recorded")
+    except (OSError, RuntimeError, TimeoutError, subprocess.SubprocessError) as error:
+        outcome["error"] = str(error)
+
+
 def verify_finder_receipt(rows, report, observations, before, after,
                           prior_command_ids=()):
     """Require one exact selected fixture file in Finder and no desktop move."""
@@ -922,7 +996,8 @@ def verify_finder_context_rejection_receipt(rows, report, observations,
 
 def verify_textedit_receipt(rows, note, observations, windows_before,
                             windows_after, space_before, space_after,
-                            prior_command_ids=()):
+                            prior_command_ids=(), context_windows=0,
+                            verifier_failure=False, window_transitions=None):
     """Require exact app proof, saved bytes, and an independently reopened note."""
     starts = [row for row in rows if row.get("event") == "command_started"
               and row.get("details", {}).get("user_action") == "run"]
@@ -952,11 +1027,16 @@ def verify_textedit_receipt(rows, note, observations, windows_before,
                      and tool.get("result_is_error") == "false"}
     if None in started_ids or started_ids != completed_ids:
         raise ValueError("TextEdit CUA item did not complete cleanly")
+    expected_verification = "unverified" if verifier_failure else "verified"
+    expected_reason = ("synthetic_accessibility_failure" if verifier_failure
+                       else "exact_note_file_and_text")
     if len(ax) != 1 or ax[0].get("target") != "textedit" \
-            or ax[0].get("verified") != "true" \
-            or ax[0].get("reason") != "exact_note_file_and_text" \
-            or len(app_turns) != 1 or app_turns[0].get("verification") != "verified" \
-            or len(finishes) != 1 or finishes[0].get("verification") != "verified":
+            or ax[0].get("verified") != str(not verifier_failure).lower() \
+            or ax[0].get("reason") != expected_reason \
+            or len(app_turns) != 1 \
+            or app_turns[0].get("verification") != expected_verification \
+            or len(finishes) != 1 \
+            or finishes[0].get("verification") != expected_verification:
         raise ValueError("TextEdit app-owned saved-note verification mismatch")
     if windows_after != windows_before or space_before is None or space_after != space_before:
         raise ValueError("TextEdit windows or desktop Space were not restored")
@@ -972,19 +1052,74 @@ def verify_textedit_receipt(rows, note, observations, windows_before,
         raise ValueError("TextEdit command invoked unrelated desktop action")
     target_uri = note.as_uri()
     appearances = [(index, entry) for index, entry in enumerate(observations)
-                   if target_uri in entry["state"] and expected in entry["state"]
-                   and entry["window_id"] is not None
-                   and entry["window_id"] not in windows_before]
+                   if target_uri in entry["state"] and expected in entry["state"]]
     if len(appearances) < 2 or not any(
             entry["window_id"] is None
             for entry in observations[appearances[0][0] + 1:appearances[-1][0]]):
         raise ValueError("TextEdit note was not visibly closed and reopened")
-    if appearances[0][1]["window_id"] == appearances[-1][1]["window_id"]:
-        raise ValueError("TextEdit reopened document reused the original live window")
+    if window_transitions is not None:
+        samples = [row["matching_window_ids"] for row in window_transitions]
+        identity = None
+        for first_index, first in enumerate(samples):
+            if len(first) != 1 or first[0] in windows_before:
+                continue
+            for closed_index in range(first_index + 1, len(samples)):
+                if samples[closed_index]:
+                    continue
+                for reopened in samples[closed_index + 1:]:
+                    if len(reopened) == 1 and reopened[0] != first[0] \
+                            and reopened[0] not in windows_before:
+                        identity = (first[0], reopened[0])
+                        break
+                if identity:
+                    break
+            if identity:
+                break
+        if identity is None:
+            raise ValueError("TextEdit window transitions did not prove reopen")
+        first_window_id, reopened_window_id = identity
+        if appearances[0][1]["window_id"] not in (None, first_window_id) \
+                or appearances[-1][1]["window_id"] not in (None, reopened_window_id):
+            raise ValueError("TextEdit Accessibility and CG window identities disagree")
+    else:
+        first_window_id = appearances[0][1]["window_id"]
+        reopened_window_id = appearances[-1][1]["window_id"]
+        if first_window_id is None or reopened_window_id is None \
+                or first_window_id == reopened_window_id \
+                or first_window_id in windows_before \
+                or reopened_window_id in windows_before:
+            raise ValueError("TextEdit reopened document lacked a new live window")
+    if context_windows:
+        prepared = [(index, entry) for index, entry in enumerate(observations)
+                    if target_uri in entry["state"]
+                    and f"Voice Computer draft {run_id}" in entry["state"]
+                    and entry["window_id"] is not None
+                    and entry["window_id"] not in windows_before]
+        if not prepared or prepared[0][0] >= appearances[0][0] \
+                or prepared[0][1]["window_id"] != first_window_id:
+            raise ValueError("TextEdit did not reuse the prepared draft window")
+        if context_windows == 2:
+            decoy_uri = decoy.as_uri()
+            decoy_seen = [(index, entry["decoy_window_id"])
+                          for index, entry in enumerate(observations)
+                          if decoy_uri in entry["state"] and "Decoy note" in entry["state"]
+                          and entry.get("decoy_window_id") is not None
+                          and entry["decoy_window_id"] not in windows_before]
+            prepared_decoy = {window_id for index, window_id in decoy_seen
+                              if index < appearances[0][0]}
+            preserved_decoy = {window_id for index, window_id in decoy_seen
+                               if index > appearances[0][0]}
+            if len(prepared_decoy) != 1 or prepared_decoy != preserved_decoy \
+                    or first_window_id in prepared_decoy:
+                raise ValueError("TextEdit decoy window identity was not preserved")
     assert_log_privacy(rows)
     return {"command_id": command_id, "run_id": run_id,
-            "first_window_id": appearances[0][1]["window_id"],
-            "reopened_window_id": appearances[-1][1]["window_id"],
+            "first_window_id": first_window_id,
+            "reopened_window_id": reopened_window_id,
+            "window_transitions_verified": window_transitions is not None,
+            "prepared_window_reused": bool(context_windows),
+            "decoy_window_preserved": context_windows == 2,
+            "app_verifier_fail_closed": verifier_failure,
             "file_bytes_verified": True, "reopened_text_verified": True,
             "window_cleanup_verified": True, "before": space_before,
             "after": space_after}
@@ -1017,6 +1152,59 @@ def verify_textedit_rejection_receipt(rows, note, windows_before, windows_after,
         raise ValueError("Unsafe TextEdit request changed file, windows, or Space")
     assert_log_privacy(rows)
     return {"command_id": command_id, "rejected_before_actor": True,
+            "draft_unchanged": True, "window_cleanup_verified": True,
+            "before": space_before, "after": space_after}
+
+
+def verify_textedit_stop_receipt(rows, note, windows_before, windows_after,
+                                 space_before, space_after, prior_command_ids=()):
+    """A Stop at CUA approval must prevent the first TextEdit actor call."""
+    starts = [row for row in rows if row.get("event") == "command_started"
+              and row.get("details", {}).get("user_action") == "run"]
+    if len(starts) != 1:
+        raise ValueError("TextEdit Stop lacks one command")
+    command_id = starts[0].get("details", {}).get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("TextEdit Stop command ID missing or stale")
+    command_rows = [row for row in rows if row.get("details", {}).get("command_id") == command_id]
+    def entries(name):
+        return [(index, row.get("details", {})) for index, row in enumerate(command_rows)
+                if row.get("event") == name]
+    route, turn, approval, stop, finish = (
+        entries(name) for name in ("router_decided", "turn_requested",
+                                   "approval_requested", "stop_requested", "command_finished"))
+    if len(route) != 1 or route[0][1].get("route") != "textedit" \
+            or len(turn) != 1 or turn[0][1].get("route") != "textedit" \
+            or len(approval) != 1 or approval[0][1].get("server_name") != "cua_repl" \
+            or len(stop) != 1 or len(finish) != 1 \
+            or not turn[0][0] < approval[0][0] < stop[0][0] < finish[0][0] \
+            or finish[0][1].get("verification") == "verified":
+        raise ValueError("TextEdit Stop lifecycle was not fail-closed")
+    ax = entries("fixture_ax_verification")
+    if any(item.get("verified") == "true" for _, item in ax):
+        raise ValueError("TextEdit Stop reported verified Accessibility")
+    tools = entries("tool_started")
+    if len(tools) != 1 or tools[0][1].get("server") != "cua_repl" \
+            or not turn[0][0] < tools[0][0] < approval[0][0]:
+        raise ValueError("TextEdit Stop did not interrupt one pending CUA call")
+    decisions = entries("approval_decided")
+    if len(decisions) != 1 or decisions[0][1].get("decision") != "Declined on Stop" \
+            or not stop[0][0] < decisions[0][0] < finish[0][0]:
+        raise ValueError("TextEdit Stop did not decline pending approval")
+    completed = entries("tool_completed")
+    if any(item.get("status") == "completed" and item.get("result_is_error") == "false"
+           for _, item in completed):
+        raise ValueError("TextEdit actor completed after Stop")
+    if any(row.get("event") in ("native_space_requested", "mcp_action_requested")
+           for row in command_rows):
+        raise ValueError("TextEdit Stop invoked an unrelated desktop action")
+    draft = f"Voice Computer draft {note.parent.name}".encode()
+    if note.read_bytes() != draft or (note.parent / "note-copy.txt").read_bytes() \
+            != b"Decoy note" or windows_after != windows_before \
+            or space_before is None or space_after != space_before:
+        raise ValueError("TextEdit Stop changed fixture bytes, windows, or Space")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "stop_before_cua_approval": True,
             "draft_unchanged": True, "window_cleanup_verified": True,
             "before": space_before, "after": space_after}
 
@@ -1452,6 +1640,18 @@ class Driver:
         self.log.write(json.dumps(entry, ensure_ascii=False) + "\n")
         self.log.flush()
 
+    def textedit_decoy_window_id(self, state):
+        uri = getattr(self, "textedit_decoy_uri", None)
+        if not uri or uri not in state:
+            return None
+        try:
+            matches = textedit_window_inventory("note-copy.txt")["matching_window_ids"]
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError) as error:
+            self.record("textedit_decoy_observer_unavailable",
+                        error_type=type(error).__name__)
+            return None
+        return next(iter(matches)) if len(matches) == 1 else None
+
     def send(self, message):
         self.process.stdin.write(json.dumps(message) + "\n")
         self.process.stdin.flush()
@@ -1623,9 +1823,12 @@ class Driver:
                         self.textedit_observations.append({
                             "state": state,
                             "window_id": next(iter(matches)) if len(matches) == 1 else None,
+                            "decoy_window_id": self.textedit_decoy_window_id(state),
                         })
                         self.record("textedit_context_observed",
                                     window_id=next(iter(matches)) if len(matches) == 1 else None,
+                                    decoy_window_id=self.textedit_observations[-1][
+                                        "decoy_window_id"],
                                     matching_window_count=len(matches),
                                     open_panel='Window: "Open", App: TextEdit' in state,
                                     target_url_visible=bool(getattr(self, "textedit_note_uri", None)
@@ -1734,8 +1937,11 @@ def main():
                         choices=("normal", "missing-file", "symlink-escape", "decoy-target"),
                         help="Fixture scenario for a focused --case 18, 19, or 22 run")
     parser.add_argument("--textedit-mode", default="normal",
-                        choices=("normal", "wrong-text", "wrong-file"),
+                        choices=("normal", "wrong-text", "wrong-file",
+                                 "verifier-failure", "stop-before-save"),
                         help="Fixture scenario for a focused --case 23 run")
+    parser.add_argument("--textedit-context-windows", type=int, choices=(0, 1, 2), default=0,
+                        help="Prepared TextEdit fixture windows for focused --case 23")
     parser.add_argument("--safari-context-windows", type=int, choices=(1, 2), default=1,
                         help="Number of test-owned sentinel windows for focused --case 21")
     parser.add_argument("--finder-context-windows", type=int, choices=(1, 2), default=1,
@@ -1769,6 +1975,10 @@ def main():
         parser.error("--finder-mode requires a focused --case 18, 19, or 22 run")
     if args.textedit_mode != "normal" and selected != [23]:
         parser.error("--textedit-mode requires a focused --case 23 run")
+    if args.textedit_context_windows and (selected != [23]
+                                          or args.textedit_mode not in ("normal", "verifier-failure")
+                                          or args.inject_inner_cua_failure):
+        parser.error("Prepared TextEdit windows require normal or verifier focused --case 23")
     if args.textedit_mode != "normal" and args.inject_inner_cua_failure:
         parser.error("Use one TextEdit failure mode at a time")
     if selected == [19] and args.browser_mode == "form-submit":
@@ -1795,6 +2005,8 @@ def main():
             parser.error(str(error))
     if args.inject_inner_cua_failure and "Debug" not in app_path.parts:
         parser.error("Injected CUA failure requires an exact Debug app")
+    if args.textedit_mode == "verifier-failure" and "Debug" not in app_path.parts:
+        parser.error("Synthetic TextEdit verifier failure requires a Debug app")
     if mcp_selected:
         try:
             validate_mcp_cases(
@@ -1813,6 +2025,7 @@ def main():
     finder_outside_fixtures = []
     textedit_fixture_root = None
     textedit_windows_before = None
+    textedit_sampler = None
     try:
         locked = screen_is_locked()
         driver.record("environment_check", screen_locked=locked)
@@ -1848,6 +2061,7 @@ def main():
             finder_decoy_report = None
             textedit_note = None
             textedit_windows_before = None
+            textedit_sampler = None
             home_requested = home_release = None
             if index in (17, 19, 21):
                 run_id = uuid.uuid4().hex
@@ -2014,10 +2228,37 @@ def main():
                 driver.textedit_note_uri = textedit_note.as_uri()
                 driver.textedit_saved_text = f"Voice Computer saved {run_id}"
                 (fixture_root / "note-copy.txt").write_text("Decoy note")
+                driver.textedit_decoy_uri = ((fixture_root / "note-copy.txt").as_uri()
+                                           if args.textedit_context_windows == 2 else None)
                 if args.inject_inner_cua_failure:
                     (fixture_root / "inject_cua_failure").write_text(
                         f"textedit:{run_id}\n")
+                if args.textedit_mode == "verifier-failure":
+                    (fixture_root / "inject_ax_failure").write_text(
+                        f"textedit:{run_id}\n")
                 textedit_windows_before = textedit_window_inventory()["window_ids"]
+                if args.textedit_mode in ("normal", "verifier-failure") \
+                        and not args.inject_inner_cua_failure:
+                    textedit_sampler = TextEditWindowSampler()
+                if not args.textedit_context_windows and args.textedit_mode in (
+                        "normal", "verifier-failure"):
+                    subprocess.run(["open", "-a", "TextEdit"], check=True, timeout=15)
+                    time.sleep(0.5)
+                if args.textedit_context_windows:
+                    prepared_notes = ([fixture_root / "note-copy.txt"]
+                                      if args.textedit_context_windows == 2 else [])
+                    prepared_notes.append(textedit_note)
+                    for prepared_note in prepared_notes:
+                        subprocess.run(["open", "-a", "TextEdit", str(prepared_note)],
+                                       check=True, timeout=15)
+                        deadline = time.monotonic() + 10
+                        while time.monotonic() < deadline:
+                            if len(textedit_window_inventory(prepared_note.name)[
+                                    "matching_window_ids"]) == 1:
+                                break
+                            time.sleep(0.2)
+                        else:
+                            raise RuntimeError("Prepared TextEdit fixture window did not open")
                 phrase = (f'In the exact Voice Computer POC app, enter "In TextEdit, '
                           f'replace the test note at {textedit_note} with '
                           f'\"Voice Computer saved {run_id}\" and save it." once. '
@@ -2030,7 +2271,31 @@ def main():
                               f'replace the test note at {textedit_note} with '
                               f'\"Voice Computer saved {run_id}\" and save it." once. '
                               'Wait for the injected tool failure; leave TextEdit untouched.')
-                if args.textedit_mode != "normal":
+                if args.textedit_context_windows:
+                    command = (f'In TextEdit, replace the test note at {textedit_note} '
+                               f'with "Voice Computer saved {run_id}" and save it.')
+                    prelude = (f'The decoy at {fixture_root / "note-copy.txt"} is '
+                               'already open in TextEdit. Capture its URL and text and leave '
+                               'it open. '
+                               if args.textedit_context_windows == 2 else '')
+                    phrase = (prelude + f'The existing note at {textedit_note} is '
+                              'already open in TextEdit. Capture its URL and draft text. '
+                              'In the exact '
+                              f'Voice Computer POC app, enter "{command}" once. '
+                              'Approve only TextEdit Computer Use. After the app finishes, '
+                              'verify the prepared note window shows the saved text. Close '
+                              'only that note, observe it absent, reopen the same path, '
+                              'verify its text and URL, and close it again. '
+                              + ('Verify the decoy remains unchanged and close only its '
+                                 'window.' if args.textedit_context_windows == 2 else ''))
+                if args.textedit_mode == "stop-before-save":
+                    phrase = (f'In the exact Voice Computer POC app, enter "In TextEdit, '
+                              f'replace the test note at {textedit_note} with '
+                              f'"Voice Computer saved {run_id}" and save it." once. '
+                              'Wait for its TextEdit Computer Use approval without approving. '
+                              'The test watcher will press Stop at that approval. Wait for '
+                              'the interrupted result and leave TextEdit untouched.')
+                if args.textedit_mode in ("wrong-file", "wrong-text"):
                     unsafe_note = (fixture_root / "note-copy.txt"
                                    if args.textedit_mode == "wrong-file" else textedit_note)
                     unsafe_text = ("Voice Computer different " + run_id
@@ -2108,6 +2373,12 @@ def main():
                     target=stop_browser_when_home,
                     args=(home_requested, home_release, app_pid, session_log, log_offset,
                           app_since, stop_outcome), daemon=True)
+                stop_thread.start()
+            if index == 23 and args.textedit_mode == "stop-before-save":
+                stop_thread = threading.Thread(
+                    target=stop_textedit_before_approval,
+                    args=(app_pid, session_log, log_offset, app_since, stop_outcome),
+                    daemon=True)
                 stop_thread.start()
             instruction = INSTRUCTION
             if index == 13:
@@ -2444,7 +2715,17 @@ def main():
                         "yourself. Leave all TextEdit windows untouched. Never inspect Codex "
                         "or ChatGPT. User request: "
                     )
-                elif args.textedit_mode != "normal":
+                elif args.textedit_mode == "stop-before-save":
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. Bind the exact Voice Computer "
+                        "app path with cua.getApp('" + str(app_path) + "'). Enter the quoted "
+                        "command once and press Return. Do not approve the TextEdit "
+                        "Computer Use request. The independent test watcher presses the "
+                        "app's Stop button as soon as approval appears. Wait for the "
+                        "interrupted app result. Do not open or edit TextEdit yourself. "
+                        "Never inspect Codex or ChatGPT. User request: "
+                    )
+                elif args.textedit_mode in ("wrong-file", "wrong-text"):
                     instruction = (
                         "Use only mcp__cua_repl.js for UI. Bind the exact Voice Computer "
                         "app path with cua.getApp('" + str(app_path) + "'). Enter the quoted "
@@ -2452,17 +2733,46 @@ def main():
                         "approve TextEdit, open a document, or edit any file. Never inspect "
                         "Codex or ChatGPT. User request: "
                     )
+                elif args.textedit_context_windows:
+                    decoy_prelude = (
+                        "The decoy is already open in a separate TextEdit window; "
+                        "capture a full AX state with its URL and Decoy note text. Leave "
+                        "that window open. " if args.textedit_context_windows == 2 else "")
+                    decoy_epilogue = (
+                        "Capture the still-open decoy URL and text, then close only its "
+                        "window. " if args.textedit_context_windows == 2 else "")
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. Bind TextEdit with "
+                        "cua.getApp('com.apple.TextEdit'). " + decoy_prelude +
+                        "The exact note is already open. Capture a full AX state showing "
+                        "its URL and draft text before the command. Bind the exact "
+                        "Voice Computer app with cua.getApp('" + str(app_path) + "'). "
+                        "Enter the quoted command once, press Return, approve only "
+                        "TextEdit Computer Use, then wait 15 seconds without another "
+                        "Computer Use call before inspecting the app's finished result. Do not "
+                        "edit either note yourself. Capture full TextEdit AX state showing "
+                        "the exact note URL and saved text in the same prepared window. "
+                        "Close only that URL-matched window with its visible close button. "
+                        "In a separate call capture a full state with no note.txt window. "
+                        "Reopen the same path through TextEdit's Open dialog, capture a "
+                        "full state with its URL and saved text. In a separate read-only "
+                        "Computer Use call capture that same reopened document again. "
+                        "Wait five seconds with that window open, then close only that note. "
+                        + decoy_epilogue + "Leave unrelated TextEdit windows untouched. "
+                        "Never inspect Codex or ChatGPT. User request: "
+                    )
             response = driver.wait_rpc(driver.rpc("turn/start", {
                 "threadId": thread, "input": [{"type": "text", "text": instruction + phrase}],
             }))
-            turn = driver.wait_turn(seconds=300 if index in (19, 21, 22) else 180)
+            turn = driver.wait_turn(seconds=300 if index in (19, 21, 22, 23) else 180)
             if stop_thread:
                 stop_thread.join(timeout=85)
                 if stop_thread.is_alive() or not stop_outcome.get("pressed"):
-                    raise RuntimeError("Browser Stop watchdog failed: %s" %
+                    raise RuntimeError("Fixture Stop watchdog failed: %s" %
                                        stop_outcome.get("error", "watchdog still running"))
-                # Give any late in-flight browser request a bounded chance to reach the fixture.
-                time.sleep(1)
+                if home_requested:
+                    # Give any late browser request a bounded chance to reach the fixture.
+                    time.sleep(1)
             space_after = None
             if expected_space is not None:
                 for _ in range(10):
@@ -2607,6 +2917,12 @@ def main():
                         driver.record("finder_context_receipt_verified", **exact_receipt)
                     elif index == 23:
                         textedit_windows_after = textedit_window_inventory()["window_ids"]
+                        textedit_transitions = []
+                        if textedit_sampler is not None:
+                            textedit_transitions = textedit_sampler.stop()
+                            textedit_sampler = None
+                            for transition in textedit_transitions:
+                                driver.record("textedit_window_transition", **transition)
                         if args.inject_inner_cua_failure:
                             exact_receipt = verify_injected_cua_failure_receipt(
                                 rows, textedit_note.parent.name, "textedit",
@@ -2619,7 +2935,13 @@ def main():
                             if textedit_windows_after != textedit_windows_before:
                                 raise ValueError("Injected TextEdit failure changed document windows")
                             driver.record("textedit_injected_failure_verified", **exact_receipt)
-                        elif args.textedit_mode != "normal":
+                        elif args.textedit_mode == "stop-before-save":
+                            exact_receipt = verify_textedit_stop_receipt(
+                                rows, textedit_note, textedit_windows_before,
+                                textedit_windows_after, space_before["current"],
+                                after_id, prior_ids)
+                            driver.record("textedit_stop_before_save_verified", **exact_receipt)
+                        elif args.textedit_mode in ("wrong-file", "wrong-text"):
                             exact_receipt = verify_textedit_rejection_receipt(
                                 rows, textedit_note, textedit_windows_before,
                                 textedit_windows_after, space_before["current"],
@@ -2629,7 +2951,10 @@ def main():
                             exact_receipt = verify_textedit_receipt(
                                 rows, textedit_note, driver.textedit_observations,
                                 textedit_windows_before, textedit_windows_after,
-                                space_before["current"], after_id, prior_ids)
+                                space_before["current"], after_id, prior_ids,
+                                context_windows=args.textedit_context_windows,
+                                verifier_failure=args.textedit_mode == "verifier-failure",
+                                window_transitions=textedit_transitions)
                             driver.record("textedit_context_receipt_verified", **exact_receipt)
                     else:
                         exact_receipt = verify_mcp_receipt(
@@ -2686,6 +3011,15 @@ def main():
         driver.record("driver_interrupted")
         print("Smoke test interrupted", file=sys.stderr)
     finally:
+        if textedit_sampler is not None:
+            try:
+                transitions = textedit_sampler.stop()
+                driver.record("textedit_window_sampler_stopped",
+                              transition_count=len(transitions))
+            except (OSError, ValueError, subprocess.SubprocessError) as error:
+                driver.record("textedit_window_sampler_failed",
+                              error_type=type(error).__name__)
+                failed = True
         for server, thread, temporary, release in fixtures:
             if release:
                 release.set()

@@ -4,6 +4,58 @@ import XCTest
 @testable import VoiceComputerPOC
 
 final class TextEditRouteTests: XCTestCase {
+    func testStopRejectsPendingComputerUseApproval() throws {
+        let request = try XCTUnwrap(
+            ApprovalRequest.parse(
+                method: "mcpServer/elicitation/request", id: 42,
+                params: [
+                    "serverName": "cua_repl", "mode": "form",
+                    "message": "Allow Computer Use to use TextEdit?",
+                    "requestedSchema": ["properties": [String: Any]()],
+                    "_meta": [
+                        "codex_approval_kind": "mcp_tool_call",
+                        "connector_id": "computer-use",
+                        "connector_name": "Computer Use",
+                        "riskLevel": "low",
+                        "tool_name": "js",
+                        "tool_params": ["app": "TextEdit"],
+                        "tool_params_display": [["value": "TextEdit"]],
+                        "persist": ["session"],
+                        "x-codex-turn-metadata": [String: Any](),
+                    ],
+                ]))
+        let client = AppServerClient()
+        client.isWorking = true
+        client.activeCommandID = "stop-test"
+        client.input = Pipe()
+        client.approval = request
+        client.stop()
+        XCTAssertNil(client.approval)
+        XCTAssertNil(client.generalTurnFailure)
+        XCTAssertEqual(
+            client.diagnosticEntries.last { $0.event == "approval_decided" }?
+                .details["decision"], "Declined on Stop")
+    }
+
+    #if DEBUG
+        func testSyntheticAccessibilityFailureCannotReportVerified() throws {
+            let runID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+            let root = FileManager.default.urls(
+                for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("VoiceComputerPOC/TestFixtures/\(runID)")
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let note = root.appendingPathComponent("note.txt")
+            try "Voice Computer saved \(runID)".write(
+                to: note, atomically: true, encoding: .utf8)
+            let marker = root.appendingPathComponent("inject_ax_failure")
+            try "textedit:\(runID)\n".write(to: marker, atomically: true, encoding: .utf8)
+            let observation = FixtureAXVerifier.verifyTextEdit(noteURL: note)
+            XCTAssertFalse(observation.verified)
+            XCTAssertEqual(observation.reason, "synthetic_accessibility_failure")
+        }
+    #endif
+
     func testOnlyRunOwnedDraftAndExactPhraseCanRoute() throws {
         let runID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
         let root = FileManager.default.urls(

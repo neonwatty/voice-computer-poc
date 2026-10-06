@@ -34,7 +34,8 @@ from smoke_app_server import (COMMANDS, Driver, app_log_rows, canonical_app_path
                               verify_injected_safari_context,
                               verify_injected_finder_context,
                               verify_textedit_receipt,
-                              verify_textedit_rejection_receipt)  # noqa: E402
+                              verify_textedit_rejection_receipt,
+                              verify_textedit_stop_receipt)  # noqa: E402
 
 
 COMMAND_ID = "A1B2C3D4"
@@ -63,6 +64,30 @@ class SuiteSelectionTests(unittest.TestCase):
 
 
 class TextEditReceiptTests(unittest.TestCase):
+    def test_stop_at_approval_starts_no_textedit_actor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / ("c" * 32)
+            root.mkdir()
+            note = root / "note.txt"
+            note.write_text(f"Voice Computer draft {root.name}")
+            (root / "note-copy.txt").write_text("Decoy note")
+            rows = [row("command_started", user_action="run"),
+                    row("router_decided", route="textedit"),
+                    row("turn_requested", route="textedit"),
+                    row("tool_started", server="cua_repl"),
+                    row("approval_requested", server_name="cua_repl"),
+                    row("stop_requested"),
+                    row("approval_decided", decision="Declined on Stop"),
+                    row("fixture_ax_verification", verified="false"),
+                    row("command_finished", verification="unverified")]
+            self.assertTrue(verify_textedit_stop_receipt(
+                rows, note, {7}, {7}, 5, 5)["stop_before_cua_approval"])
+            with self.assertRaisesRegex(ValueError, "actor completed"):
+                verify_textedit_stop_receipt(
+                    rows[:7] + [row("tool_completed", status="completed",
+                                   result_is_error="false")] + rows[7:],
+                    note, {7}, {7}, 5, 5)
+
     def test_unsafe_phrase_starts_no_textedit_actor(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / ("b" * 32)
@@ -114,6 +139,59 @@ class TextEditReceiptTests(unittest.TestCase):
             ]
             receipt = verify_textedit_receipt(rows, note, observations, {7}, {7}, 5, 5)
             self.assertEqual(receipt["reopened_window_id"], 102)
+            delayed = observations[:2] + [dict(observations[2], window_id=None)]
+            transitions = [
+                {"matching_window_ids": [], "window_ids": [7]},
+                {"matching_window_ids": [101], "window_ids": [7, 101]},
+                {"matching_window_ids": [], "window_ids": [7]},
+                {"matching_window_ids": [102], "window_ids": [7, 102]},
+                {"matching_window_ids": [], "window_ids": [7]},
+            ]
+            sampled = verify_textedit_receipt(
+                rows, note, delayed, {7}, {7}, 5, 5,
+                window_transitions=transitions)
+            self.assertEqual(sampled["reopened_window_id"], 102)
+            with self.assertRaisesRegex(ValueError, "transitions did not prove"):
+                verify_textedit_receipt(
+                    rows, note, delayed, {7}, {7}, 5, 5,
+                    window_transitions=transitions[:3])
+            prepared = {"state": visible.replace(expected,
+                        f"Voice Computer draft {root.name}"), "window_id": 101}
+            prepared_receipt = verify_textedit_receipt(
+                rows, note, [prepared] + observations, {7}, {7}, 5, 5,
+                context_windows=1)
+            self.assertTrue(prepared_receipt["prepared_window_reused"])
+            with self.assertRaisesRegex(ValueError, "prepared draft window"):
+                verify_textedit_receipt(
+                    rows, note, [dict(prepared, window_id=103)] + observations,
+                    {7}, {7}, 5, 5, context_windows=1)
+            decoy = {"state": f'Window: "note-copy.txt", App: TextEdit\n'
+                     f'3 text entry area URL: {(root / "note-copy.txt").as_uri()} '
+                     'Value: Decoy note', "window_id": None,
+                     "decoy_window_id": 104}
+            self.assertTrue(verify_textedit_receipt(
+                rows, note, [decoy, prepared] + observations + [decoy],
+                {7}, {7}, 5, 5,
+                context_windows=2)["decoy_window_preserved"])
+            with self.assertRaisesRegex(ValueError, "decoy window identity"):
+                verify_textedit_receipt(
+                    rows, note, [prepared] + observations, {7}, {7}, 5, 5,
+                    context_windows=2)
+            failed_verifier_rows = [
+                {**entry, "details": {
+                    **entry.get("details", {}),
+                    **({"verified": "false", "reason": "synthetic_accessibility_failure"}
+                       if entry["event"] == "fixture_ax_verification" else {}),
+                    **({"verification": "unverified"}
+                       if entry["event"] in ("turn_completed", "command_finished") else {}),
+                }} for entry in rows]
+            self.assertTrue(verify_textedit_receipt(
+                failed_verifier_rows, note, observations, {7}, {7}, 5, 5,
+                verifier_failure=True)["app_verifier_fail_closed"])
+            with self.assertRaisesRegex(ValueError, "app-owned"):
+                verify_textedit_receipt(
+                    rows, note, observations, {7}, {7}, 5, 5,
+                    verifier_failure=True)
             with self.assertRaisesRegex(ValueError, "closed and reopened"):
                 verify_textedit_receipt(rows, note, observations[:1], {7}, {7}, 5, 5)
             note.write_text("wrong bytes")
