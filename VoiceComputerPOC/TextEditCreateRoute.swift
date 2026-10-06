@@ -1,6 +1,14 @@
 import Foundation
 
 extension RouteSafety {
+    static func permitsTextEdit(_ route: CommandRoute, phrase: String) -> Bool {
+        switch route {
+        case .textEditSave(let url): return textEditFixtureURL(in: phrase) == url
+        case .textEditCreate(let url): return textEditNewFixtureURL(in: phrase) == url
+        default: return false
+        }
+    }
+
     static func textEditNewFixtureURL(in phrase: String) -> URL? {
         let prefix = "In TextEdit, create the test note at "
         let marker = " with \"Voice Computer saved "

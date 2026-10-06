@@ -286,10 +286,8 @@ enum RouteSafety {
             return request.0 == url && request.1 == query
         case .finderReveal(let url):
             return finderFixtureURL(in: phrase) == url
-        case .textEditSave(let url):
-            return textEditFixtureURL(in: phrase) == url
-        case .textEditCreate(let url):
-            return textEditNewFixtureURL(in: phrase) == url
+        case .textEditSave, .textEditCreate:
+            return permitsTextEdit(route, phrase: phrase)
         case .browserThenFinder(let home, let report):
             guard let request = browserFinderRequest(in: phrase) else { return false }
             return request.0 == home && request.1 == report
@@ -297,4 +295,5 @@ enum RouteSafety {
             return true
         }
     }
+
 }

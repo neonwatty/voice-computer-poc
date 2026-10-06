@@ -36,7 +36,9 @@ import Foundation
             guard textAreas.count == 1,
                 (attribute(textAreas[0], kAXValueAttribute) as? String) == expected,
                 let close = attribute(untitled[0], kAXCloseButtonAttribute),
-                AXUIElementPerformAction(close as! AXUIElement, kAXPressAction as CFString)
+                CFGetTypeID(close) == AXUIElementGetTypeID(),
+                AXUIElementPerformAction(
+                    unsafeDowncast(close, to: AXUIElement.self), kAXPressAction as CFString)
                     == .success
             else { return false }
             guard let delete = waitForDeleteButton(app),
@@ -68,8 +70,10 @@ import Foundation
         private static func waitForDeleteButton(_ app: AXUIElement) -> AXUIElement? {
             for _ in 0..<12 {
                 var roots = (attribute(app, kAXWindowsAttribute) as? [AXUIElement]) ?? []
-                if let focused = attribute(app, kAXFocusedWindowAttribute) {
-                    roots.insert(focused as! AXUIElement, at: 0)
+                if let focused = attribute(app, kAXFocusedWindowAttribute),
+                    CFGetTypeID(focused) == AXUIElementGetTypeID()
+                {
+                    roots.insert(unsafeDowncast(focused, to: AXUIElement.self), at: 0)
                 }
                 for root in roots {
                     guard let all = nodes(root) else { continue }
