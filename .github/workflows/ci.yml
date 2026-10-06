@@ -42,6 +42,7 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_*.py'
           swiftc -typecheck scripts/observe_safari_windows.swift
           swiftc -typecheck scripts/observe_finder_windows.swift
+          swiftc -typecheck scripts/observe_textedit_windows.swift
       - name: Test Swift MCP tool
         run: swift test --package-path DesktopToolServer
       - name: Build and run unit tests

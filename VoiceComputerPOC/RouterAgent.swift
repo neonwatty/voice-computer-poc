@@ -42,7 +42,8 @@ enum RouterAgent {
                 "route": [
                     "type": "string",
                     "enum": [
-                        "space", "computer_use", "browser", "finder", "browser_finder", "clarification",
+                        "space", "computer_use", "browser", "finder", "textedit",
+                        "browser_finder", "clarification",
                     ],
                 ],
                 "directions": [
@@ -52,7 +53,7 @@ enum RouterAgent {
                     "type": "string",
                     "enum": [
                         "", "calculator", "local_docs", "local_form", "fixture_report",
-                        "local_docs_fixture_report",
+                        "fixture_note", "local_docs_fixture_report",
                     ],
                 ],
             ],

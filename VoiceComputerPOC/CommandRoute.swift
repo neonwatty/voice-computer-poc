@@ -6,6 +6,7 @@ enum CommandRoute: Equatable {
     case browserDocs(URL)
     case browserForm(URL, String)
     case finderReveal(URL)
+    case textEditSave(URL)
     case browserThenFinder(URL, URL)
     case clarification
 
@@ -41,6 +42,11 @@ enum CommandRoute: Equatable {
                 let url = RouteSafety.finderFixtureURL(in: originalPhrase)
             else { return nil }
             return .finderReveal(url)
+        case "textedit":
+            guard directions.isEmpty, target == "fixture_note",
+                let url = RouteSafety.textEditFixtureURL(in: originalPhrase)
+            else { return nil }
+            return .textEditSave(url)
         case "browser_finder":
             guard directions.isEmpty, target == "local_docs_fixture_report",
                 let (home, report) = RouteSafety.browserFinderRequest(in: originalPhrase)
@@ -75,6 +81,7 @@ enum RouteHandoff: Equatable {
     case browserDocs(URL)
     case browserForm(URL, String)
     case finderReveal(URL)
+    case textEditSave(URL)
     case browserThenFinder(URL, URL)
 
     static func decide(_ data: Data?, phrase: String) -> Self {
@@ -89,6 +96,7 @@ enum RouteHandoff: Equatable {
         case .browserDocs(let url): return .browserDocs(url)
         case .browserForm(let url, let query): return .browserForm(url, query)
         case .finderReveal(let url): return .finderReveal(url)
+        case .textEditSave(let url): return .textEditSave(url)
         case .browserThenFinder(let home, let report):
             return .browserThenFinder(home, report)
         }
@@ -96,6 +104,36 @@ enum RouteHandoff: Equatable {
 }
 
 enum RouteSafety {
+    static func textEditFixtureURL(in phrase: String) -> URL? {
+        let prefix = "In TextEdit, replace the test note at "
+        guard phrase.hasPrefix(prefix), phrase.hasSuffix(" and save it.") else { return nil }
+        let marker = " with \"Voice Computer saved "
+        let rest = String(phrase.dropFirst(prefix.count))
+        let pieces = rest.components(separatedBy: marker)
+        guard pieces.count == 2, pieces[1].hasSuffix("\" and save it.") else { return nil }
+        let path = pieces[0]
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("VoiceComputerPOC/TestFixtures", isDirectory: true)
+            .standardizedFileURL
+        guard path.hasPrefix(root.path + "/") else { return nil }
+        let parts = path.dropFirst(root.path.count + 1).split(
+            separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+            String(parts[0]).range(of: #"^[0-9a-f]{32}$"#, options: .regularExpression) != nil,
+            parts[1] == "note.txt"
+        else { return nil }
+        let runID = String(parts[0])
+        let url = URL(fileURLWithPath: path)
+        guard url.standardizedFileURL.path == path,
+            url.resolvingSymlinksInPath().standardizedFileURL.path == path,
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+            values.isRegularFile == true, let size = values.fileSize, size <= 256,
+            (try? Data(contentsOf: url)) == Data("Voice Computer draft \(runID)".utf8),
+            phrase == "\(prefix)\(path)\(marker)\(runID)\" and save it."
+        else { return nil }
+        return url
+    }
+
     static func browserFinderRequest(in phrase: String) -> (URL, URL)? {
         let trimmed = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
         let separator = " and follow the Docs link, then reveal the test report at "
@@ -234,6 +272,8 @@ enum RouteSafety {
             return request.0 == url && request.1 == query
         case .finderReveal(let url):
             return finderFixtureURL(in: phrase) == url
+        case .textEditSave(let url):
+            return textEditFixtureURL(in: phrase) == url
         case .browserThenFinder(let home, let report):
             guard let request = browserFinderRequest(in: phrase) else { return false }
             return request.0 == home && request.1 == report

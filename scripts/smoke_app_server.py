@@ -52,10 +52,11 @@ COMMANDS = [
     None,  # Case 20 reads the desktop state through MCP.
     None,  # Case 21 preserves a test-owned Safari sentinel tab.
     None,  # Case 22 selects a report in an already-open Finder window.
+    None,  # Case 23 edits and reopens a run-owned TextEdit note.
 ]
-CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC"]
+CASE_APP = ["Safari", "Calculator", "TextEdit", "Finder", "Voice Computer POC", "Voice Computer POC", "Finder", "Finder", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC", "Voice Computer POC"]
 MCP_CASES = {15: "right", 16: "left"}
-EXACT_APP_CASES = {13, 17, 18, 19, 20, 21, 22, *MCP_CASES}
+EXACT_APP_CASES = {13, 17, 18, 19, 20, 21, 22, 23, *MCP_CASES}
 APP_LOG_DIRECTORY = Path.home() / "Library/Application Support/VoiceComputerPOC/Logs"
 
 
@@ -76,6 +77,7 @@ EXPECTED_EVIDENCE = [
     None,
     re.compile(r"mission_control_ax_summary"),
     re.compile(r"native_space_step_verified"),
+    None,
     None,
     None,
     None,
@@ -188,6 +190,23 @@ def finder_window_inventory(title=None):
                                               for item in ids + matches) \
             or not set(matches).issubset(ids):
         raise ValueError("Finder window observer returned invalid IDs")
+    return {"window_ids": set(ids), "matching_window_ids": set(matches)}
+
+
+def textedit_window_inventory(title=None):
+    """Observe TextEdit window IDs without publishing unrelated titles."""
+    helper = Path(__file__).with_name("observe_textedit_windows.swift")
+    command = ["swift", str(helper)] + ([title] if title else [])
+    result = subprocess.run(command, capture_output=True, text=True,
+                            check=True, timeout=20)
+    inventory = json.loads(result.stdout)
+    ids = inventory["window_ids"]
+    matches = inventory["matching_window_ids"]
+    if not isinstance(ids, list) or not isinstance(matches, list) \
+            or len(ids) != len(set(ids)) or any(type(item) is not int or item <= 0
+                                              for item in ids + matches) \
+            or not set(matches).issubset(ids):
+        raise ValueError("TextEdit window observer returned invalid IDs")
     return {"window_ids": set(ids), "matching_window_ids": set(matches)}
 
 
@@ -901,6 +920,108 @@ def verify_finder_context_rejection_receipt(rows, report, observations,
     raise ValueError("Rejected Finder request changed its prepared window")
 
 
+def verify_textedit_receipt(rows, note, observations, windows_before,
+                            windows_after, space_before, space_after,
+                            prior_command_ids=()):
+    """Require exact app proof, saved bytes, and an independently reopened note."""
+    starts = [row for row in rows if row.get("event") == "command_started"
+              and row.get("details", {}).get("user_action") == "run"]
+    if len(starts) != 1:
+        raise ValueError("TextEdit command start missing or ambiguous")
+    command_id = starts[0].get("details", {}).get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("TextEdit command ID missing or stale")
+    command_rows = [row for row in rows if row.get("details", {}).get("command_id") == command_id]
+    def events(name):
+        return [row.get("details", {}) for row in command_rows if row.get("event") == name]
+    routes, turns = events("router_decided"), events("turn_requested")
+    tools, completed = events("tool_started"), events("tool_completed")
+    ax, app_turns, finishes = (events("fixture_ax_verification"),
+                                events("turn_completed"), events("command_finished"))
+    if len(routes) != 1 or routes[0].get("route") != "textedit" \
+            or routes[0].get("action") != "save_note" \
+            or routes[0].get("target") != "fixture_note" \
+            or len(turns) != 1 or turns[0].get("route") != "textedit":
+        raise ValueError("TextEdit route or acting turn mismatch")
+    if not tools or any(tool.get("server") != "cua_repl"
+                        or tool.get("turn_matches") != "true" for tool in tools):
+        raise ValueError("TextEdit acting turn lacked correlated Computer Use")
+    started_ids = {tool.get("item_id") for tool in tools}
+    completed_ids = {tool.get("item_id") for tool in completed
+                     if tool.get("server") == "cua_repl" and tool.get("status") == "completed"
+                     and tool.get("result_is_error") == "false"}
+    if None in started_ids or started_ids != completed_ids:
+        raise ValueError("TextEdit CUA item did not complete cleanly")
+    if len(ax) != 1 or ax[0].get("target") != "textedit" \
+            or ax[0].get("verified") != "true" \
+            or ax[0].get("reason") != "exact_note_file_and_text" \
+            or len(app_turns) != 1 or app_turns[0].get("verification") != "verified" \
+            or len(finishes) != 1 or finishes[0].get("verification") != "verified":
+        raise ValueError("TextEdit app-owned saved-note verification mismatch")
+    if windows_after != windows_before or space_before is None or space_after != space_before:
+        raise ValueError("TextEdit windows or desktop Space were not restored")
+    run_id = note.parent.name
+    expected = f"Voice Computer saved {run_id}"
+    if note.is_symlink() or not note.is_file() or note.read_bytes() != expected.encode():
+        raise ValueError("TextEdit saved file bytes mismatch")
+    decoy = note.parent / "note-copy.txt"
+    if decoy.read_bytes() != b"Decoy note":
+        raise ValueError("TextEdit decoy file changed")
+    if any(row.get("event") in ("native_space_requested", "mcp_action_requested",
+                                    "space_changed") for row in command_rows):
+        raise ValueError("TextEdit command invoked unrelated desktop action")
+    target_uri = note.as_uri()
+    appearances = [(index, entry) for index, entry in enumerate(observations)
+                   if target_uri in entry["state"] and expected in entry["state"]
+                   and entry["window_id"] is not None
+                   and entry["window_id"] not in windows_before]
+    if len(appearances) < 2 or not any(
+            'Window: "Open", App: TextEdit' in entry["state"]
+            and entry["window_id"] is None
+            for entry in observations[appearances[0][0] + 1:appearances[-1][0]]):
+        raise ValueError("TextEdit note was not visibly closed and reopened")
+    if appearances[0][1]["window_id"] == appearances[-1][1]["window_id"]:
+        raise ValueError("TextEdit reopened document reused the original live window")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "run_id": run_id,
+            "first_window_id": appearances[0][1]["window_id"],
+            "reopened_window_id": appearances[-1][1]["window_id"],
+            "file_bytes_verified": True, "reopened_text_verified": True,
+            "window_cleanup_verified": True, "before": space_before,
+            "after": space_after}
+
+
+def verify_textedit_rejection_receipt(rows, note, windows_before, windows_after,
+                                      space_before, space_after, prior_command_ids=()):
+    """An unsafe TextEdit phrase must finish before any UI actor or file write."""
+    starts = [row for row in rows if row.get("event") == "command_started"
+              and row.get("details", {}).get("user_action") == "run"]
+    if len(starts) != 1:
+        raise ValueError("TextEdit rejection lacks one command")
+    command_id = starts[0].get("details", {}).get("command_id")
+    if not command_id or command_id in prior_command_ids:
+        raise ValueError("TextEdit rejection command ID missing or stale")
+    command_rows = [row for row in rows if row.get("details", {}).get("command_id") == command_id]
+    routes = [row["details"] for row in command_rows if row.get("event") == "router_decided"]
+    finishes = [row["details"] for row in command_rows if row.get("event") == "command_finished"]
+    if len(routes) != 1 or routes[0].get("route") != "clarification" \
+            or len(finishes) != 1 or finishes[0].get("verification") != "no_action" \
+            or any(row.get("event") in ("turn_requested", "tool_started", "tool_completed",
+                                       "fixture_ax_verification", "native_space_requested")
+                   for row in command_rows):
+        raise ValueError("Unsafe TextEdit request started an actor")
+    draft = f"Voice Computer draft {note.parent.name}".encode()
+    decoy = note.parent / "note-copy.txt"
+    if note.read_bytes() != draft or decoy.read_bytes() != b"Decoy note" \
+            or windows_after != windows_before \
+            or space_before is None or space_after != space_before:
+        raise ValueError("Unsafe TextEdit request changed file, windows, or Space")
+    assert_log_privacy(rows)
+    return {"command_id": command_id, "rejected_before_actor": True,
+            "draft_unchanged": True, "window_cleanup_verified": True,
+            "before": space_before, "after": space_after}
+
+
 def verify_composed_receipt(rows, run_id, port, fixture_rows, report,
                             browser_observations, finder_observations,
                             before, after, prior_command_ids=()):
@@ -1404,6 +1525,9 @@ class Driver:
                          "Finder", "com.apple.finder"}
                         if self.command_index == 22 or \
                         (self.command_index == 18 and self.finder_mode == "normal") else
+                        {CASE_APP[self.command_index - 1], str(self.app_path),
+                         "TextEdit", "com.apple.TextEdit"}
+                        if self.command_index == 23 else
                         {CASE_APP[self.command_index - 1], str(self.app_path)}
                         if self.command_index in EXACT_APP_CASES else
                         {CASE_APP[self.command_index - 1]})
@@ -1435,7 +1559,7 @@ class Driver:
                     self.cua_binding_observed = True
                     self.record("cua_exact_path_requested")
             self.tool_calls += 1
-            limit = 44 if self.command_index in (21, 22) else \
+            limit = 44 if self.command_index in (21, 22, 23) else \
                 36 if self.command_index == 19 else \
                 24 if self.command_index in (6, 9, 10, 14, 15, 16, 17, 18) else 12
             if self.tool_calls > limit:
@@ -1483,9 +1607,27 @@ class Driver:
                             "state": state,
                             "window_id": next(iter(matches)) if len(matches) == 1 else None,
                         })
+                if self.command_index == 23 and item.get("server") == "cua_repl":
+                    for part in content:
+                        state = part.get("text") or ""
+                        if "App: TextEdit" not in state:
+                            continue
+                        try:
+                            matches = textedit_window_inventory("note.txt")["matching_window_ids"]
+                        except (OSError, subprocess.SubprocessError, ValueError, KeyError) as error:
+                            self.record("textedit_context_observer_unavailable",
+                                        error_type=type(error).__name__)
+                            matches = set()
+                        self.textedit_observations.append({
+                            "state": state,
+                            "window_id": next(iter(matches)) if len(matches) == 1 else None,
+                        })
                 if self.trace_tool_output:
                     self.record("tool_output_trace", item_id=item.get("id"),
                                 excerpt="\n".join(str(part.get("text") or "") for part in content)[:3000])
+                    if error:
+                        self.record("tool_error_trace", item_id=item.get("id"),
+                                    excerpt=error[:2000])
                 if item.get("status") == "failed" or result.get("isError"):
                     error = error or next((part.get("text") for part in content if part.get("text")), None)
                     self.tool_failures.append(
@@ -1548,7 +1690,7 @@ def selected_cases(suite, cases, mission_control_gate):
     if suite and cases:
         raise ValueError("--suite cannot be combined with --case")
     if suite:
-        return ([13] if mission_control_gate else []) + [20, 17, 18, 21, 22, 19, 15, 16, 20]
+        return ([13] if mission_control_gate else []) + [20, 17, 18, 21, 22, 23, 19, 15, 16, 20]
     return cases or list(range(1, 7))
 
 
@@ -1581,12 +1723,15 @@ def main():
     parser.add_argument("--finder-mode", default="normal",
                         choices=("normal", "missing-file", "symlink-escape", "decoy-target"),
                         help="Fixture scenario for a focused --case 18, 19, or 22 run")
+    parser.add_argument("--textedit-mode", default="normal",
+                        choices=("normal", "wrong-text", "wrong-file"),
+                        help="Fixture scenario for a focused --case 23 run")
     parser.add_argument("--safari-context-windows", type=int, choices=(1, 2), default=1,
                         help="Number of test-owned sentinel windows for focused --case 21")
     parser.add_argument("--finder-context-windows", type=int, choices=(1, 2), default=1,
                         help="Number of test-owned fixture windows for focused --case 22")
     parser.add_argument("--inject-inner-cua-failure", action="store_true",
-                        help="Synthetic Debug CUA completion failure for focused case 21 or 22")
+                        help="Synthetic Debug CUA completion failure for focused case 21, 22, or 23")
     parser.add_argument("--codex-thread-id",
                         help="Optional exact existing Codex task UUID for --suite's read-only status probe")
     parser.add_argument("--app-path", type=Path,
@@ -1606,12 +1751,16 @@ def main():
         parser.error("Two Safari context windows require normal focused --case 21")
     if args.finder_context_windows != 1 and (selected != [22] or args.finder_mode != "normal"):
         parser.error("Two Finder context windows require normal focused --case 22")
-    if args.inject_inner_cua_failure and (selected not in ([21], [22])
+    if args.inject_inner_cua_failure and (selected not in ([21], [22], [23])
             or args.browser_mode != "normal" or args.finder_mode != "normal"
             or args.safari_context_windows != 1 or args.finder_context_windows != 1):
-        parser.error("Injected CUA failure requires one normal focused case 21 or 22 window")
+        parser.error("Injected CUA failure requires one normal focused case 21, 22, or 23 window")
     if args.finder_mode != "normal" and selected not in ([18], [19], [22]):
         parser.error("--finder-mode requires a focused --case 18, 19, or 22 run")
+    if args.textedit_mode != "normal" and selected != [23]:
+        parser.error("--textedit-mode requires a focused --case 23 run")
+    if args.textedit_mode != "normal" and args.inject_inner_cua_failure:
+        parser.error("Use one TextEdit failure mode at a time")
     if selected == [19] and args.browser_mode == "form-submit":
         parser.error("--case 19 does not accept form-submit")
     if selected == [19] and args.browser_mode != "normal" and args.finder_mode != "normal":
@@ -1652,6 +1801,8 @@ def main():
     fixtures = []
     finder_fixtures = []
     finder_outside_fixtures = []
+    textedit_fixture_root = None
+    textedit_windows_before = None
     try:
         locked = screen_is_locked()
         driver.record("environment_check", screen_locked=locked)
@@ -1685,6 +1836,8 @@ def main():
             finder_run_id = None
             finder_decoy_run_id = None
             finder_decoy_report = None
+            textedit_note = None
+            textedit_windows_before = None
             home_requested = home_release = None
             if index in (17, 19, 21):
                 run_id = uuid.uuid4().hex
@@ -1827,13 +1980,43 @@ def main():
                                   f'test report at {report} in Finder." once. Wait for the unsafe '
                                   'target rejection, verify the prepared Finder window did not '
                                   'change, and close only that test-created window.')
+            if index == 23:
+                run_id = uuid.uuid4().hex
+                fixture_root = support / "TestFixtures" / run_id
+                fixture_root.mkdir(parents=True, mode=0o700)
+                finder_fixtures.append(fixture_root)
+                textedit_fixture_root = fixture_root
+                textedit_note = fixture_root / "note.txt"
+                textedit_note.write_text(f"Voice Computer draft {run_id}")
+                (fixture_root / "note-copy.txt").write_text("Decoy note")
+                if args.inject_inner_cua_failure:
+                    (fixture_root / "inject_cua_failure").write_text(
+                        f"textedit:{run_id}\n")
+                textedit_windows_before = textedit_window_inventory()["window_ids"]
+                phrase = (f'In the exact Voice Computer POC app, enter "In TextEdit, '
+                          f'replace the test note at {textedit_note} with '
+                          f'\"Voice Computer saved {run_id}\" and save it." once. '
+                          'Approve only TextEdit Computer Use. Wait for the app result, '
+                          'then inspect the exact TextEdit file URL and visible text. '
+                          'Close only this test document, reopen the same file through '
+                          'TextEdit, verify its saved text, and close it again.')
+                if args.textedit_mode != "normal":
+                    unsafe_note = (fixture_root / "note-copy.txt"
+                                   if args.textedit_mode == "wrong-file" else textedit_note)
+                    unsafe_text = ("Voice Computer different " + run_id
+                                   if args.textedit_mode == "wrong-text"
+                                   else "Voice Computer saved " + run_id)
+                    phrase = (f'In the exact Voice Computer POC app, enter "In TextEdit, '
+                              f'replace the test note at {unsafe_note} with '
+                              f'\"{unsafe_text}\" and save it." once. Wait for the '
+                              'preflight clarification; do not open or edit TextEdit.')
             if index == 20:
                 phrase = ('In the exact Voice Computer POC app, enter "agent get desktop state" '
                           'in the command field and press Return once. Approve only the visible '
                           'desktop_tool.get_desktop_state read with Allow once. Wait for the '
                           'typed app result and report its Main Space ID, ordered IDs, '
                           'foreground bundle ID, and observation time. Do not switch Spaces.')
-            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22) else None
+            space_before = space_state() if index in (7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23) else None
             expected_space = None
             if index in EXACT_APP_CASES:
                 validate_exact_space_state(space_before, index)
@@ -1884,6 +2067,7 @@ def main():
             driver.finder_context_observations = []
             driver.finder_run_id = finder_run_id
             driver.finder_decoy_run_id = finder_decoy_run_id
+            driver.textedit_observations = []
             driver.record("command_started",
                           space_before=space_before, expected_space=expected_space)
             started = time.monotonic()
@@ -2077,26 +2261,6 @@ def main():
                     "report it without closing uncertain content. Never inspect or control the "
                     "Codex or ChatGPT host app. User request: "
                 )
-            elif index == 22:
-                instruction = (
-                    "Use only mcp__cua_repl.js for UI. Your first Computer Use call must be "
-                    "var vcFinderContextApp = await cua.getApp('" + str(app_path) + "'); "
-                    "then use var vcFinderContext = await cua.getApp('com.apple.finder'). "
-                    "In Finder, use the visible File menu's New Finder Window item. In that "
-                    "new window use the visible Go menu's Go to Folder item to enter the "
-                    "test folder path from the request, then switch to list view. Capture a "
-                    "full getAXState({disableDiffing:true}) showing that folder's window "
-                    "title, sentinel.txt, report.txt, and report-copy.txt without selecting "
-                    "the report. Return to vcFinderContextApp and submit the quoted Voice "
-                    "Computer command once. Choose Allow for session only for Finder Computer "
-                    "Use inside the app; decline any other target. Wait until the app result "
-                    "is no longer working. Then inspect Finder with a full AX state. Require "
-                    "the same test folder window and exact selected report file URL. Do not "
-                    "select the report yourself. Close only that test-created Finder window "
-                    "using its visible close button. If window identity is ambiguous, stop "
-                    "without closing unrelated windows. Never inspect or control the Codex "
-                    "or ChatGPT host app. User request: "
-                )
                 if home_requested:
                     instruction = (
                         "Use only mcp__cua_repl.js for UI. First bind the exact app with "
@@ -2136,8 +2300,28 @@ def main():
                         "without Docs, then close only that first test-created window. "
                         "If either window identity is ambiguous, leave it open. Do not "
                         "navigate Safari after submitting the app command or inspect the "
-                        "Codex or ChatGPT host app. User request: "
-                    )
+                    "Codex or ChatGPT host app. User request: "
+                )
+            elif index == 22:
+                instruction = (
+                    "Use only mcp__cua_repl.js for UI. Your first Computer Use call must be "
+                    "var vcFinderContextApp = await cua.getApp('" + str(app_path) + "'); "
+                    "then use var vcFinderContext = await cua.getApp('com.apple.finder'). "
+                    "In Finder, use the visible File menu's New Finder Window item. In that "
+                    "new window use the visible Go menu's Go to Folder item to enter the "
+                    "test folder path from the request, then switch to list view. Capture a "
+                    "full getAXState({disableDiffing:true}) showing that folder's window "
+                    "title, sentinel.txt, report.txt, and report-copy.txt without selecting "
+                    "the report. Return to vcFinderContextApp and submit the quoted Voice "
+                    "Computer command once. Choose Allow for session only for Finder Computer "
+                    "Use inside the app; decline any other target. Wait until the app result "
+                    "is no longer working. Then inspect Finder with a full AX state. Require "
+                    "the same test folder window and exact selected report file URL. Do not "
+                    "select the report yourself. Close only that test-created Finder window "
+                    "using its visible close button. If window identity is ambiguous, stop "
+                    "without closing unrelated windows. Never inspect or control the Codex "
+                    "or ChatGPT host app. User request: "
+                )
                 if args.finder_mode != "normal":
                     instruction = (
                         "Use only mcp__cua_repl.js for UI. First bind the exact Voice Computer "
@@ -2177,6 +2361,38 @@ def main():
                         "identity is ambiguous, leave it open. Never inspect the Codex "
                         "or ChatGPT host app. User request: "
                     )
+            elif index == 23:
+                instruction = (
+                    "Use only mcp__cua_repl.js for UI. First bind to the exact Voice Computer "
+                    "app path with cua.getApp('" + str(app_path) + "'). Enter the quoted command "
+                    "once and press Return. Approve only TextEdit Computer Use through the "
+                    "visible Allow for session button. Wait for the app's finished result; "
+                    "do not edit the note yourself. Then bind with cua.getApp('com.apple.TextEdit') "
+                    "and capture a full Accessibility state showing the exact note.txt URL "
+                    "and saved text. Close only that URL-matched test document with its visible "
+                    "close button. Reopen the same exact path through TextEdit's Open dialog "
+                    "using the CUA key name super+shift+g (never CMD), then capture a full "
+                    "state showing its URL and "
+                    "saved text. Close only the reopened test document. Leave other TextEdit "
+                    "windows untouched. Never inspect Codex or ChatGPT. User request: "
+                )
+                if args.inject_inner_cua_failure:
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. Bind the exact Voice Computer "
+                        "app path with cua.getApp('" + str(app_path) + "'). Enter the quoted "
+                        "command once and press Return. Approve only TextEdit Computer Use. "
+                        "Wait for the injected tool failure and do not open or edit the note "
+                        "yourself. Leave all TextEdit windows untouched. Never inspect Codex "
+                        "or ChatGPT. User request: "
+                    )
+                elif args.textedit_mode != "normal":
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. Bind the exact Voice Computer "
+                        "app path with cua.getApp('" + str(app_path) + "'). Enter the quoted "
+                        "command once and press Return. Wait for its clarification. Do not "
+                        "approve TextEdit, open a document, or edit any file. Never inspect "
+                        "Codex or ChatGPT. User request: "
+                    )
             response = driver.wait_rpc(driver.rpc("turn/start", {
                 "threadId": thread, "input": [{"type": "text", "text": instruction + phrase}],
             }))
@@ -2195,7 +2411,7 @@ def main():
                     if space_after and space_after["current"] == expected_space:
                         break
                     time.sleep(0.5)
-            elif index in (13, 17, 18, 19, 20, 21, 22):
+            elif index in (13, 17, 18, 19, 20, 21, 22, 23):
                 space_after = space_state()
             negative_result = re.search(
                 r"couldn.t|cannot|can.t|declined|unverified|failed|unable to",
@@ -2330,6 +2546,31 @@ def main():
                                 space_before["current"], after_id, prior_ids,
                                 mode=args.finder_mode)
                         driver.record("finder_context_receipt_verified", **exact_receipt)
+                    elif index == 23:
+                        textedit_windows_after = textedit_window_inventory()["window_ids"]
+                        if args.inject_inner_cua_failure:
+                            exact_receipt = verify_injected_cua_failure_receipt(
+                                rows, textedit_note.parent.name, "textedit",
+                                space_before["current"], after_id, prior_ids)
+                            expected_draft = f"Voice Computer draft {textedit_note.parent.name}"
+                            if textedit_note.read_bytes() != expected_draft.encode() \
+                                    or (textedit_note.parent / "note-copy.txt").read_bytes() \
+                                    != b"Decoy note" \
+                                    or textedit_windows_after != textedit_windows_before:
+                                raise ValueError("Injected TextEdit failure changed note or windows")
+                            driver.record("textedit_injected_failure_verified", **exact_receipt)
+                        elif args.textedit_mode != "normal":
+                            exact_receipt = verify_textedit_rejection_receipt(
+                                rows, textedit_note, textedit_windows_before,
+                                textedit_windows_after, space_before["current"],
+                                after_id, prior_ids)
+                            driver.record("textedit_rejection_receipt_verified", **exact_receipt)
+                        else:
+                            exact_receipt = verify_textedit_receipt(
+                                rows, textedit_note, driver.textedit_observations,
+                                textedit_windows_before, textedit_windows_after,
+                                space_before["current"], after_id, prior_ids)
+                            driver.record("textedit_context_receipt_verified", **exact_receipt)
                     else:
                         exact_receipt = verify_mcp_receipt(
                             rows, mcp_case_phrase(index), MCP_CASES[index],
@@ -2339,7 +2580,7 @@ def main():
                     driver.record("exact_app_receipt_rejected", reason=str(error))
                     verified = False
                 else:
-                    verified = exact_receipt is not None and (verified or index in (13, 17, 18, 19, 20, 21, 22))
+                    verified = exact_receipt is not None and (verified or index in (13, 17, 18, 19, 20, 21, 22, 23))
             recovered_stale_ui = (
                 index == 13 and exact_receipt is not None
                 and driver.tool_failures == ["stale_ui_state"])
@@ -2348,7 +2589,7 @@ def main():
             success = (turn.get("status") == "completed" and verified
                        and (not driver.tool_failures or recovered_stale_ui)
                        and all(a["allowed"] for a in driver.approvals)
-                       and (expected_space is not None or index in (17, 18, 19, 20, 21, 22) or not negative_result))
+                       and (expected_space is not None or index in (17, 18, 19, 20, 21, 22, 23) or not negative_result))
             driver.record("command_finished", success=success,
                           elapsed_ms=round((time.monotonic() - started) * 1000),
                           tool_failures=driver.tool_failures, approvals=driver.approvals,
@@ -2394,12 +2635,25 @@ def main():
             temporary.cleanup()
         if fixtures:
             driver.record("fixtures_cleaned", count=len(fixtures))
+        cleaned_directories = 0
         for directory in finder_fixtures:
+            if directory == textedit_fixture_root:
+                try:
+                    restored = (textedit_windows_before is not None and
+                                textedit_window_inventory()["window_ids"] ==
+                                textedit_windows_before)
+                except (OSError, subprocess.SubprocessError, ValueError, KeyError):
+                    restored = False
+                if not restored:
+                    driver.record("textedit_fixture_retained", path=str(directory),
+                                  reason="document_window_inventory_not_restored")
+                    continue
             shutil.rmtree(directory)
+            cleaned_directories += 1
         for directory in finder_outside_fixtures:
             directory.cleanup()
         if finder_fixtures:
-            driver.record("finder_fixtures_cleaned", count=len(finder_fixtures))
+            driver.record("finder_fixtures_cleaned", count=cleaned_directories)
         driver.close()
         print("Log: %s" % args.log, flush=True)
     return 1 if failed else 0

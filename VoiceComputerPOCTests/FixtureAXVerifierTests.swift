@@ -102,7 +102,7 @@ final class FixtureAXVerifierTests: XCTestCase {
 
     #if DEBUG
         func testSyntheticCUAFailureUsesRealFixtureRejectionPath() throws {
-            for target in ["browser", "finder"] {
+            for target in ["browser", "finder", "textedit"] {
                 let runID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
                 let root = FileManager.default.urls(
                     for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -122,8 +122,10 @@ final class FixtureAXVerifierTests: XCTestCase {
                 if target == "browser" {
                     client.browserDocsURL = try XCTUnwrap(
                         URL(string: "http://127.0.0.1:61234/home?run_id=\(runID)"))
-                } else {
+                } else if target == "finder" {
                     client.finderReportURL = root.appendingPathComponent("report.txt")
+                } else {
+                    client.textEditNoteURL = root.appendingPathComponent("note.txt")
                 }
                 let item: [String: Any] = [
                     "type": "mcpToolCall", "server": "cua_repl", "tool": "js",

@@ -65,6 +65,13 @@ extension AppServerClient {
             finderReportURL = url
             queuedPhrase = "Reveal the test report at \(url.path) in Finder."
             beginActingTurn()
+        case .textEditSave(let url):
+            record(
+                "router_decided",
+                details: ["route": "textedit", "action": "save_note", "target": "fixture_note"])
+            textEditNoteURL = url
+            queuedPhrase = phrase
+            beginActingTurn()
         case .browserThenFinder(let home, let report):
             guard let snapshot = SpaceNavigator.snapshot() else {
                 fail("Could not read the starting desktop Space for the composed request.")

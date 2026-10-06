@@ -55,6 +55,7 @@ final class AppServerClient: ObservableObject {
     var browserFormURL: URL?
     var browserFormQuery: String?
     var finderReportURL: URL?
+    var textEditNoteURL: URL?
     var composedReportURL: URL?
     var composedBrowserVerified = false
     var composedOriginSpace: SpaceSnapshot?
@@ -236,6 +237,7 @@ final class AppServerClient: ObservableObject {
         browserFormURL = nil
         browserFormQuery = nil
         finderReportURL = nil
+        textEditNoteURL = nil
         composedReportURL = nil
         composedBrowserVerified = false
         composedOriginSpace = nil

@@ -144,6 +144,56 @@ enum FixtureAXVerifier {
             visited: visited)
     }
 
+    static func verifyTextEdit(noteURL: URL) -> FixtureAXObservation {
+        let runID = noteURL.deletingLastPathComponent().lastPathComponent
+        let expected = "Voice Computer saved \(runID)"
+        guard noteURL.isFileURL,
+            noteURL.resolvingSymlinksInPath().standardizedFileURL == noteURL.standardizedFileURL,
+            let values = try? noteURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+            values.isRegularFile == true, let size = values.fileSize, size <= 256,
+            (try? Data(contentsOf: noteURL)) == Data(expected.utf8)
+        else { return .reject("file_bytes_mismatch") }
+        guard let windows = windows(for: "com.apple.TextEdit") else {
+            return .reject("accessibility_unavailable")
+        }
+        let deadline = ProcessInfo.processInfo.systemUptime + scanSeconds
+        var matches = 0
+        var documentMatches = 0
+        var visited = 0
+        for window in windows {
+            var queue = [window]
+            var values: [String] = []
+            var documentFound = false
+            while !queue.isEmpty {
+                guard visited < nodeLimit, ProcessInfo.processInfo.systemUptime < deadline else {
+                    return .reject("scan_limit", visited: visited)
+                }
+                let node = queue.removeFirst()
+                visited += 1
+                AXUIElementSetMessagingTimeout(node, 0.05)
+                if (url(node) ?? documentURL(node))?.standardizedFileURL
+                    == noteURL.standardizedFileURL
+                {
+                    documentFound = true
+                }
+                if string(node, kAXRoleAttribute) == "AXTextArea" {
+                    values.append(string(node, kAXValueAttribute))
+                }
+                queue.append(contentsOf: children(node))
+            }
+            if documentFound {
+                documentMatches += 1
+                if values == [expected] { matches += 1 }
+            }
+        }
+        return FixtureAXObservation(
+            verified: matches == 1,
+            reason: matches == 1
+                ? "exact_note_file_and_text"
+                : documentMatches == 0 ? "document_url_mismatch" : "document_text_mismatch",
+            visited: visited)
+    }
+
     static func browserMatches(
         _ areas: [WebAreaEvidence], expectedURL: URL, expectedHeading: String
     ) -> Bool {
@@ -210,6 +260,15 @@ enum FixtureAXVerifier {
         let raw = attribute(element, kAXURLAttribute)
         if let value = raw as? URL { return value }
         if let value = raw as? String { return URL(string: value) }
+        return nil
+    }
+
+    private static func documentURL(_ element: AXUIElement) -> URL? {
+        let raw = attribute(element, kAXDocumentAttribute)
+        if let value = raw as? URL, value.isFileURL { return value }
+        if let value = raw as? String, let parsed = URL(string: value), parsed.isFileURL {
+            return parsed
+        }
         return nil
     }
 

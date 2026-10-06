@@ -129,6 +129,7 @@ extension AppServerClient {
         spaceCountAtTurnStart = nil
         focusTargetBundleID = nil
         composedReportURL = nil
+        textEditNoteURL = nil
         composedBrowserVerified = false
         composedOriginSpace = nil
         activatedBundleIDsThisTurn.removeAll()

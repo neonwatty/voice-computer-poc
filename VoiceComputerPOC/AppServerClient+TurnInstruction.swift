@@ -10,6 +10,11 @@ extension AppServerClient {
             return
                 "Use only mcp__cua_repl.js with Finder (com.apple.finder). Your first Computer Use call must assign var vcFinderTarget = await cua.getApp('com.apple.finder'); use vcFinderTarget for every later Finder action. Click the visible Go menu, then click Go to Folder. Do not use a keyboard shortcut for that menu item. Enter exactly \(url.path), and press Return once. Inspect Finder's Accessibility state and report the selected item's exact file URL. Stop if Finder has no window, the file is missing, the selected item differs, access is declined, or the tool fails. Do not open or edit the file, use a shell, or control another app. User request: \(phrase)"
         }
+        if let url = textEditNoteURL {
+            let runID = url.deletingLastPathComponent().lastPathComponent
+            return
+                "Use only mcp__cua_repl.js with TextEdit (com.apple.TextEdit). First bind with cua.getApp('com.apple.TextEdit') and inspect its windows. Open exactly \(url.path) through TextEdit's visible Open dialog, using Go to Folder if needed; if that exact file is already open, reuse only its matching URL window. Do not edit another document. Confirm its initial text is exactly Voice Computer draft \(runID). Replace the text in its one text entry area with exactly Voice Computer saved \(runID), press Command-S once, and inspect that same window's file URL and visible text. Leave the test document open for independent verification. Stop if the file URL or initial text differs, the save is canceled, access is declined, or a tool fails. Do not use a shell, file operations, or another app. User request: \(phrase)"
+        }
         if let url = browserFormURL, let query = browserFormQuery {
             var submitted = URLComponents(url: url, resolvingAgainstBaseURL: false)
             submitted?.path = "/submitted"

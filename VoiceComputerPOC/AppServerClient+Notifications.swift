@@ -254,6 +254,7 @@ extension AppServerClient {
         browserFormURL = nil
         browserFormQuery = nil
         finderReportURL = nil
+        textEditNoteURL = nil
         composedReportURL = nil
         composedBrowserVerified = false
         composedOriginSpace = nil
@@ -296,5 +297,4 @@ extension AppServerClient {
         threadID = nil
         turnID = nil
     }
-
 }
