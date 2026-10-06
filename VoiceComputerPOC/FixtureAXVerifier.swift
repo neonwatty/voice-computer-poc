@@ -78,8 +78,10 @@ enum FixtureAXVerifier {
                 let role = string(item.element, kAXRoleAttribute)
                 var webAreaIndex = item.webAreaIndex
                 if role == "AXWebArea" {
+                    let pageURL = url(item.element)
+                    guard pageURL?.absoluteString == expectedURL.absoluteString else { continue }
                     webAreaIndex = areas.count
-                    areas.append(WebAreaEvidence(url: url(item.element), headings: []))
+                    areas.append(WebAreaEvidence(url: pageURL, headings: []))
                 } else if role == "AXHeading", let webAreaIndex {
                     let heading = string(item.element, kAXTitleAttribute)
                     let value = string(item.element, kAXValueAttribute)

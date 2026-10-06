@@ -140,6 +140,16 @@ and became mergeable after the same head passed. One real inner CUA
 the same SHA was rerun after recovery and passed all ten ordered cases before
 merge. Recovery reruns the same SHA and never waives the check.
 
+**PR #17 recovery:** Its first reviewed head failed at Safari case 21 with
+`scan_limit` after an unrelated Hacker News page made the Safari Accessibility
+tree exceed 400 nodes. The browser verifier now skips descendants of web
+areas whose URL differs from the exact fixture URL; it still checks all
+matching web areas for duplicates. The outer case uses Safari's `super+n`
+new-window shortcut after the visible File menu led to screenshot and offscreen
+click errors. A focused case 21 passed with the unrelated window present and
+restored its window inventory and Space. The updated head still needs the full
+required-gate run.
+
 ## Work package 4: bounded TextEdit document workflow
 
 **Implementation status:** PR #16 replaces one exact run-owned existing draft
