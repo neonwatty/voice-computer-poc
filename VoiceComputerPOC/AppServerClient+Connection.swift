@@ -8,9 +8,10 @@ extension AppServerClient {
             request.serverName == "desktop_tool"
             ? (request.desktopStateRead
                 ? decideDesktopStateApproval(request, allow: allow, forSession: forSession)
-                : decideSpaceApproval(request, allow: allow, forSession: forSession)) : allow
+                : decideSpaceApproval(request, allow: allow, forSession: forSession))
+            : (allow && generalTurnFailure == nil)
         sendRaw(request.response(allow: accepted, forSession: forSession))
-        if !accepted, request.serverName == "cua_repl" {
+        if !accepted, request.serverName == "cua_repl", generalTurnFailure == nil {
             generalTurnFailure = .accessDeclined
         }
         let decision = accepted ? (forSession ? "Allowed for session" : "Allowed once") : "Declined"

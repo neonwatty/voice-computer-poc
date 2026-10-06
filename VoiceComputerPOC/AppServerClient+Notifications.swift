@@ -106,9 +106,7 @@ extension AppServerClient {
             "result_is_error": String(resultIsError),
         ]
         if status == "failed" || resultIsError {
-            if item["server"] as? String == "cua_repl", generalTurnFailure == nil {
-                generalTurnFailure = .toolFailed
-            }
+            if item["server"] as? String == "cua_repl" { handleCUAToolFailure() }
             fields["error"] = detail ?? "Unknown tool error"
             let label = isSpaceTool ? "Space tool call failed" : "Computer Use tool call failed"
             append(detail.map { "\(label): \(String($0.prefix(500)))" } ?? label)

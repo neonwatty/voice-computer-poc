@@ -8,6 +8,20 @@ struct FixtureTurnResult {
 }
 
 extension AppServerClient {
+    func handleCUAToolFailure() {
+        guard generalTurnFailure == nil else { return }
+        generalTurnFailure = .toolFailed
+        guard isWorking,
+            browserDocsURL != nil || browserFormURL != nil || finderReportURL != nil
+                || textEditNoteURL != nil,
+            let threadID, let turnID
+        else { return }
+        record("fixture_tool_failure_interrupt_requested", details: ["turn_id": turnID])
+        _ = send(
+            "turn/interrupt", params: ["threadId": threadID, "turnId": turnID],
+            pendingKind: .interrupt)
+    }
+
     func observedFixtureItem(_ item: [String: Any]) -> [String: Any] {
         #if DEBUG
             injectFixtureCUAFailureIfRequested(item)
@@ -122,10 +136,10 @@ extension AppServerClient {
                 : finderReportURL != nil ? "finder" : textEditNoteURL != nil ? "textedit" : nil
         guard let kind else { return nil }
         let observation: FixtureAXObservation
-        if outcome != "completed" {
-            observation = .reject("turn_incomplete")
-        } else if generalTurnFailure != nil {
+        if generalTurnFailure != nil {
             observation = .reject("tool_failure")
+        } else if outcome != "completed" {
+            observation = .reject("turn_incomplete")
         } else if fixtureCUAToolStartedIDs.isEmpty
             || fixtureCUAToolStartedIDs != fixtureCUAToolCompletedIDs
         {

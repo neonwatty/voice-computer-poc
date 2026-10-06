@@ -118,7 +118,9 @@ final class FixtureAXVerifierTests: XCTestCase {
                         .appendingPathComponent(UUID().uuidString))
                 client.isWorking = true
                 client.activeCommandID = "command-\(target)"
+                client.threadID = "thread-\(target)"
                 client.turnID = "turn-\(target)"
+                client.input = Pipe()
                 if target == "browser" {
                     client.browserDocsURL = try XCTUnwrap(
                         URL(string: "http://127.0.0.1:61234/home?run_id=\(runID)"))
@@ -143,10 +145,18 @@ final class FixtureAXVerifierTests: XCTestCase {
                     client.diagnosticEntries.filter {
                         $0.event == "test_cua_failure_injected"
                     }.count, 1)
+                XCTAssertEqual(
+                    client.diagnosticEntries.filter {
+                        $0.event == "fixture_tool_failure_interrupt_requested"
+                    }.count, 1)
                 client.handleItemCompleted(item)
                 XCTAssertEqual(
                     client.diagnosticEntries.filter {
                         $0.event == "test_cua_failure_injected"
+                    }.count, 1)
+                XCTAssertEqual(
+                    client.diagnosticEntries.filter {
+                        $0.event == "fixture_tool_failure_interrupt_requested"
                     }.count, 1)
             }
         }

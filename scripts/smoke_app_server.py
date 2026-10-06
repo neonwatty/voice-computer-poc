@@ -1606,6 +1606,9 @@ class Driver:
                             "state": state,
                             "window_id": next(iter(matches)) if len(matches) == 1 else None,
                         })
+                        self.record("finder_context_observed",
+                                    window_id=next(iter(matches)) if len(matches) == 1 else None,
+                                    sentinel_visible="sentinel.txt" in state)
                 if self.command_index == 23 and item.get("server") == "cua_repl":
                     for part in content:
                         state = part.get("text") or ""
@@ -1888,6 +1891,12 @@ def main():
                               'After the app finishes, inspect the acted Safari window, close '
                               'only the new run-specific fixture tab, verify its sentinel remains, '
                               'then close only the test-created Safari window or windows.')
+                    if args.inject_inner_cua_failure:
+                        phrase = (f'Create one Safari window with {sentinel_url} as its sentinel '
+                                  'tab. In the exact Voice Computer POC app, enter '
+                                  f'"Open {url} and follow the Docs link." once. Wait for the '
+                                  'injected tool failure. Verify the sentinel remains unchanged, '
+                                  'then close only that test-created Safari window.')
             if index == 19:
                 fixture_root = support / "TestFixtures" / run_id
                 fixture_root.mkdir(parents=True, mode=0o700)
@@ -1987,6 +1996,13 @@ def main():
                                   f'test report at {report} in Finder." once. Wait for the unsafe '
                                   'target rejection, verify the prepared Finder window did not '
                                   'change, and close only that test-created window.')
+                    if args.inject_inner_cua_failure:
+                        phrase = (f'Create one Finder window showing {fixture_root} in list '
+                                  'view with sentinel.txt. In the exact Voice Computer POC '
+                                  f'app, enter "Reveal the test report at {report} in Finder." '
+                                  'once. Wait for the injected tool failure, verify the '
+                                  'sentinel and selection remain unchanged, then close only '
+                                  'that test-created Finder window.')
             if index == 23:
                 run_id = uuid.uuid4().hex
                 fixture_root = support / "TestFixtures" / run_id
@@ -2009,6 +2025,11 @@ def main():
                           'then inspect the exact TextEdit file URL and visible text. '
                           'Close only this test document, reopen the same file through '
                           'TextEdit, verify its saved text, and close it again.')
+                if args.inject_inner_cua_failure:
+                    phrase = (f'In the exact Voice Computer POC app, enter "In TextEdit, '
+                              f'replace the test note at {textedit_note} with '
+                              f'\"Voice Computer saved {run_id}\" and save it." once. '
+                              'Wait for the injected tool failure; leave TextEdit untouched.')
                 if args.textedit_mode != "normal":
                     unsafe_note = (fixture_root / "note-copy.txt"
                                    if args.textedit_mode == "wrong-file" else textedit_note)
@@ -2311,6 +2332,19 @@ def main():
                         "navigate Safari after submitting the app command or inspect the "
                     "Codex or ChatGPT host app. User request: "
                 )
+                if args.inject_inner_cua_failure:
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. Bind the exact Voice Computer "
+                        "app with cua.getApp('" + str(app_path) + "') and Safari with "
+                        "cua.getApp('com.apple.Safari'). Create one new Safari window and "
+                        "load the exact sentinel URL from the request. Capture its UUID and "
+                        "sentinel state. Submit the quoted app command once and allow only "
+                        "Safari Computer Use. Wait for the injected failure. Inspect the same "
+                        "Safari UUID and require its sentinel URL and heading unchanged; no "
+                        "Docs tab is expected. Close only that test-created Safari window "
+                        "with its visible close button. Never inspect Codex or ChatGPT. "
+                        "User request: "
+                    )
             elif index == 22:
                 instruction = (
                     "Use only mcp__cua_repl.js for UI. Your first Computer Use call must be "
@@ -2369,6 +2403,20 @@ def main():
                         "selection. Close only that first test-created window. If either "
                         "identity is ambiguous, leave it open. Never inspect the Codex "
                         "or ChatGPT host app. User request: "
+                    )
+                if args.inject_inner_cua_failure:
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. Bind the exact Voice Computer "
+                        "app with cua.getApp('" + str(app_path) + "') and Finder with "
+                        "cua.getApp('com.apple.finder'). Create one new Finder window, show "
+                        "the test folder in list view, and capture its title, sentinel.txt, "
+                        "and unselected report in a full getAXState({disableDiffing:true}). "
+                        "Submit the quoted app command once and allow only Finder Computer "
+                        "Use. Wait for the injected failure. Capture a second full "
+                        "getAXState({disableDiffing:true}) requiring the same test folder "
+                        "window, unchanged sentinel and selection, "
+                        "then close only that test-created Finder window with its visible "
+                        "close button. Never inspect Codex or ChatGPT. User request: "
                     )
             elif index == 23:
                 instruction = (
@@ -2566,9 +2614,10 @@ def main():
                             expected_draft = f"Voice Computer draft {textedit_note.parent.name}"
                             if textedit_note.read_bytes() != expected_draft.encode() \
                                     or (textedit_note.parent / "note-copy.txt").read_bytes() \
-                                    != b"Decoy note" \
-                                    or textedit_windows_after != textedit_windows_before:
-                                raise ValueError("Injected TextEdit failure changed note or windows")
+                                    != b"Decoy note":
+                                raise ValueError("Injected TextEdit failure changed fixture bytes")
+                            if textedit_windows_after != textedit_windows_before:
+                                raise ValueError("Injected TextEdit failure changed document windows")
                             driver.record("textedit_injected_failure_verified", **exact_receipt)
                         elif args.textedit_mode != "normal":
                             exact_receipt = verify_textedit_rejection_receipt(
