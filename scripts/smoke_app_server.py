@@ -2122,6 +2122,7 @@ def main():
             sentinel_url = None
             safari_windows_before = None
             finder_windows_before = None
+            finder_prepared_by_host = False
             finder_run_id = None
             finder_decoy_run_id = None
             finder_decoy_report = None
@@ -2232,6 +2233,20 @@ def main():
                             f"finder:{finder_run_id}\n")
                     (fixture_root / "sentinel.txt").write_text("Finder window sentinel\n")
                     finder_windows_before = finder_window_inventory()["window_ids"]
+                    if (not finder_windows_before and args.finder_context_windows == 1
+                            and args.finder_mode == "normal"
+                            and not args.inject_inner_cua_failure):
+                        subprocess.run(["open", "-a", "Finder", str(fixture_root)],
+                                       check=True, timeout=15)
+                        deadline = time.monotonic() + 10
+                        while time.monotonic() < deadline:
+                            if len(finder_window_inventory(finder_run_id)[
+                                    "matching_window_ids"]) == 1:
+                                finder_prepared_by_host = True
+                                break
+                            time.sleep(0.2)
+                        if not finder_prepared_by_host:
+                            raise RuntimeError("Test-owned Finder fixture window did not open")
                     if args.finder_context_windows == 2:
                         decoy_root = support / "TestFixtures" / f"{finder_run_id}-decoy"
                         decoy_root.mkdir(parents=True, mode=0o700)
@@ -2260,6 +2275,13 @@ def main():
                               f'test report at {report} in Finder." once. After the app finishes, '
                               'inspect the exact report selection in that same Finder window '
                               'and close only the test-created window.')
+                    if finder_prepared_by_host:
+                        phrase = (f'A test-owned Finder window already shows {fixture_root}. '
+                                  'In that window, verify sentinel.txt is present, then in the '
+                                  'exact Voice Computer POC app enter "Reveal the test report at '
+                                  f'{report} in Finder." once. After the app finishes, inspect '
+                                  'the exact report selection in the same Finder window and '
+                                  'close only that test-owned window.')
                     if args.finder_context_windows == 2:
                         phrase = (f'Create one Finder window showing decoy folder '
                                   f'{finder_decoy_report.parent} in list view, then a second '
@@ -2737,6 +2759,28 @@ def main():
                     "without closing unrelated windows. Never inspect or control the Codex "
                     "or ChatGPT host app. User request: "
                 )
+                if finder_prepared_by_host:
+                    instruction = (
+                        "Use only mcp__cua_repl.js for UI. First bind the exact Voice Computer "
+                        "app with var vcFinderContextApp = await cua.getApp('" + str(app_path) +
+                        "'); then bind Finder with var vcFinderContext = await "
+                        "cua.getApp('com.apple.finder'). The test runner already opened one "
+                        "test-owned Finder window on the folder named in the request. Do not "
+                        "create another window. Switch that window to list view with super+2 "
+                        "if needed, and capture a full AX state showing its title, sentinel.txt, "
+                        "report.txt, and report-copy.txt without selecting report.txt. Use "
+                        "that AX state for window identity; cua.listWindows is unavailable "
+                        "on this Mac. Return to vcFinderContextApp and submit the "
+                        "quoted command once. Choose Allow for session only for Finder Computer "
+                        "Use inside the app. Wait for the app result, then inspect Finder with "
+                        "a full AX state requiring the same prepared window and exact report "
+                        "file URL. Do not select the report yourself. Close only that test-owned "
+                        "Finder window with its visible close button in a final Computer Use "
+                        "call. Do not ask Finder for another AX state after closing its last "
+                        "window; the independent runner verifies window absence. If identity "
+                        "is ambiguous, leave it open. Never inspect or control Codex or "
+                        "ChatGPT. User request: "
+                    )
                 if args.finder_mode != "normal":
                     instruction = (
                         "Use only mcp__cua_repl.js for UI. First bind the exact Voice Computer "

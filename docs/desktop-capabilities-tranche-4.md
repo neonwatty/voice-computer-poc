@@ -149,6 +149,11 @@ new-window shortcut after the visible File menu led to screenshot and offscreen
 click errors. A focused case 21 passed with the unrelated window present and
 restored its window inventory and Space. The updated head still needs the full
 required-gate run.
+An exact-source rerun passed Safari case 21 and then encountered Finder case
+22 with no Finder window. CUA cannot bind headless Finder on this Mac
+(`cgWindowNotFound`). The case 22 harness now prepares one run-owned Finder
+window only when its baseline inventory is empty; the agent must observe and
+reuse that same window, and the native observer requires its removal afterward.
 
 ## Work package 4: bounded TextEdit document workflow
 
