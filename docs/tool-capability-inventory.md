@@ -45,6 +45,10 @@ catalog. The PR trigger checks an exact approved head and green CI/CodeQL,
 then posts a redacted commit status; its positive path has not run because
 this repository has one collaborator and cannot supply independent approval.
 The Mac status is not yet a required merge check.
+Focused Debug case 21 and 22 synthetic inner-CUA failure runs now passed with
+app-owned `tool_failed` results, independent sentinel/window cleanup evidence,
+and unchanged Space 5. They exercise the app's failure classification, not a
+real remote CUA service outage; the tranche 4 exact-head suite is pending.
 
 ## Next capabilities to build and validate
 

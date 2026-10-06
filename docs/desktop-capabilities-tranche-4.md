@@ -66,6 +66,15 @@ Keep current positive, decoy, route-rejection, and Stop checks intact.
 command and tool correlation, no unrelated UI changes, and an honest private
 receipt. The normal full suite still passes on the same exact build.
 
+**Initial focused evidence:** The Debug test seam changed one completed inner
+CUA item into a synthetic failed event at the app's event ingress. Focused
+case 21 and 22 both passed on the unlocked Mac: the app recorded the matching
+item, `tool_failed` verification, and one `synthetic_debug_event`; independent
+Safari/Finder observations confirmed sentinel preservation, known window
+identity, restored window inventory, and unchanged Space 5. These runs do not
+prove a failure in the remote CUA service itself. The exact clean-SHA full
+suite is still pending for this tranche.
+
 ## Work package 2: owner-attested Mac PR trigger
 
 Replace the impossible independent-review prerequisite in

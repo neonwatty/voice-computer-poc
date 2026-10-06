@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the desktop suite for one approved, green PR head on this Mac."""
+"""Run the desktop suite for one owner-attested, green PR head on this Mac."""
 
 import argparse
 import json
@@ -10,6 +10,7 @@ import sys
 import uuid
 
 from run_desktop_suite import validate_checkout
+from smoke_app_server import selected_cases
 
 
 REPOSITORY = "neonwatty/voice-computer-poc"
@@ -20,19 +21,19 @@ REQUIRED_CHECKS = {("CI", "Build and test"), ("CodeQL", "Analyze Swift")}
 def pr_details(number):
     command = ["gh", "pr", "view", str(number), "--repo", REPOSITORY, "--json",
                "number,state,isDraft,baseRefName,headRefOid,headRepository,"
-               "headRepositoryOwner,reviewDecision,statusCheckRollup"]
+               "headRepositoryOwner,statusCheckRollup"]
     output = subprocess.run(command, check=True, capture_output=True,
                             text=True, timeout=30).stdout
     return json.loads(output)
 
 
-def pr_reviews(number):
-    output = subprocess.run(["gh", "api", f"repos/{REPOSITORY}/pulls/{number}/reviews"],
-                            check=True, capture_output=True, text=True, timeout=30).stdout
-    return json.loads(output)
+def authenticated_owner():
+    output = subprocess.run(["gh", "api", "user"], check=True,
+                            capture_output=True, text=True, timeout=30).stdout
+    return json.loads(output).get("login") == REPOSITORY.split("/")[0]
 
 
-def validate_pr(pr, reviews, number, sha):
+def validate_pr(pr, number, sha):
     if pr.get("number") != number or pr.get("state") != "OPEN" \
             or pr.get("isDraft") is not False or pr.get("baseRefName") != "main":
         raise ValueError("PR must be open, ready for review, and target main")
@@ -43,18 +44,28 @@ def validate_pr(pr, reviews, number, sha):
     if repository.get("name") != REPOSITORY.split("/")[1] \
             or owner.get("login") != REPOSITORY.split("/")[0]:
         raise ValueError("PR head must belong to the trusted repository")
-    if pr.get("reviewDecision") != "APPROVED":
-        raise ValueError("PR head requires an approved review")
-    if not any(review.get("state") == "APPROVED" and review.get("commit_id") == sha
-               for review in reviews):
-        raise ValueError("Exact PR head SHA requires an approved review")
     checks = pr.get("statusCheckRollup") or []
     for workflow, name in REQUIRED_CHECKS:
         matching = [check for check in checks if check.get("workflowName") == workflow
                     and check.get("name") == name]
         if len(matching) != 1 or matching[0].get("status") != "COMPLETED" \
                 or matching[0].get("conclusion") != "SUCCESS":
-            raise ValueError(f"Required {workflow} / {name} check is not green")
+                raise ValueError(f"Required {workflow} / {name} check is not green")
+
+
+def validate_attestation(sha, attested_sha, owner_authenticated):
+    if attested_sha != sha:
+        raise ValueError("Owner attestation must repeat the exact PR head SHA")
+    if not owner_authenticated:
+        raise ValueError("The authenticated GitHub account must be the repository owner")
+
+
+def validate_receipt(result, summary, sha):
+    start = summary.get("starting_space_id")
+    return (result.returncode == 0 and summary.get("status") == "passed"
+            and summary.get("sha") == sha and summary.get("all_cases_passed") is True
+            and isinstance(start, int) and summary.get("final_space_id") == start
+            and summary.get("case_ids") == selected_cases(True, None, False))
 
 
 def post_status(sha, state, description):
@@ -71,6 +82,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pr", type=int, required=True)
     parser.add_argument("--sha", required=True)
+    parser.add_argument("--attest-sha", required=True,
+                        help="Repeat the exact SHA after inspecting this PR's diff")
     parser.add_argument("--derived-data-path", type=Path, required=True)
     args = parser.parse_args()
     os.umask(0o077)
@@ -79,7 +92,8 @@ def main():
         if args.pr <= 0 or not args.derived_data_path.is_absolute():
             raise ValueError("Positive PR number and absolute build path required")
         validate_checkout(args.sha)
-        validate_pr(pr_details(args.pr), pr_reviews(args.pr), args.pr, args.sha)
+        validate_attestation(args.sha, args.attest_sha, authenticated_owner())
+        validate_pr(pr_details(args.pr), args.pr, args.sha)
         log_directory = (Path.home() / "Library/Application Support/VoiceComputerPOC/SmokeRuns" /
                          f"reviewed-{args.sha[:12]}-{uuid.uuid4().hex}")
         post_status(args.sha, "pending", "Exact-SHA desktop suite running on the Mac")
@@ -91,10 +105,9 @@ def main():
                                  "--log-directory", str(log_directory)], check=False)
         summary_path = log_directory / "summary.json"
         summary = json.loads(summary_path.read_text()) if summary_path.is_file() else {}
-        passed = (result.returncode == 0 and summary.get("status") == "passed"
-                  and summary.get("sha") == args.sha
-                  and summary.get("all_cases_passed") is True)
+        passed = validate_receipt(result, summary, args.sha)
         if passed:
+            validate_pr(pr_details(args.pr), args.pr, args.sha)
             cases = summary.get("case_ids") or []
             description = f"{len(cases)} desktop cases passed; Space and windows restored"
             post_status(args.sha, "success", description)
