@@ -64,7 +64,7 @@ extension AppServerClient {
                 details: ["route": "finder", "action": "reveal_file", "target": "fixture_report"])
             finderReportURL = url
             queuedPhrase = "Reveal the test report at \(url.path) in Finder."
-            beginActingTurn()
+            prepareFinderAndBeginActingTurn()
         case .textEditSave(let url):
             routeTextEditNote(url, phrase: phrase, creates: false)
         case .textEditCreate(let url):

@@ -144,6 +144,7 @@ import XCTest
         func testComposedRequestStartsFinderOnlyAfterVerifiedBrowserStep() {
             let client = makeClient()
             let report = URL(fileURLWithPath: "/tmp/fixture/report.txt")
+            client.finderBootstrapOverride = { _ in .existingWindow }
             client.isWorking = true
             client.activeCommandID = "one-command"
             client.turnID = "browser-turn"
@@ -178,6 +179,7 @@ import XCTest
 
         func testStopBetweenComposedStepsPreventsFinderActor() {
             let client = makeClient()
+            client.finderBootstrapOverride = { _ in .existingWindow }
             client.isWorking = true
             client.activeCommandID = "one-command"
             client.turnID = "browser-turn"
@@ -194,6 +196,57 @@ import XCTest
             wait(for: [settled], timeout: 2)
             XCTAssertEqual(starts, 0)
             XCTAssertFalse(client.isWorking)
+        }
+
+        func testFinderColdStartWaitsForWindowBeforeActor() {
+            let client = makeClient()
+            let report = URL(fileURLWithPath: "/tmp/fixture/report.txt")
+            client.isWorking = true
+            client.activeCommandID = "finder-command"
+            client.finderReportURL = report
+            var starts = 0
+            client.actingTurnOverride = { starts += 1 }
+            client.finderBootstrapOverride = { url in
+                XCTAssertEqual(url, report)
+                return .openedWindow
+            }
+
+            client.prepareFinderAndBeginActingTurn()
+
+            XCTAssertEqual(starts, 1)
+            XCTAssertEqual(
+                client.diagnosticEntries.last { $0.event == "finder_window_bootstrap" }?
+                    .details["result"], "opened_window")
+        }
+
+        func testFinderDesktopSurfaceIsNotAFileWindow() {
+            XCTAssertEqual(FinderWindowBootstrap.fileWindowCount(subroles: ["AXDesktop"]), 0)
+            XCTAssertEqual(
+                FinderWindowBootstrap.fileWindowCount(
+                    subroles: ["AXDesktop", "AXStandardWindow"]), 1)
+            XCTAssertNil(FinderWindowBootstrap.fileWindowCount(subroles: ["AXDialog"]))
+            XCTAssertEqual(
+                FinderWindowBootstrap.prepare(
+                    reportURL: URL(fileURLWithPath: "/tmp/unsupported/report.txt")),
+                .unavailable)
+        }
+
+        func testFinderBootstrapFailureStartsNoActor() {
+            let client = makeClient()
+            client.isWorking = true
+            client.activeCommandID = "finder-command"
+            client.finderReportURL = URL(fileURLWithPath: "/tmp/fixture/report.txt")
+            var starts = 0
+            client.actingTurnOverride = { starts += 1 }
+            client.finderBootstrapOverride = { _ in .unavailable }
+
+            client.prepareFinderAndBeginActingTurn()
+
+            XCTAssertEqual(starts, 0)
+            XCTAssertFalse(client.isWorking)
+            XCTAssertEqual(
+                client.diagnosticEntries.last { $0.event == "finder_window_bootstrap" }?
+                    .details["result"], "unavailable")
         }
 
         private func roundTripClient() -> AppServerClient {

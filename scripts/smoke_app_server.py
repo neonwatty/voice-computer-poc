@@ -1273,7 +1273,8 @@ def verify_textedit_stop_receipt(rows, note, windows_before, windows_after,
 
 def verify_composed_receipt(rows, run_id, port, fixture_rows, report,
                             browser_observations, finder_observations,
-                            before, after, prior_command_ids=()):
+                            before, after, prior_command_ids=(),
+                            finder_windows_before=None, finder_windows_after=None):
     """Require two verified app turns under one command and independent UI evidence."""
     starts = [row for row in rows if row.get("event") == "command_started"
               and row.get("details", {}).get("user_action") == "run"]
@@ -1311,6 +1312,16 @@ def verify_composed_receipt(rows, run_id, port, fixture_rows, report,
             < positions("turn_requested")[1] < positions("finder_step_verified")[0] \
             < positions("command_finished")[0]:
         raise ValueError("Finder started before Browser verification")
+    bootstrap = details("finder_window_bootstrap")
+    if finder_windows_before is not None:
+        if finder_windows_before or finder_windows_after != finder_windows_before:
+            raise ValueError("Headless Finder baseline or window restoration failed")
+        if len(bootstrap) != 1 or bootstrap[0].get("result") != "opened_window" \
+                or len(details("finder_window_bootstrap_ready")) != 1 \
+                or not positions("browser_step_verified")[0] \
+                    < positions("finder_window_bootstrap")[0] \
+                    < positions("turn_requested")[1]:
+            raise ValueError("App did not bootstrap headless Finder after Browser verification")
     if len(finishes) != 1 or finishes[0].get("status") != "completed" \
             or finishes[0].get("verification") != "verified":
         raise ValueError("Composed command did not finish verified")
@@ -2123,7 +2134,6 @@ def main():
             safari_windows_before = None
             finder_windows_before = None
             finder_prepared_by_host = False
-            composed_finder_prepared = False
             finder_run_id = None
             finder_decoy_run_id = None
             finder_decoy_report = None
@@ -2180,6 +2190,10 @@ def main():
                                   'injected tool failure. Verify the sentinel remains unchanged, '
                                   'then close only that test-created Safari window.')
             if index == 19:
+                finder_windows_before = finder_window_inventory()["window_ids"]
+                if args.browser_mode == "normal" and args.finder_mode == "normal" \
+                        and finder_windows_before:
+                    raise RuntimeError("Composed cold-start case requires no Finder windows")
                 fixture_root = support / "TestFixtures" / run_id
                 fixture_root.mkdir(parents=True, mode=0o700)
                 finder_fixtures.append(fixture_root)
@@ -2193,18 +2207,6 @@ def main():
                     outside_report.write_text("Outside composed fixture\n")
                     report.symlink_to(outside_report)
                 (fixture_root / "report-copy.txt").write_text("Decoy\n")
-                if (args.browser_mode == "normal" and args.finder_mode == "normal"
-                        and not finder_window_inventory()["window_ids"]):
-                    subprocess.run(["open", "-a", "Finder", str(fixture_root)],
-                                   check=True, timeout=15)
-                    deadline = time.monotonic() + 10
-                    while time.monotonic() < deadline:
-                        if len(finder_window_inventory(run_id)["matching_window_ids"]) == 1:
-                            composed_finder_prepared = True
-                            break
-                        time.sleep(0.2)
-                    if not composed_finder_prepared:
-                        raise RuntimeError("Composed Finder fixture window did not open")
                 if args.finder_mode == "decoy-target":
                     report = fixture_root / "report-copy.txt"
                 phrase = (f'In the exact Voice Computer POC app, enter "Open {url} '
@@ -3050,10 +3052,12 @@ def main():
                                 rows, run_id, fixture_rows, space_before["current"],
                                 after_id, prior_ids, mode=args.browser_mode)
                         else:
+                            finder_windows_after = finder_window_inventory()["window_ids"]
                             exact_receipt = verify_composed_receipt(
                                 rows, run_id, port, fixture_rows, report,
                                 driver.browser_observations, driver.finder_observations,
-                                space_before["current"], after_id, prior_ids)
+                                space_before["current"], after_id, prior_ids,
+                                finder_windows_before, finder_windows_after)
                         driver.record("composed_receipt_verified", **exact_receipt)
                     elif index == 20:
                         independent_frontmost = frontmost_bundle_id()

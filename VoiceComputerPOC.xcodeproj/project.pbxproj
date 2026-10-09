@@ -31,8 +31,10 @@
 		4B75BA142D677494C7DB4484 /* FixtureAXVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 437F4703D8FF94A3D866FA6A /* FixtureAXVerifier.swift */; };
 		4B783A83A2C9EC4A3D90A251 /* SpaceNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4892574811141080E9E93FE /* SpaceNavigator.swift */; };
 		4C89AD07C7FD92FE012B26E3 /* NativeSpaceAXExecutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAF6FC2A95408A77DEB5287E /* NativeSpaceAXExecutionTests.swift */; };
+		50EBADEB5F344E30F07DC768 /* AppServerClient+FinderBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A757FB03670794A21989BF /* AppServerClient+FinderBootstrap.swift */; };
 		51C8F021EEB3C28AF14AA781 /* RouterAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54D737F47D4FB6002490D93 /* RouterAgent.swift */; };
 		6E47380606EC3DFF30BF1E0E /* AppServerClientRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B71C5871C819570F0B56DC8 /* AppServerClientRoutingTests.swift */; };
+		777AFBB365925D177C71E64B /* FinderWindowBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC74D66E4D41D9FEA9B142ED /* FinderWindowBootstrap.swift */; };
 		815AE3BC1BD46EA6E2F4BF79 /* CommandRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D632B99140C3882305A8768D /* CommandRouteTests.swift */; };
 		8832F6771617F802E160B22F /* ApprovalProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0021295ABADC32033A3EDE68 /* ApprovalProtocolTests.swift */; };
 		8C8E6085BEBB050DAC7DE0EB /* AppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5685373ED6C8075DD282EA /* AppServerClient.swift */; };
@@ -127,8 +129,10 @@
 		E7EBF26FA90A2A71786A1435 /* SpaceToolContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolContractTests.swift; sourceTree = "<group>"; };
 		EB2CE7E2613EEBFB29969E02 /* SpaceToolBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolBridge.swift; sourceTree = "<group>"; };
 		F54D737F47D4FB6002490D93 /* RouterAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouterAgent.swift; sourceTree = "<group>"; };
+		F7A757FB03670794A21989BF /* AppServerClient+FinderBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+FinderBootstrap.swift"; sourceTree = "<group>"; };
 		FA818DA41010F13056BC0096 /* AppServerClient+Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Notifications.swift"; sourceTree = "<group>"; };
 		FAF6FC2A95408A77DEB5287E /* NativeSpaceAXExecutionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSpaceAXExecutionTests.swift; sourceTree = "<group>"; };
+		FC74D66E4D41D9FEA9B142ED /* FinderWindowBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderWindowBootstrap.swift; sourceTree = "<group>"; };
 		FF4FEB267CEE60E12935A59B /* TextEditCreateRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextEditCreateRoute.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -194,6 +198,7 @@
 				3E5685373ED6C8075DD282EA /* AppServerClient.swift */,
 				1553759D35311E1698534226 /* AppServerClient+Connection.swift */,
 				7EB983EE3835E4C22691C543 /* AppServerClient+DesktopState.swift */,
+				F7A757FB03670794A21989BF /* AppServerClient+FinderBootstrap.swift */,
 				872783EC2FBD66E63D00C835 /* AppServerClient+FixtureVerification.swift */,
 				0462EAA1EC591D98B59A5113 /* AppServerClient+FocusActivation.swift */,
 				E1DA61CCE4D3F6CC8236658A /* AppServerClient+Lifecycle.swift */,
@@ -210,6 +215,7 @@
 				5C9F9324497C1AD7B0B64440 /* ContentView.swift */,
 				D552F358A7F8C27CC1457175 /* DesktopStateToolContract.swift */,
 				0F9746E05DAF2F18E2164AE0 /* DiagnosticLog.swift */,
+				FC74D66E4D41D9FEA9B142ED /* FinderWindowBootstrap.swift */,
 				437F4703D8FF94A3D866FA6A /* FixtureAXVerifier.swift */,
 				7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */,
 				9FBF783BA4090E303FF1E695 /* MissionControlAXDiscovery.swift */,
@@ -365,6 +371,7 @@
 			files = (
 				2FC0AEA630182A4F6C177E93 /* AppServerClient+Connection.swift in Sources */,
 				B50F7B771224521A7B3B691D /* AppServerClient+DesktopState.swift in Sources */,
+				50EBADEB5F344E30F07DC768 /* AppServerClient+FinderBootstrap.swift in Sources */,
 				9E495468E25A3000878BC3B8 /* AppServerClient+FixtureVerification.swift in Sources */,
 				FB9DF7EBC9313DD2DDF7F5A5 /* AppServerClient+FocusActivation.swift in Sources */,
 				A8852D260D8504D5024ABB58 /* AppServerClient+Lifecycle.swift in Sources */,
@@ -383,6 +390,7 @@
 				E807A0BA7ED80F13CE2784C6 /* ContentView.swift in Sources */,
 				B20109C691FC13B37CB4A276 /* DesktopStateToolContract.swift in Sources */,
 				0233268CC94C9A26838D022C /* DiagnosticLog.swift in Sources */,
+				777AFBB365925D177C71E64B /* FinderWindowBootstrap.swift in Sources */,
 				4B75BA142D677494C7DB4484 /* FixtureAXVerifier.swift in Sources */,
 				B00819EC5F0AB40C9AEDB658 /* LocalVoiceInput.swift in Sources */,
 				B1977B752C4EF9097128F4DF /* MissionControlAXDiscovery.swift in Sources */,

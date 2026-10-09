@@ -1045,6 +1045,8 @@ class ComposedReceiptTests(unittest.TestCase):
                     reason="exact_url_and_heading"),
                 row("turn_completed", status="completed", verification="verified"),
                 row("browser_step_verified", turn_id="browser-turn"),
+                row("finder_window_bootstrap", result="opened_window"),
+                row("finder_window_bootstrap_ready"),
                 row("turn_requested", route="finder"),
                 row("tool_started", server="cua_repl", tool="js", item_id="finder-tool"),
                 row("tool_completed", server="cua_repl", tool="js", item_id="finder-tool",
@@ -1065,8 +1067,21 @@ class ComposedReceiptTests(unittest.TestCase):
                 return verify_composed_receipt(current, run_id, port, requests, report,
                                                browser, finder, 5, 5)
             self.assertEqual(check(rows)["turns"], 2)
+            self.assertEqual(verify_composed_receipt(
+                rows, run_id, port, requests, report, browser, finder, 5, 5,
+                finder_windows_before=set(), finder_windows_after=set())["turns"], 2)
+            with self.assertRaisesRegex(ValueError, "Headless Finder baseline"):
+                verify_composed_receipt(
+                    rows, run_id, port, requests, report, browser, finder, 5, 5,
+                    finder_windows_before=set(), finder_windows_after={42})
+            missing_bootstrap = [entry for entry in rows
+                                 if entry["event"] != "finder_window_bootstrap_ready"]
+            with self.assertRaisesRegex(ValueError, "bootstrap headless Finder"):
+                verify_composed_receipt(
+                    missing_bootstrap, run_id, port, requests, report, browser, finder, 5, 5,
+                    finder_windows_before=set(), finder_windows_after=set())
             moved = copy.deepcopy(rows)
-            moved.insert(7, moved.pop(8))
+            moved.insert(7, moved.pop(10))
             with self.assertRaisesRegex(ValueError, "Finder started before"):
                 check(moved)
             missing = [entry for entry in rows if entry["event"] != "browser_step_verified"]
