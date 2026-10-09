@@ -104,6 +104,45 @@ final class TextEditRouteTests: XCTestCase {
                 originalPhrase: phrase))
     }
 
+    func testCreateRequiresAbsentRunOwnedNoteAndExactPhrase() throws {
+        let runID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        let root = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("VoiceComputerPOC/TestFixtures/\(runID)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let note = root.appendingPathComponent("note.txt")
+        let phrase =
+            "In TextEdit, create the test note at \(note.path) with "
+            + "\"Voice Computer saved \(runID)\" and save it."
+        let output = Data(
+            #"{"route":"textedit","directions":[],"target":"fixture_new_note"}"#.utf8)
+        XCTAssertEqual(CommandRoute.parse(output, originalPhrase: phrase), .textEditCreate(note))
+        XCTAssertEqual(RouteHandoff.decide(output, phrase: phrase), .textEditCreate(note))
+        let unsafe = [
+            phrase + " Delete another document.",
+            phrase.replacingOccurrences(of: "saved", with: "deleted"),
+            phrase.replacingOccurrences(of: "create", with: "replace"),
+            phrase.replacingOccurrences(of: "note.txt", with: "other.txt"),
+            "Do not \(phrase)",
+        ]
+        for request in unsafe {
+            XCTAssertNil(CommandRoute.parse(output, originalPhrase: request), request)
+        }
+        try "existing user content".write(to: note, atomically: true, encoding: .utf8)
+        XCTAssertNil(CommandRoute.parse(output, originalPhrase: phrase))
+        try FileManager.default.removeItem(at: note)
+        let outside = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try "outside".write(to: outside, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: outside) }
+        try FileManager.default.createSymbolicLink(at: note, withDestinationURL: outside)
+        XCTAssertNil(CommandRoute.parse(output, originalPhrase: phrase))
+        try FileManager.default.removeItem(at: note)
+        try FileManager.default.removeItem(at: outside)
+        try FileManager.default.createSymbolicLink(at: note, withDestinationURL: outside)
+        XCTAssertNil(CommandRoute.parse(output, originalPhrase: phrase))
+    }
+
     #if DEBUG
         func testHandoffQueuesBoundedTextEditTurn() throws {
             let runID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()

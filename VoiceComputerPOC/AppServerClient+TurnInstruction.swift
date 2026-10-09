@@ -12,8 +12,22 @@ extension AppServerClient {
         }
         if let url = textEditNoteURL {
             let runID = url.deletingLastPathComponent().lastPathComponent
+            if textEditCreatesNote {
+                #if DEBUG
+                    let marker = url.deletingLastPathComponent().appendingPathComponent("cancel_save")
+                    if marker.resolvingSymlinksInPath() == marker,
+                        (try? String(contentsOf: marker, encoding: .utf8))
+                            == "textedit:\(runID)\n"
+                    {
+                        return
+                            "Use only mcp__cua_repl.js with TextEdit (com.apple.TextEdit). First bind with cua.getApp('com.apple.TextEdit'). Create one new plain-text document through TextEdit's visible UI and type exactly Voice Computer saved \(runID) using Computer Use typing. Open the Save sheet, click its Cancel button once, and inspect that the same document is still unsaved. Stop immediately after Cancel. Do not click Save, create \(url.path), use a shell, file operations, or another app. User request: \(phrase)"
+                    }
+                #endif
+                return
+                    "Use only mcp__cua_repl.js with TextEdit (com.apple.TextEdit). First bind with cua.getApp('com.apple.TextEdit') and inspect its windows. Create one new plain-text document through TextEdit's visible UI. Type exactly Voice Computer saved \(runID) into its text area using Computer Use typing; do not use setValue on the document text area, which may leave saved bytes empty. Open TextEdit's Save sheet. Navigate to exactly \(url.deletingLastPathComponent().path) using Go to Folder if needed. Set the Save As name field to exactly note.txt with setValue and confirm it is exactly note.txt, not appended to Untitled.txt. Never press Backspace, which Computer Use does not support. Click Save once, confirm the sheet closed, and inspect that document's exact file URL and visible text. Leave it open for independent verification. Stop if another document would be edited, the destination already exists, Save is canceled, access is declined, or a tool fails. Do not use a shell, file operations, or another app. User request: \(phrase)"
+            }
             return
-                "Use only mcp__cua_repl.js with TextEdit (com.apple.TextEdit). First bind with cua.getApp('com.apple.TextEdit') and inspect its windows. Open exactly \(url.path) through TextEdit's visible Open dialog, using Go to Folder if needed; if that exact file is already open, reuse only its matching URL window. Do not edit another document. Confirm its initial text is exactly Voice Computer draft \(runID). Replace the text in its one text entry area with exactly Voice Computer saved \(runID), press Command-S once, and inspect that same window's file URL and visible text. Leave the test document open for independent verification. Stop if the file URL or initial text differs, the save is canceled, access is declined, or a tool fails. Do not use a shell, file operations, or another app. User request: \(phrase)"
+                "Use only mcp__cua_repl.js with TextEdit (com.apple.TextEdit). First bind with cua.getApp('com.apple.TextEdit') and inspect its windows. Open exactly \(url.path) through TextEdit's visible Open dialog, using Go to Folder if needed; if that exact file is already open, reuse only its matching URL window. Do not edit another document. Confirm its initial text is exactly Voice Computer draft \(runID). Focus that document's text entry area, select its draft text with Command-A, and type exactly Voice Computer saved \(runID) using Computer Use typing; do not use setValue on the document text area. In a separate call, inspect the Accessibility state and confirm that same window shows the exact file URL and replacement text. Only then press Command-S once in another call and inspect the saved window. Leave the test document open for independent verification. Stop if the file URL or initial text differs, the save is canceled, access is declined, or a tool fails. Do not use a shell, file operations, or another app. User request: \(phrase)"
         }
         if let url = browserFormURL, let query = browserFormQuery {
             var submitted = URLComponents(url: url, resolvingAgainstBaseURL: false)

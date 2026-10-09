@@ -42,6 +42,7 @@
 		9E495468E25A3000878BC3B8 /* AppServerClient+FixtureVerification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872783EC2FBD66E63D00C835 /* AppServerClient+FixtureVerification.swift */; };
 		A8852D260D8504D5024ABB58 /* AppServerClient+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DA61CCE4D3F6CC8236658A /* AppServerClient+Lifecycle.swift */; };
 		AA621174BB334EDF6B44707F /* SpaceToolBridgePythonPeerSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17C96BB825E16BE3B775FD87 /* SpaceToolBridgePythonPeerSupport.swift */; };
+		AD5780B5D0B8D89544C8E34F /* TextEditCreateRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF4FEB267CEE60E12935A59B /* TextEditCreateRoute.swift */; };
 		AF487C5644218A3A386E1AC2 /* RouterRetryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B830BC1C49F30F83959D186E /* RouterRetryTests.swift */; };
 		B00819EC5F0AB40C9AEDB658 /* LocalVoiceInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACB5EE942BC4C16FBA579B7 /* LocalVoiceInput.swift */; };
 		B1977B752C4EF9097128F4DF /* MissionControlAXDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FBF783BA4090E303FF1E695 /* MissionControlAXDiscovery.swift */; };
@@ -50,6 +51,7 @@
 		BC4753D6EC07F923ED6AE722 /* DiagnosticLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BDB7479844A824CE79FA957 /* DiagnosticLogTests.swift */; };
 		CA907AAE2B1E537AD1A8EDF4 /* ApprovalProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF54FE5EDD2D827D67E8AF4 /* ApprovalProtocol.swift */; };
 		CCC922B84BD4EA953E7D52BE /* WindowManagerAXExecutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 707B471B25A7F1DAAE972363 /* WindowManagerAXExecutionTests.swift */; };
+		D45CD40BE7DFA7104ADD67AD /* TextEditCanceledFixtureCleanup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D26CBC36AA55727A8ED05C /* TextEditCanceledFixtureCleanup.swift */; };
 		D8182DE6E3A2B8DD9BC19CD0 /* AppServerClient+Routing.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAEE0B9B8B1A5F7E5359DD50 /* AppServerClient+Routing.swift */; };
 		E47F520E49C91E7C1477649E /* AppServerClient+Responses.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEF216825C70926B73579A26 /* AppServerClient+Responses.swift */; };
 		E807A0BA7ED80F13CE2784C6 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C9F9324497C1AD7B0B64440 /* ContentView.swift */; };
@@ -121,11 +123,13 @@
 		DEF216825C70926B73579A26 /* AppServerClient+Responses.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Responses.swift"; sourceTree = "<group>"; };
 		DF84CDBE5580684B8B7B21D1 /* VoiceComputerPOCTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VoiceComputerPOCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E1DA61CCE4D3F6CC8236658A /* AppServerClient+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Lifecycle.swift"; sourceTree = "<group>"; };
+		E7D26CBC36AA55727A8ED05C /* TextEditCanceledFixtureCleanup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextEditCanceledFixtureCleanup.swift; sourceTree = "<group>"; };
 		E7EBF26FA90A2A71786A1435 /* SpaceToolContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolContractTests.swift; sourceTree = "<group>"; };
 		EB2CE7E2613EEBFB29969E02 /* SpaceToolBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceToolBridge.swift; sourceTree = "<group>"; };
 		F54D737F47D4FB6002490D93 /* RouterAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouterAgent.swift; sourceTree = "<group>"; };
 		FA818DA41010F13056BC0096 /* AppServerClient+Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppServerClient+Notifications.swift"; sourceTree = "<group>"; };
 		FAF6FC2A95408A77DEB5287E /* NativeSpaceAXExecutionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSpaceAXExecutionTests.swift; sourceTree = "<group>"; };
+		FF4FEB267CEE60E12935A59B /* TextEditCreateRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextEditCreateRoute.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -214,6 +218,8 @@
 				B4892574811141080E9E93FE /* SpaceNavigator.swift */,
 				EB2CE7E2613EEBFB29969E02 /* SpaceToolBridge.swift */,
 				8D890B71ED4ECE57D20290F2 /* SpaceToolContract.swift */,
+				E7D26CBC36AA55727A8ED05C /* TextEditCanceledFixtureCleanup.swift */,
+				FF4FEB267CEE60E12935A59B /* TextEditCreateRoute.swift */,
 				03E832F80A1C092C60825323 /* VoiceComputerPOCApp.swift */,
 				C0BFCDA2960DFBDC48C0D048 /* WindowManagerAXExecution.swift */,
 				A5D25FC23DE94B511E999EB7 /* WindowManagerAXProbe.swift */,
@@ -385,6 +391,8 @@
 				4B783A83A2C9EC4A3D90A251 /* SpaceNavigator.swift in Sources */,
 				0A5EEDD1B1A4032FCBA313DC /* SpaceToolBridge.swift in Sources */,
 				0EF5A8F7A156B5D7DA21AB23 /* SpaceToolContract.swift in Sources */,
+				D45CD40BE7DFA7104ADD67AD /* TextEditCanceledFixtureCleanup.swift in Sources */,
+				AD5780B5D0B8D89544C8E34F /* TextEditCreateRoute.swift in Sources */,
 				0E6B219B0F072ED018D3065B /* VoiceComputerPOCApp.swift in Sources */,
 				F26A69D825E2BE4983896932 /* WindowManagerAXExecution.swift in Sources */,
 				99965E951BC65D2FC6AE76D9 /* WindowManagerAXProbe.swift in Sources */,

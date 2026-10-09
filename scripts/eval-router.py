@@ -13,7 +13,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 EVALS = ROOT / "evals"
-FIXTURES = json.loads((EVALS / "router-v6.json").read_text())
+FIXTURES = json.loads((EVALS / "router-v7.json").read_text())
 INSTRUCTION = (EVALS / "router-instruction.txt").read_text()
 CLI_ARGS = json.loads((EVALS / "router-cli-args.json").read_text())
 SCHEMA = EVALS / "router-output.schema.json"
@@ -109,6 +109,7 @@ def evaluate(reusable=None):
         validator = Path(temp) / "route-validator"
         subprocess.run(["swiftc", "-O", "-o", str(validator),
                         str(ROOT / "VoiceComputerPOC/CommandRoute.swift"),
+                        str(ROOT / "VoiceComputerPOC/TextEditCreateRoute.swift"),
                         str(ROOT / "scripts/route-validator.swift")], check=True)
         all_jobs = [(index, trial) for index in range(len(FIXTURES)) for trial in (1, 2, 3)]
         jobs = [job for job in all_jobs if job not in reusable]
@@ -127,7 +128,7 @@ def evaluate(reusable=None):
         decisions = { (index, trial): decision for (index, trial, _, _), decision
                       in zip(valid_results, valid_decisions) }
 
-    report = {"corpus": "router-v6", "fixture_count": len(FIXTURES),
+    report = {"corpus": "router-v7", "fixture_count": len(FIXTURES),
               "independent_model_turns": len(results), "reused_trial_count": len(reusable),
               "new_trial_count": len(jobs), "trials": [], "misses": []}
     report["trace_errors"] = []
@@ -153,7 +154,9 @@ def evaluate(reusable=None):
             correct = correct and handoff.get("route") == "finder" \
                 and handoff.get("path") in expected["phrase"]
         elif expected["route"] == "textedit":
-            correct = correct and handoff.get("route") == "textedit" \
+            expected_handoff = ("textedit_create" if expected["target"] == "fixture_new_note"
+                                else "textedit")
+            correct = correct and handoff.get("route") == expected_handoff \
                 and handoff.get("path") in expected["phrase"]
         elif expected["route"] == "browser_finder":
             correct = correct and handoff.get("route") == "browser_finder" \
@@ -178,11 +181,13 @@ def evaluate(reusable=None):
         for row in report["trials"])
     report["clarification_actions"] = sum(
         row["expected"]["route"] == "clarification"
-        and row["handoff"]["route"] in ("space", "calculator", "browser", "browser_form", "finder", "textedit", "browser_finder")
+        and row["handoff"]["route"] in ("space", "calculator", "browser", "browser_form", "finder", "textedit", "textedit_create", "browser_finder")
         for row in report["trials"])
-    (EVALS / "router-v6-report.json").write_text(
+    (EVALS / "router-v7-report.json").write_text(
         json.dumps(report, indent=2).replace(FINDER_PATH, "@FINDER_REPORT@")
-        .replace(TEXTEDIT_PATH, "@TEXTEDIT_NOTE@") + "\n")
+        .replace(TEXTEDIT_PATH, "@TEXTEDIT_NOTE@")
+        .replace(TEXTEDIT_NEW_PATH, "@TEXTEDIT_NEW_NOTE@")
+        .replace(TEXTEDIT_NEW_RUN_ID, "@TEXTEDIT_NEW_RUN_ID@") + "\n")
     summary = {key: report[key] for key in ("fixture_count", "independent_model_turns", "accuracy",
                                           "wrong_direction_actions", "clarification_actions")}
     summary["miss_count"] = len(report["misses"])
@@ -193,11 +198,13 @@ def evaluate(reusable=None):
 
 
 def main():
-    global FIXTURES, FINDER_PATH, TEXTEDIT_PATH
+    global FIXTURES, FINDER_PATH, TEXTEDIT_PATH, TEXTEDIT_NEW_PATH, TEXTEDIT_NEW_RUN_ID
     if sys.argv[1:] not in ([], ["--resume"]):
         raise SystemExit("Usage: eval-router.py [--resume]")
     templates = FIXTURES
-    saved_report = EVALS / "router-v6-report.json"
+    saved_report = (EVALS / "router-v7-report.json"
+                    if (EVALS / "router-v7-report.json").exists()
+                    else EVALS / "router-v6-report.json")
     reusable = reusable_trials(json.loads(saved_report.read_text()), templates) \
         if sys.argv[1:] == ["--resume"] else {}
     root = (Path.home() / "Library/Application Support/VoiceComputerPOC/TestFixtures"
@@ -209,15 +216,22 @@ def main():
     note = root / "note.txt"
     note.write_text(f"Voice Computer draft {root.name}")
     TEXTEDIT_PATH = str(note)
+    new_root = root.parent / uuid.uuid4().hex
+    new_root.mkdir(parents=True, mode=0o700)
+    TEXTEDIT_NEW_PATH = str(new_root / "note.txt")
+    TEXTEDIT_NEW_RUN_ID = new_root.name
     FIXTURES = [{**row, "phrase": row["phrase"]
                  .replace("@FINDER_REPORT@", FINDER_PATH)
                  .replace("@TEXTEDIT_NOTE@", TEXTEDIT_PATH)
-                 .replace("@FINDER_RUN_ID@", root.name)}
+                 .replace("@FINDER_RUN_ID@", root.name)
+                 .replace("@TEXTEDIT_NEW_NOTE@", TEXTEDIT_NEW_PATH)
+                 .replace("@TEXTEDIT_NEW_RUN_ID@", TEXTEDIT_NEW_RUN_ID)}
                 for row in FIXTURES]
     try:
         return evaluate(reusable)
     finally:
         shutil.rmtree(root)
+        shutil.rmtree(new_root)
 
 
 if __name__ == "__main__":

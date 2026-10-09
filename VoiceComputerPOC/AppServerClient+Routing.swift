@@ -66,17 +66,23 @@ extension AppServerClient {
             queuedPhrase = "Reveal the test report at \(url.path) in Finder."
             beginActingTurn()
         case .textEditSave(let url):
-            routeTextEditNote(url, phrase: phrase)
+            routeTextEditNote(url, phrase: phrase, creates: false)
+        case .textEditCreate(let url):
+            routeTextEditNote(url, phrase: phrase, creates: true)
         case .browserThenFinder(let home, let report):
             routeBrowserThenFinder(home, report: report)
         }
     }
 
-    private func routeTextEditNote(_ url: URL, phrase: String) {
+    private func routeTextEditNote(_ url: URL, phrase: String, creates: Bool) {
         record(
             "router_decided",
-            details: ["route": "textedit", "action": "save_note", "target": "fixture_note"])
+            details: [
+                "route": "textedit", "action": creates ? "create_note" : "save_note",
+                "target": creates ? "fixture_new_note" : "fixture_note",
+            ])
         textEditNoteURL = url
+        textEditCreatesNote = creates
         queuedPhrase = phrase
         beginActingTurn()
     }

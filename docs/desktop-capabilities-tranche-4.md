@@ -1,9 +1,12 @@
 # Desktop capabilities, tranche 4
 
-Status: in progress October 5, 2026. PR #15 merged at
-`2fdddc1eab3a56e20c72485000a2b5fdfb13a2a7`; PR #16 is a draft for the
-TextEdit workflow. Speech input, Foil integration, and Codex host-task status
-remain deferred.
+Status: in progress October 6, 2026. PR #15 merged at
+`2fdddc1eab3a56e20c72485000a2b5fdfb13a2a7`; PR #16 merged at
+`010bf4471e28dfea3fdf83b18775c39737c917d7`. The new-document Save/Cancel
+extension is under test. Two focused new-document Save runs and one focused
+canceled Save run have passed with independent Mac observations. Speech input,
+Foil integration, and Codex host-task
+status remain deferred.
 
 ## Goal and baseline
 
@@ -126,15 +129,47 @@ does not waive the check silently. Keep unrelated PRs from inheriting an old
 SHA's result.
 
 **Gate:** the repository rule is active and its blocked/allowed behavior has
-been observed. Until then, describe the Mac status as reported but optional,
-and explicitly inspect it before merging desktop changes.
+been observed. Inspect all three exact-head checks before merging desktop
+changes.
+
+**Observed:** The active `Protect main` ruleset (ID 24084858) requires
+`Build and test`, `Analyze Swift`, and `Voice Computer / desktop suite`, with
+strict exact-head checks. PR #16 was blocked while its Mac status was pending
+and became mergeable after the same head passed. One real inner CUA
+`noWindowsAvailable` failure produced `tool_failed` and a failed Mac status;
+the same SHA was rerun after recovery and passed all ten ordered cases before
+merge. Recovery reruns the same SHA and never waives the check.
+
+**PR #17 recovery:** Its first reviewed head failed at Safari case 21 with
+`scan_limit` after an unrelated Hacker News page made the Safari Accessibility
+tree exceed 400 nodes. The browser verifier now skips descendants of web
+areas whose URL differs from the exact fixture URL; it still checks all
+matching web areas for duplicates. The outer case uses Safari's `super+n`
+new-window shortcut after the visible File menu led to screenshot and offscreen
+click errors. A focused case 21 passed with the unrelated window present and
+restored its window inventory and Space. The updated head still needs the full
+required-gate run.
+An exact-source rerun passed Safari case 21 and then encountered Finder case
+22 with no Finder window. CUA cannot bind headless Finder on this Mac
+(`cgWindowNotFound`). The case 22 harness now prepares one run-owned Finder
+window only when its baseline inventory is empty; the agent must observe and
+reuse that same window, and the native observer requires its removal afterward.
+The subsequent exact-source suite passed TextEdit cases 23 and 24, then its
+composed case 19 hit the same empty-Finder boundary after Safari verified Docs.
+The positive composed fixture now prepares a run-owned Finder window only when
+none exists; a focused run passed with two ordered verified turns, exact Safari
+and Finder evidence, and cleanup. This is a harness precondition; general
+product behavior with headless Finder is a candidate for the next capability
+tranche.
 
 ## Work package 4: bounded TextEdit document workflow
 
-**Implementation status:** PR #16 currently replaces one exact run-owned
-existing draft and reopens it through TextEdit. That path has no Save dialog,
-so the planned canceled-save variant requires a separate create or Save As
-flow and remains open. Three normal focused saves on an earlier PR #16
+**Implementation status:** PR #16 replaces one exact run-owned existing draft
+and reopens it through TextEdit. That path has no Save dialog. The separate
+new-document route now exercises TextEdit's Save sheet and has passed two
+focused normal runs and a focused canceled Save. The canceled Save showed a
+real sheet, produced no note file, returned `unverified`, and restored the
+starting windows and Space. Three normal focused saves on an earlier PR #16
 revision, wrong-file/wrong-text rejections, synthetic CUA failure, and Stop
 at pending CUA approval have
 passed. One prepared-window run, one two-window decoy run, and a Debug-only
