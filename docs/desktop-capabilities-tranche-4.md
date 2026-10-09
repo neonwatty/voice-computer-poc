@@ -1,12 +1,12 @@
 # Desktop capabilities, tranche 4
 
-Status: in progress October 6, 2026. PR #15 merged at
+Status: PR #17 merged October 8, 2026. PR #15 merged at
 `2fdddc1eab3a56e20c72485000a2b5fdfb13a2a7`; PR #16 merged at
 `010bf4471e28dfea3fdf83b18775c39737c917d7`. The new-document Save/Cancel
-extension is under test. Two focused new-document Save runs and one focused
-canceled Save run have passed with independent Mac observations. Speech input,
-Foil integration, and Codex host-task
-status remain deferred.
+extension passed its exact-head Mac suite and merged. Two focused new-document
+Save runs and one focused canceled Save run passed with independent Mac
+observations. Speech input, Foil integration, and Codex host-task status remain
+deferred.
 
 ## Goal and baseline
 
@@ -147,8 +147,8 @@ areas whose URL differs from the exact fixture URL; it still checks all
 matching web areas for duplicates. The outer case uses Safari's `super+n`
 new-window shortcut after the visible File menu led to screenshot and offscreen
 click errors. A focused case 21 passed with the unrelated window present and
-restored its window inventory and Space. The updated head still needs the full
-required-gate run.
+restored its window inventory and Space. The updated head passed the full
+required-gate run before merge.
 An exact-source rerun passed Safari case 21 and then encountered Finder case
 22 with no Finder window. CUA cannot bind headless Finder on this Mac
 (`cgWindowNotFound`). The case 22 harness now prepares one run-owned Finder
@@ -158,9 +158,13 @@ The subsequent exact-source suite passed TextEdit cases 23 and 24, then its
 composed case 19 hit the same empty-Finder boundary after Safari verified Docs.
 The positive composed fixture now prepares a run-owned Finder window only when
 none exists; a focused run passed with two ordered verified turns, exact Safari
-and Finder evidence, and cleanup. This is a harness precondition; general
-product behavior with headless Finder is a candidate for the next capability
-tranche.
+and Finder evidence, and cleanup. This was a harness precondition at PR #17
+merge. In a focused October 8 continuation run, the app opened the exact fixture folder
+after Safari verification, Computer Use selected the report, and the outer
+observer saw the Finder window inventory return to empty. The first attempt
+exposed Finder's `AXDesktop` surface in the app's window count; counting only
+`AXStandardWindow` file windows fixed it. The exact-head PR suite remains to
+be run for this continuation.
 
 ## Work package 4: bounded TextEdit document workflow
 

@@ -99,6 +99,7 @@ final class AppServerClient: ObservableObject {
     #if DEBUG
         var actingTurnOverride: (() -> Void)?
         var routingOverride: ((String) -> Void)?
+        var finderBootstrapOverride: ((URL) -> FinderWindowBootstrap.Outcome)?
         var fixtureCUAFailureInjected = false
     #endif
     let diagnosticLog: DiagnosticLog?

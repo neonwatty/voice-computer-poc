@@ -259,7 +259,7 @@ extension AppServerClient {
                     self.cancelledNativeSpaceCommandID != self.activeCommandID,
                     self.finderReportURL == report
                 else { return }
-                self.beginActingTurn()
+                self.prepareFinderAndBeginActingTurn()
             }
             return true
         }
